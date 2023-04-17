@@ -162,7 +162,7 @@ relations {
 
 # Getting Started
 ```
-git clone --recursive https://github.com/voltrondata/substrait-python.git
+git clone --recursive https://github.com/substrait-io/substrait-python.git
 cd substrait-python
 ```
 

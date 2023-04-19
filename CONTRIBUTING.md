@@ -12,7 +12,7 @@ git submodule sync --recursive
 git submodule update --init --recursive
 ```
 ## Upgrade the substrait submodule
-You will need to regenerate protobuf classes afterwards (`gen_proto.sh`).
+You will need to regenerate protobuf classes if you do this (run `gen_proto.sh`).
 ```
 cd third_party/substrait
 git checkout <version>

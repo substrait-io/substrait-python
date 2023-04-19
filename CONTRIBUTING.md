@@ -1,4 +1,3 @@
-
 # Getting Started
 ## Get the repo
 Fork and clone the repo.

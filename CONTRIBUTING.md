@@ -6,7 +6,7 @@ git clone --recursive https://github.com/<your-fork>/substrait-python.git
 cd substrait-python
 ```
 ## Update the substrait submodule locally
-If you are updating an existing checkout.
+This might be necessary if you are updating an existing checkout.
 ```
 git submodule sync --recursive
 git submodule update --init --recursive

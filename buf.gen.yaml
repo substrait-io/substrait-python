@@ -1,4 +1,4 @@
 plugins:
   - name: python
-    out: src/substrait
+    out: src/substrait/gen
 version: v1

@@ -1,19 +1,19 @@
-# PySubstrait
+# Substrait
 
 A Python package for [Substrait](https://substrait.io), the cross-language specification for data compute operations.
 
 ## Goals
-PySubstrait aims to provide a Python interface for the Substrait specification. It will allow users to construct and manipulate a Substrait Plan from Python for evaluation by a Substrait consumer, such as DataFusion or DuckDB.
+This project aims to provide a Python interface for the Substrait specification. It will allow users to construct and manipulate a Substrait Plan from Python for evaluation by a Substrait consumer, such as DataFusion or DuckDB.
 
 ## Non-goals
-PySubstrait is not an execution engine for Substrait Plans.
+This project is not an execution engine for Substrait Plans.
 
 ## Status
 This is an experimental package that is still under development.
 
 # Example
-At the moment, PySubstrait contains only generated Python classes for the Substrait protobuf messages. Let's use an existing Substrait producer, [Ibis](https://ibis-project.org), to provide an example.
-## Generate a Substrait Plan with Ibis
+At the moment, this project contains only generated Python classes for the Substrait protobuf messages. Let's use an existing Substrait producer, [Ibis](https://ibis-project.org), to provide an example using Python Substrait as the consumer.
+## Produce a Substrait Plan with Ibis
 ```
 In [1]: import ibis
 
@@ -42,11 +42,11 @@ In [6]: protobuf_msg = compiler.compile(query).SerializeToString()
 In [7]: type(protobuf_msg)
 Out[7]: bytes
 ```
-## Read the Plan protobuf message using PySubstrait
+## Consume the Substrait Plan using Python Substrait
 ```
-In [8]: import pysubstrait
+In [8]: import substrait
 
-In [9]: from pysubstrait.proto.pysubstrait.plan_pb2 import Plan
+In [9]: from substrait.proto.pysubstrait.plan_pb2 import Plan
 
 In [10]: my_plan = Plan()
 
@@ -157,5 +157,9 @@ relations {
     names: "avg_rating"
     names: "num_votes"
   }
+}
+version {
+  minor_number: 24
+  producer: "ibis-substrait"
 }
 ```

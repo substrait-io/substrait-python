@@ -6,7 +6,7 @@ namespace=pysubstrait
 submodule_dir=./third_party/substrait
 src_dir="$submodule_dir"/proto
 tmp_dir=./proto
-dest_dir=./src/pysubstrait/proto
+dest_dir=./src/substrait/proto
 
 # Prefix the protobuf files with a unique configuration to prevent namespace conflicts
 # with other substrait packages. Save output to the work dir.

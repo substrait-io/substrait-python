@@ -1,5 +1,5 @@
 [project]
-name = "pysubstrait"
+name = "substrait"
 description = "A python package for Substrait."
 authors = [{name = "Substrait contributors", email = "substrait@googlegroups.com"}]
 license = {text = "Apache-2.0"}
@@ -9,7 +9,7 @@ dependencies = ["protobuf >= 3.20"]
 dynamic = ["version"]
 
 [tool.setuptools_scm]
-write_to = "src/pysubstrait/_version.py"
+write_to = "src/substrait/_version.py"
 
 [project.optional-dependencies]
 gen_proto = ["protobuf == 3.20.1", "protoletariat >= 2.0.0"]

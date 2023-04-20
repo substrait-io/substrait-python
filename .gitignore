@@ -132,7 +132,7 @@ dmypy.json
 src/substrait/_version.py
 
 # Buf working directory
-./proto
+./buf_work_dir
 
 # Editor files
 .idea

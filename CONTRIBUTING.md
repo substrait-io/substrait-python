@@ -26,7 +26,7 @@ git commit . -m "Use submodule <version>"
 Create a conda environment with developer dependencies.
 ```
 conda env create -f environment.yml
-conda activate pysubstrait
+conda activate substrait-python-env
 ```
 
 # Build

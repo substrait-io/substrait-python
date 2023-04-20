@@ -1,1 +1,1 @@
-from . import pysubstrait
+from . import extensions

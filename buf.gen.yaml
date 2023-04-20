@@ -1,4 +1,4 @@
 plugins:
   - name: python
-    out: src/substrait/proto
+    out: src/substrait
 version: v1

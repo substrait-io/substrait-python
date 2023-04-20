@@ -46,7 +46,7 @@ Out[7]: bytes
 ```
 In [8]: import substrait
 
-In [9]: from substrait.proto.pysubstrait.plan_pb2 import Plan
+In [9]: from substrait.proto.plan_pb2 import Plan
 
 In [10]: my_plan = Plan()
 

@@ -1,0 +1,23 @@
+[project]
+name = "substrait"
+description = "A python package for Substrait."
+authors = [{name = "Substrait contributors", email = "substrait@googlegroups.com"}]
+license = {text = "Apache-2.0"}
+readme = "README.md"
+requires-python = ">=3.8.1"
+dependencies = ["protobuf >= 3.20"]
+dynamic = ["version"]
+
+[tool.setuptools_scm]
+write_to = "src/substrait/_version.py"
+
+[project.optional-dependencies]
+gen_proto = ["protobuf == 3.20.1", "protoletariat >= 2.0.0"]
+test = ["pytest >= 7.0.0"]
+
+[tool.pytest.ini_options]
+pythonpath = "src"
+
+[build-system]
+requires = ["setuptools>=61.0.0", "setuptools_scm[toml]>=6.2.0"]
+build-backend = "setuptools.build_meta"

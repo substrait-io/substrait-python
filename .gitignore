@@ -127,3 +127,21 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# setuptools_scm dynamic versioning
+src/substrait/_version.py
+
+# Buf working directory
+./buf_work_dir
+
+# Editor files
+.idea
+.vscode
+
+# OS generated files
+.directory
+.gdb_history
+.DS_Store
+
+# Python interface files
+*.pyi

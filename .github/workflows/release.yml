@@ -1,62 +1,38 @@
 name: Release
 
 on:
-  push:
-    branches: [ main ]
-    tags: [ 'v*.*.*' ]
+  workflow_run:
+    workflows: [build, test]
+    types: [completed]
+    branches: [main]
 
 jobs:
-  build:
-    name: Build
-    runs-on: ubuntu-latest
-    if: ${{ github.repository == 'substrait-io/substrait-python' }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-        with:
-          submodules: recursive
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: "3.x"
-      - name: Install build dependencies
-        run: |
-          python -m pip install build --user
-      - name: Build package
-        run: |
-          python -m build
-      - name: Upload package
-        uses: actions/upload-artifact@v3
-        with:
-          name: dist
-          path: dist/
-          retention-days: 1
   release:
     name: Release
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
-    needs: [build]
     steps:
       - name: Download artifact
         uses: actions/download-artifact@v3
         with:
           name: dist
+          path: dist/
       - name: Publish to GitHub release page
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            *.whl
-            *.tar.gz
+            ./dist/*.whl
+            ./dist/*.tar.gz
   publish:
     name: Publish
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/')
-    needs: [build, release]
+    needs: [release]
     steps:
       - name: Download artifact
         uses: actions/download-artifact@v3
         with:
           name: dist
+          path: dist/
       - name: Publish package to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
@@ -64,13 +40,12 @@ jobs:
   publish_test:
     name: Publish test
     runs-on: ubuntu-latest
-    if: ${{ github.ref == 'refs/heads/main' }}
-    needs: [build]
     steps:
       - name: Download artifact
         uses: actions/download-artifact@v3
         with:
           name: dist
+          path: dist/
       - name: Publish package to Test PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:

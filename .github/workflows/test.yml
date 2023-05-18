@@ -6,6 +6,9 @@ on:
     branches: [ main ]
     tags: [ 'v*.*.*' ]
 
+permissions:
+  contents: read
+
 jobs:
   test:
     name: Test

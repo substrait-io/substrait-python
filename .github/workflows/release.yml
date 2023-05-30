@@ -6,7 +6,7 @@ on:
     tags: [ 'v[0-9]+.[0-9]+.[0-9]+' ]
 
 permissions:
-  contents: read|write
+  contents: write
 
 jobs:
   build:

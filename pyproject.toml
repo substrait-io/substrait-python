@@ -10,6 +10,7 @@ dynamic = ["version"]
 
 [tool.setuptools_scm]
 write_to = "src/substrait/_version.py"
+local_scheme = "no-local-version"
 
 [project.optional-dependencies]
 gen_proto = ["protobuf == 3.20.1", "protoletariat >= 2.0.0"]

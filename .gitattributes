@@ -1,1 +1,2 @@
 src/substrait/gen/** linguist-generated=true
+src/substrait/extensions/** linguist-generated=true

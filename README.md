@@ -1,6 +1,21 @@
 # Substrait
 
+![PyPI version](https://badge.fury.io/py/substrait.svg)
+![conda-forge version](https://anaconda.org/conda-forge/python-substrait/badges/version.svg)
+
 A Python package for [Substrait](https://substrait.io), the cross-language specification for data compute operations.
+
+## Installation
+
+You can install the Python substrait bindings from PyPI or conda-forge
+
+```sh
+pip install substrait
+```
+
+```sh
+conda install -c conda-forge python-substrait  # or use mamba
+```
 
 ## Goals
 This project aims to provide a Python interface for the Substrait specification. It will allow users to construct and manipulate a Substrait Plan from Python for evaluation by a Substrait consumer, such as DataFusion or DuckDB.

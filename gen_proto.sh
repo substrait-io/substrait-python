@@ -27,5 +27,8 @@ rm -rf "$extension_dir"
 cp -fr "$submodule_dir"/extensions "$extension_dir"
 find "$extension_dir" -type f -exec chmod u+rw {} +
 
+# Ensure there's an __init__.py file in the extension directory
+touch $extension_dir/__init__.py
+
 # Remove the temporary work dir
 rm -rf "$tmp_dir"

@@ -9,6 +9,9 @@ fi
 
 VERSION=$1
 
+echo "Updating substrait submodule..."
+git submodule update --remote third_party/substrait
+
 DIR=$(cd $(dirname $0) && pwd)
 pushd "${DIR}"/third_party/substrait/
 git checkout $VERSION

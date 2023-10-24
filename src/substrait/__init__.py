@@ -3,6 +3,6 @@ try:
 except ImportError:
     pass
 
-__substrait_version__ = "0.36.0"
-__substrait_hash__ = "92302d8"
+__substrait_version__ = "0.37.0"
+__substrait_hash__ = "52e81a9"
 __minimum_substrait_version__ = "0.30.0"

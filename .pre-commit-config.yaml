@@ -1,0 +1,11 @@
+ci:
+  autofix_commit_msg: "style: [pre-commit.ci] autofix"
+  autoupdate_commit_msg: "chore(deps): [pre-commit.ci] autoupdate"
+
+repos:
+- repo: https://github.com/astral-sh/ruff-pre-commit
+  rev: v0.1.6
+  hooks:
+    - id: ruff
+      args: [ --fix ]
+    - id: ruff-format

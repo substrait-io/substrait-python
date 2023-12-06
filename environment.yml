@@ -4,6 +4,7 @@ channels:
 dependencies:
   - buf
   - pip
+  - pre-commit
   - protobuf = 3.20.1  # protobuf==3.20 C extensions aren't compatible with 3.19.4
   - protoletariat >= 2.0.0
   - pytest >= 7.0.0

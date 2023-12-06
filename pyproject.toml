@@ -21,3 +21,15 @@ pythonpath = "src"
 [build-system]
 requires = ["setuptools>=61.0.0", "setuptools_scm[toml]>=6.2.0"]
 build-backend = "setuptools.build_meta"
+
+[tool.ruff]
+respect-gitignore = true
+# should target minimum supported version
+target-version = "py38"
+# never autoformat upstream or generated code
+exclude = ["third_party/", "src/substrait/gen"]
+# do not autofix the following (will still get flagged in lint)
+unfixable = [
+  "F401",  # unused imports
+  "T201",  # print statements
+]

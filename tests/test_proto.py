@@ -1,3 +1,6 @@
+# ruff: noqa: F401
+
+
 def test_imports():
     """Temporary sanity test"""
     from substrait.gen.proto.algebra_pb2 import Expression

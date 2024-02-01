@@ -27,7 +27,7 @@ This project is not an execution engine for Substrait Plans.
 This is an experimental package that is still under development.
 
 # Example
-At the moment, this project contains only generated Python classes for the Substrait protobuf messages. Let's use an existing Substrait producer, [Ibis](https://ibis-project.org), to provide an example using Python Substrait as the consumer.
+At the moment, this project contains generated Python classes for the Substrait protobuf messages and a library for loading and saving them in various formats. Let's use an existing Substrait producer, [Ibis](https://ibis-project.org), to provide an example using Python Substrait as the consumer.
 ## Produce a Substrait Plan with Ibis
 ```
 In [1]: import ibis

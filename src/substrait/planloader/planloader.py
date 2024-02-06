@@ -1,9 +1,10 @@
 # SPDX-License-Identifier: Apache-2.0
-
+"""Routines for loading and saving Substrait plans."""
 import ctypes
 import ctypes.util as ctutil
 import enum
 import substrait.gen.proto.plan_pb2 as plan_pb2
+import sys
 
 
 class PlanFileFormat(enum.Enum):
@@ -30,8 +31,13 @@ SerializedPlan._fields_ = [
 
 # Load the C++ library
 # MEGAHACK -- Make this work on Windows, Linux, and MACOSX
-#planloader_lib = ctypes.CDLL("/Users/davids/projects/substrait-cpp/cmake-build-release/export/planloader/libplanloader.dylib")
-planloader_lib = ctypes.CDLL(ctutil.find_library("planloader"))
+#planloader_path = "/Users/davids/projects/substrait-cpp/cmake-build-release/export/planloader/libplanloader.dylib"
+planloader_path = ctutil.find_library("planloader")
+sys.stderr.write(f'Path is %s.' % planloader_path)
+planloader_lib = ctypes.CDLL(planloader_path)
+if planloader_lib is None:
+    print('Failed to find planloader library')
+    sys.exit(1)
 
 # Declare the function signatures for the external functions.
 external_load_substrait_plan = planloader_lib.load_substrait_plan

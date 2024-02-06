@@ -54,7 +54,7 @@ Generate the protobuf files manually. Requires protobuf `v3.20.1`.
 ## Build and install the textplan loader dynamic library
 ```commandline
 pushd third_party/substrait-cpp
-make releaase
+make release
 cd build-Release/export/planloader
 make install
 popd

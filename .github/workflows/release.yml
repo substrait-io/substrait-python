@@ -25,6 +25,12 @@ jobs:
       - name: Install build dependencies
         run: |
           python -m pip install build --user
+      - name: Build Substrait planloader
+        run: |
+          cd third_party/substrait-cpp
+          make release
+          cd build-Release/export/planloader
+          make install
       - name: Build package
         run: |
           python -m build

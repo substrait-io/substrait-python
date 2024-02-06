@@ -30,10 +30,7 @@ SerializedPlan._fields_ = [
 
 
 # Load the C++ library
-# MEGAHACK -- Make this work on Windows, Linux, and MACOSX
-#planloader_path = "/Users/davids/projects/substrait-cpp/cmake-build-release/export/planloader/libplanloader.dylib"
 planloader_path = ctutil.find_library("planloader")
-sys.stderr.write(f'Path is %s.' % planloader_path)
 planloader_lib = ctypes.CDLL(planloader_path)
 if planloader_lib is None:
     print('Failed to find planloader library')

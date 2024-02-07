@@ -1,8 +1,9 @@
 // cppimport
 
 #include <pybind11/pybind11.h>
-#include "../../../third_party/pybind11_abseil/pybind11_abseil/statusor_caster.h"
-#include "../../../third_party/pybind11_protobuf/pybind11_protobuf/native_proto_caster.h"
+#include <pybind11_abseil/statusor_caster.h>
+#include <pybind11_protobuf/native_proto_caster.h>
+#include <substrait/common/Io.h>
 
 #define STRINGIFY(x) #x
 #define MACRO_STRINGIFY(x) STRINGIFY(x)
@@ -14,6 +15,8 @@ int add(int i, int j) {
 namespace py = pybind11;
 
 PYBIND11_MODULE(planloader, m) {
+    pybind11_protobuf::ImportNativeProtoCasters();
+
     m.doc() = R"pbdoc(
         Pybind11 example plugin
         -----------------------
@@ -49,10 +52,13 @@ PYBIND11_MODULE(planloader, m) {
 /*
 <%
 setup_pybind11(cfg)
-cfg['dependencies'] = [
-    '../../../third_party/pybind11_abseil/pybind11_abseil/statusor_caster.h',
-    '../../../third_party/pybind11_abseil/pybind11_abseil/statusor_caster.h',
-    '../../../third_party/substrait-cpp/third_party/abseil-cpp/statusor.h',
+cfg['include_dirs'] = [
+    '../../../third_party/pybind11_abseil',
+    '../../../third_party/pybind11_protobuf',
+    '../../../third_party/substrait-cpp/third_party/abseil-cpp',
+    '../../../third_party/substrait-cpp/include',
+]
+cfg['libraries'] = [
 ]
 %>
 */

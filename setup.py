@@ -6,6 +6,11 @@ ext_modules = [
     Pybind11Extension(
         "planloader",
         sorted(glob("src/substrait/planloader/*.cpp")),
+        include_dirs=[
+            'third_party/pybind11_abseil',
+            'third_party/pybind11_protobuf',
+            'third_party/substrait-cpp/third_party/abseil-cpp',
+        ],
     ),
 ]
 

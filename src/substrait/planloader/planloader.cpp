@@ -1,5 +1,3 @@
-// cppimport
-
 #include <pybind11/pybind11.h>
 #include <pybind11_abseil/statusor_caster.h>
 #include <pybind11_protobuf/native_proto_caster.h>
@@ -48,17 +46,3 @@ PYBIND11_MODULE(planloader, m) {
     m.attr("__version__") = "dev";
 #endif
 }
-
-/*
-<%
-setup_pybind11(cfg)
-cfg['include_dirs'] = [
-    '../../../third_party/pybind11',
-    '../../../third_party/pybind11_abseil',
-    '../../../third_party/pybind11_protobuf',
-]
-cfg['libraries'] = [
-    'substrait_io',
-]
-%>
-*/

@@ -53,12 +53,12 @@ PYBIND11_MODULE(planloader, m) {
 <%
 setup_pybind11(cfg)
 cfg['include_dirs'] = [
+    '../../../third_party/pybind11',
     '../../../third_party/pybind11_abseil',
     '../../../third_party/pybind11_protobuf',
-    '../../../third_party/substrait-cpp/third_party/abseil-cpp',
-    '../../../third_party/substrait-cpp/include',
 ]
 cfg['libraries'] = [
+    'substrait_io',
 ]
 %>
 */

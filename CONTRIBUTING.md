@@ -50,6 +50,16 @@ Generate the protobuf files manually. Requires protobuf `v3.20.1`.
 
 
 # Build
+
+## Build and install the textplan loader dynamic library
+```commandline
+pushd third_party/substrait-cpp
+make release
+cd build-Release/src/substrait/common
+make install
+popd
+```
+
 ## Python package
 Editable installation.
 ```

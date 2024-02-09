@@ -24,7 +24,7 @@ class SerializedPlan(ctypes.Structure):
 
 SerializedPlan._fields_ = [
     ("buffer", ctypes.POINTER(ctypes.c_byte)),
-    ("size", ctypes.c_uint32),
+    ("size", ctypes.c_int32),
     ("errorMessage", ctypes.c_char_p),
 ]
 

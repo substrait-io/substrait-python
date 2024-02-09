@@ -25,11 +25,13 @@ jobs:
       - name: Install build dependencies
         run: |
           python -m pip install build --user
-      - name: Build Substrait planloader
+      - name: Build Substrait planloader library
         run: |
-          cd third_party/substrait-cpp
+          cd ${{ github.workspace }}/third_party/substrait-cpp
           make release
-          cd build-Release/export/planloader
+      - name: Install Substrait planloader library
+        run: |
+          cd ${{ github.workspace }}/third_party/substrait-cpp/build-Release/export/planloader
           make install
       - name: Build package
         run: |

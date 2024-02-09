@@ -60,12 +60,14 @@ def load_substrait_plan(filename: str) -> plan_pb2.Plan:
         PlanFileException if an except occurs while converting or reading from disk.
     """
     result = external_load_substrait_plan(filename.encode('UTF-8'))
-    if result.contents.errorMessage:
-        raise PlanFileException(result.contents.errorMessage)
-    data = ctypes.string_at(result.contents.buffer, result.contents.size)
-    plan = plan_pb2.Plan()
-    plan.ParseFromString(data)
-    external_free_substrait_plan(result)
+    try:
+      if result.contents.errorMessage:
+          raise PlanFileException(result.contents.errorMessage)
+      data = ctypes.string_at(result.contents.buffer, result.contents.size)
+      plan = plan_pb2.Plan()
+      plan.ParseFromString(data)
+    finally:
+      external_free_substrait_plan(result)
     return plan
 
 

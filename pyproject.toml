@@ -12,7 +12,7 @@ dynamic = ["version"]
 write_to = "src/substrait/_version.py"
 
 [project.optional-dependencies]
-gen_proto = ["protobuf == 3.20.1", "protoletariat >= 2.0.0"]
+gen_proto = ["protobuf == 3.20.1", "protoletariat >= 2.0.0", "libprotobuf-dev == 3.20.1"]
 test = ["pytest >= 7.0.0"]
 
 [tool.pytest.ini_options]

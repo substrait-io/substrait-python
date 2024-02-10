@@ -46,7 +46,7 @@ external_free_substrait_plan.argtypes = [ctypes.POINTER(SerializedPlan)]
 external_free_substrait_plan.restype = None
 
 external_save_substrait_plan = planloader_lib.save_substrait_plan
-external_save_substrait_plan.argtypes = [ctypes.c_void_p, ctypes.c_uint32, ctypes.c_char_p, ctypes.c_uint32]
+external_save_substrait_plan.argtypes = [ctypes.c_void_p, ctypes.c_int32, ctypes.c_char_p, ctypes.c_int32]
 external_save_substrait_plan.restype = ctypes.c_char_p
 
 

@@ -21,7 +21,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          submodules: true
+          submodules: recursive
+      - name: Pull submodules
+        run: |
+          git submodule update --init --recursive
+          git submodule update --recursive
       - name: Set up Python
         uses: actions/setup-python@v5
         with:

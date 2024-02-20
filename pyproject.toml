@@ -20,7 +20,7 @@ pythonpath = "src"
 addopts = "--ignore=third_party"
 
 [build-system]
-requires = ["setuptools>=61.0.0", "setuptools_scm[toml]>=6.2.0"]
+requires = ["setuptools>=61.0.0", "setuptools_scm[toml]>=6.2.0", "ninja", "cmake>=3.20"]
 build-backend = "setuptools.build_meta"
 
 [tool.ruff]

@@ -31,9 +31,8 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
       - name: Install dependencies
-        uses: awalsh128/cache-apt-pkgs-action@latest
-        with:
-          packages: libprotobuf-c-dev
+        run: |
+          sudo apt-get install libprotobuf-c-dev
       - name: Build Substrait planloader library
         run: |
           cd ${{ github.workspace }}/third_party/substrait-cpp

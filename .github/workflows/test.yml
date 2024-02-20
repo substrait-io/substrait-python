@@ -33,7 +33,7 @@ jobs:
       - name: Install dependencies
         uses: awalsh128/cache-apt-pkgs-action@latest
         with:
-          packages: protobuf-c
+          packages: libprotobuf-c-dev
       - name: Build Substrait planloader library
         run: |
           cd ${{ github.workspace }}/third_party/substrait-cpp

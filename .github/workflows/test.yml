@@ -30,9 +30,6 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}
-      - name: Install dependencies
-        run: |
-          sudo apt-get install libprotobuf-c-dev
       - name: Build Substrait planloader library
         run: |
           cd ${{ github.workspace }}/third_party/substrait-cpp

@@ -11,4 +11,4 @@ dependencies:
   - python >= 3.8.1
   - setuptools >= 61.0.0
   - setuptools_scm >= 6.2.0
-  - curl
+  - libcurl-dev

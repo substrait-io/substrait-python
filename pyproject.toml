@@ -5,7 +5,7 @@ authors = [{name = "Substrait contributors", email = "substrait@googlegroups.com
 license = {text = "Apache-2.0"}
 readme = "README.md"
 requires-python = ">=3.8.1"
-dependencies = ["protobuf >= 3.20", "protobuf-c >= 3.20"]
+dependencies = ["protobuf >= 3.24", "protobuf-c >= 3.20"]
 dynamic = ["version"]
 
 [tool.setuptools_scm]
@@ -20,7 +20,7 @@ pythonpath = "src"
 addopts = "--ignore=third_party"
 
 [build-system]
-requires = ["setuptools>=61.0.0", "setuptools_scm[toml]>=6.2.0", "ninja", "cmake>=3.20"]
+requires = ["setuptools>=61.0.0", "setuptools_scm[toml]>=6.2.0", "ninja", "cmake>=3.24", "libcurl4-openssl-dev", "scikit-build>=0.13"]
 build-backend = "setuptools.build_meta"
 
 [tool.ruff]

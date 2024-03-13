@@ -12,3 +12,21 @@ def test_imports():
     from substrait.gen.proto.type_expressions_pb2 import DerivationExpression
     from substrait.gen.proto.type_pb2 import Type
     from substrait.gen.proto.extensions.extensions_pb2 import SimpleExtensionURI
+
+
+def test_proto_proxy_module():
+    """Test that protocol classes are made available in substrait.proto"""
+    import substrait.proto
+
+    assert {"Plan", "Type", "NamedStruct", "RelRoot"} & set(dir(substrait.proto))
+    assert {
+        "algebra",
+        "capabilities",
+        "extensions",
+        "extended_expression",
+        "function",
+        "parameterized_types",
+        "plan",
+        "type_expressions",
+        "type",
+    } & set(dir(substrait.proto))

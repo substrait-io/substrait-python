@@ -27,8 +27,118 @@ This project is not an execution engine for Substrait Plans.
 This is an experimental package that is still under development.
 
 # Example
-At the moment, this project contains only generated Python classes for the Substrait protobuf messages. Let's use an existing Substrait producer, [Ibis](https://ibis-project.org), to provide an example using Python Substrait as the consumer.
+
+## Produce a Substrait Plan
+The ``substrait.proto`` module provides access to the classes
+that represent a substrait Plan, thus allowing to create new plans.
+
+Here is an example plan equivalent to ``SELECT first_name FROM person``
+where ``people`` table has ``first_name`` and ``surname`` columns of type ``String``
+
+```
+>>> from substrait import proto
+>>> plan = proto.Plan(
+...   relations=[
+...     proto.PlanRel(
+...       root=proto.RelRoot(
+...         names=["first_name"], 
+...         input=proto.Rel(
+...           read=proto.ReadRel(
+...             named_table=proto.ReadRel.NamedTable(names=["people"]),
+...             base_schema=proto.NamedStruct(
+...               names=["first_name", "surname"], 
+...               struct=proto.Type.Struct(
+...                 types=[
+...                   proto.Type(string=proto.Type.String(nullability=proto.Type.Nullability.NULLABILITY_REQUIRED)), 
+...                   proto.Type(string=proto.Type.String(nullability=proto.Type.Nullability.NULLABILITY_REQUIRED))
+...                 ]  # /types
+...               )  # /struct
+...             )  # /base_schema
+...           )  # /read
+...         )  # /input
+...       )  # /root
+...     )  # /PlanRel
+...   ]  # /relations
+... )
+>>> print(plan)
+relations {
+  root {
+    input {
+      read {
+        base_schema {
+          names: "first_name"
+          names: "surname"
+          struct {
+            types {
+              string {
+                nullability: NULLABILITY_REQUIRED
+              }
+            }
+            types {
+              string {
+                nullability: NULLABILITY_REQUIRED
+              }
+            }
+          }
+        }
+        named_table {
+          names: "people"
+        }
+      }
+    }
+    names: "first_name"
+  }
+}
+>>> serialized_plan = p.SerializeToString()
+>>> serialized_plan
+b'\x1aA\x12?\n1\n/\x12#\n\nfirst_name\n\x07surname\x12\x0c\n\x04b\x02\x10\x02\n\x04b\x02\x10\x02:\x08\n\x06people\x12\nfirst_name'
+```
+
+## Consume the Substrait Plan
+The same plan we generated in the previous example, 
+can be loaded back from its binary representation
+using the ``Plan.ParseFromString`` method:
+
+```
+>>> from substrait.proto import Plan
+>>> p = Plan()
+>>> p.ParseFromString(serialized_plan)
+67
+>>> p
+relations {
+  root {
+    input {
+      read {
+        base_schema {
+          names: "first_name"
+          names: "surname"
+          struct {
+            types {
+              string {
+                nullability: NULLABILITY_REQUIRED
+              }
+            }
+            types {
+              string {
+                nullability: NULLABILITY_REQUIRED
+              }
+            }
+          }
+        }
+        named_table {
+          names: "people"
+        }
+      }
+    }
+    names: "first_name"
+  }
+}
+```
+
 ## Produce a Substrait Plan with Ibis
+Let's use an existing Substrait producer, [Ibis](https://ibis-project.org), 
+to provide an example using Python Substrait as the consumer.
+
 ```
 In [1]: import ibis
 
@@ -54,21 +164,14 @@ In [5]: compiler = SubstraitCompiler()
 
 In [6]: protobuf_msg = compiler.compile(query).SerializeToString()
 
-In [7]: type(protobuf_msg)
-Out[7]: bytes
-```
-## Consume the Substrait Plan using Python Substrait
-```
-In [8]: import substrait
+In [7]: from substrait.proto import Plan
 
-In [9]: from substrait.gen.proto.plan_pb2 import Plan
+In [8]: my_plan = Plan()
 
-In [10]: my_plan = Plan()
+In [9]: my_plan.ParseFromString(protobuf_msg)
+Out[9]: 186
 
-In [11]: my_plan.ParseFromString(protobuf_msg)
-Out[11]: 186
-
-In [12]: print(my_plan)
+In [10]: print(my_plan)
 relations {
   root {
     input {

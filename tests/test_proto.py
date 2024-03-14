@@ -18,7 +18,7 @@ def test_proto_proxy_module():
     """Test that protocol classes are made available in substrait.proto"""
     import substrait.proto
 
-    assert {"Plan", "Type", "NamedStruct", "RelRoot"} & set(dir(substrait.proto))
+    assert {"Plan", "Type", "NamedStruct", "RelRoot"} <= set(dir(substrait.proto))
     assert {
         "algebra",
         "capabilities",
@@ -29,4 +29,4 @@ def test_proto_proxy_module():
         "plan",
         "type_expressions",
         "type",
-    } & set(dir(substrait.proto))
+    } <= set(dir(substrait.proto))

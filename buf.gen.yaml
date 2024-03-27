@@ -1,4 +1,6 @@
 plugins:
   - name: python
     out: src/substrait/gen
+  - plugin: buf.build/community/nipunn1313-mypy:v3.5.0
+    out: src/substrait/gen
 version: v1

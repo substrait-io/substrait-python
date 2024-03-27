@@ -142,6 +142,3 @@ src/substrait/_version.py
 .directory
 .gdb_history
 .DS_Store
-
-# Python interface files
-*.pyi

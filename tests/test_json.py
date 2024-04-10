@@ -1,9 +1,10 @@
 import os
 import pathlib
 import tempfile
+import json
 
 from substrait.proto import Plan
-from substrait.json import load_json, parse_json
+from substrait.json import load_json, parse_json, dump_json
 
 import pytest
 
@@ -46,6 +47,15 @@ def test_json_load(jsonfile):
     # Ensure that when loading from file or from string
     # the outcome is the same
     assert parsed_plan == loaded_plan
+
+
+@pytest.mark.parametrize("jsonfile", JSON_TEST_FILE, ids=JSON_TEST_FILENAMES)
+def test_json_roundtrip(jsonfile):
+    with open(jsonfile) as f:
+        jsondata = _strip_json_comments(f)
+
+    parsed_plan = parse_json(jsondata)
+    assert parse_json(dump_json(parsed_plan)) == parsed_plan
 
 
 def _strip_json_comments(jsonfile):

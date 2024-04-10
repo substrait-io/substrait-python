@@ -62,7 +62,7 @@ def _fix_fetch(jsonobj):
 
     For some reason substrait producers are generating
     fetch with offset and count being strings,
-    while their defintion in the proto is as int64.
+    while their definition in the proto is as int64.
 
     We apply a workaround to retain compatibility with
     producers that generated them as strings.

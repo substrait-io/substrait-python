@@ -32,4 +32,4 @@ jobs:
           python -m pip install ".[test]"
       - name: Run tests
         run: |
-          python -m pytest
+          python -m pytest tests

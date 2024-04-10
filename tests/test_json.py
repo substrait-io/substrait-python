@@ -28,11 +28,13 @@ def test_json_load(jsonfile):
         jsondata = _strip_json_comments(f)
         parsed_plan = parse_json(jsondata)
 
-        with tempfile.NamedTemporaryFile("w+t", encoding="utf-8") as stripped_file:
-            # Save to a temporary file so we can test load_json
-            # on content stripped of comments.
-            stripped_file.write(jsondata)
-            stripped_file.flush()
+        # Save to a temporary file so we can test load_json
+        # on content stripped of comments.
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # We use a TemporaryDirectory as on Windows NamedTemporaryFile
+            # doesn't allow for easy reopening of the file.
+            with open(pathlib.Path(tmpdir) / "jsonfile.json", "w+") as stripped_file:
+                stripped_file.write(jsondata)
             loaded_plan = load_json(stripped_file.name)
 
     # The Plan constructor itself will throw an exception
@@ -48,7 +50,7 @@ def test_json_load(jsonfile):
 
 def _strip_json_comments(jsonfile):
     # The JSON files in the cpp testsuite are prefixed with
-    # a comment containing the SQL that matches the json plan. 
+    # a comment containing the SQL that matches the json plan.
     # As Python JSON parser doesn't support comments,
     # we have to strip them to make the content readable
     return "\n".join(l for l in jsonfile.readlines() if l[0] != "#")

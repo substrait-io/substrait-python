@@ -4,7 +4,7 @@ import tempfile
 import json
 
 from substrait.proto import Plan
-from substrait.json import load_json, parse_json, dump_json
+from substrait.json import load_json, parse_json, dump_json, write_json
 
 import pytest
 
@@ -56,6 +56,12 @@ def test_json_roundtrip(jsonfile):
 
     parsed_plan = parse_json(jsondata)
     assert parse_json(dump_json(parsed_plan)) == parsed_plan
+
+    # Test with write/load
+    with tempfile.TemporaryDirectory() as tmpdir:
+        filename = pathlib.Path(tmpdir) / "jsonfile.json"
+        write_json(parsed_plan, filename)
+        assert load_json(filename) == parsed_plan
 
 
 def _strip_json_comments(jsonfile):

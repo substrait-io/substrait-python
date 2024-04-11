@@ -19,7 +19,7 @@ JSON_FIXTURES = (
     / "textplan"
     / "data"
 )
-JSON_TEST_FILE = list(JSON_FIXTURES.glob("*.json"))
+JSON_TEST_FILE = sorted(JSON_FIXTURES.glob("*.json"))
 JSON_TEST_FILENAMES = [path.name for path in JSON_TEST_FILE]
 
 

@@ -73,9 +73,10 @@ class FunctionsCatalog:
                 function_extension = extensions_by_anchor[
                     function.extension_uri_reference
                 ].uri
+                # TODO: Support overloading of functions from different extensionUris.
                 continue
                 raise ValueError(
-                    f"Duplicate function definition: {function} from {extension_uri}, already loaded from {function_extension}"
+                    f"Duplicate function definition: {function.name} from {extension_uri}, already loaded from {function_extension}"
                 )
             extension_anchor = self._registered_extensions[
                 extension_uri

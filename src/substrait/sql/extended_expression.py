@@ -126,12 +126,13 @@ class SQLGlotParser:
         try:
             function_anchor = self._functions_catalog.function_anchor(signature)
         except KeyError:
-            # not function found with the exact types, try any1_any1 version
+            # No function found with the exact types, try any1_any1 version
+            # TODO: What about cases like i32_any1? What about any instead of any1?
             signature = f"{function_name}:any1_any1"
             function_anchor = self._functions_catalog.function_anchor(signature)
         return (
             signature,
-            left_type,
+            left_type,  # TODO: Get the actually returned type from the functions catalog.
             proto.Expression(
                 scalar_function=proto.Expression.ScalarFunction(
                     function_reference=function_anchor,

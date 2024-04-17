@@ -8,6 +8,10 @@ catalog = FunctionsCatalog()
 catalog.load_standard_extensions(
     pathlib.Path(__file__).parent.parent.parent.parent / "third_party" / "substrait" / "extensions",
 )
+
+# TODO: Turn this into a command line tool to test more queries.
+# We can probably have a quick way to declare schema using command line args.
+# like first_name=String,surname=String,age=I32 etc...
 schema = proto.NamedStruct(
     names=["first_name", "surname", "age"],
     struct=proto.Type.Struct(
@@ -39,4 +43,3 @@ print("---- PROJECTION ----")
 print(projection_expr)
 print("---- FILTER ----")
 print(filter_expr)
-# parse_extended_expression("INSERT INTO table VALUES(1, 2, 3)")

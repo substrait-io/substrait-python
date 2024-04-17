@@ -21,14 +21,14 @@ git submodule update --init --recursive
 ```
 
 
-# Upgrade the substrait submodule
+# Upgrade the substrait protocol definition
 
 ## a) Use the upgrade script
 
 Run the upgrade script to upgrade the submodule and regenerate the protobuf stubs.
 
 ```
-./upgrade.sh <version>
+./update_proto.sh <version>
 ```
 
 ## b) Manual upgrade

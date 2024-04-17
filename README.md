@@ -135,6 +135,84 @@ relations {
 }
 ```
 
+## Load a Substrait Plan from JSON
+A substrait plan can be loaded from its JSON representation
+using the ``substrait.json.load_json`` and ``substrait.json.parse_json``
+functions:
+
+```
+>>> import substrait.json
+>>> jsontext = """{
+...   "relations":[
+...     {
+...       "root":{
+...         "input":{
+...           "read":{
+...             "baseSchema":{
+...               "names":[
+...                 "first_name",
+...                 "surname"
+...               ],
+...               "struct":{
+...                 "types":[
+...                   {
+...                     "string":{
+...                       "nullability":"NULLABILITY_REQUIRED"
+...                     }
+...                   },
+...                   {
+...                     "string":{
+...                       "nullability":"NULLABILITY_REQUIRED"
+...                     }
+...                   }
+...                 ]
+...               }
+...             },
+...             "namedTable":{
+...               "names":[
+...                 "people"
+...               ]
+...             }
+...           }
+...         },
+...         "names":[
+...           "first_name"
+...         ]
+...       }
+...     }
+...   ]
+... }"""
+>>> substrait.json.parse_json(jsontext)
+relations {
+  root {
+    input {
+      read {
+        base_schema {
+          names: "first_name"
+          names: "surname"
+          struct {
+            types {
+              string {
+                nullability: NULLABILITY_REQUIRED
+              }
+            }
+            types {
+              string {
+                nullability: NULLABILITY_REQUIRED
+              }
+            }
+          }
+        }
+        named_table {
+          names: "people"
+        }
+      }
+    }
+    names: "first_name"
+  }
+}
+```
+
 ## Produce a Substrait Plan with Ibis
 Let's use an existing Substrait producer, [Ibis](https://ibis-project.org), 
 to provide an example using Python Substrait as the consumer.

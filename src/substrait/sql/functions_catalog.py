@@ -7,7 +7,7 @@ from substrait import proto
 
 class FunctionsCatalog:
     """Catalog of Substrait functions and extensions.
-    
+
     Loads extensions from YAML files and records the declared functions.
     Given a set of functions it can generate the necessary extension URIs
     and extensions to be included in an ExtendedExpression or Plan.
@@ -49,6 +49,7 @@ class FunctionsCatalog:
             for function in functions:
                 function_name = function["name"]
                 for impl in function.get("impls", []):
+                    # TODO: There seem to be some functions that have arguments without type. What to do?
                     argtypes = [t.get("value", "unknown") for t in impl.get("args", [])]
                     if not argtypes:
                         signature = function_name

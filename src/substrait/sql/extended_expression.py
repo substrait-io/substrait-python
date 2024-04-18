@@ -4,15 +4,29 @@ import sqlglot
 
 from substrait import proto
 
-
+SQL_UNARY_FUNCTIONS = {"not": "not"}
 SQL_BINARY_FUNCTIONS = {
     # Arithmetic
     "add": "add",
     "div": "div",
     "mul": "mul",
     "sub": "sub",
+    "mod": "modulus",
+    "bitwiseand": "bitwise_and",
+    "bitwiseor": "bitwise_or",
+    "bitwisexor": "bitwise_xor",
+    "bitwiseor": "bitwise_or",
     # Comparisons
     "eq": "equal",
+    "nullsafeeq": "is_not_distinct_from",
+    "new": "not_equal",
+    "gt": "gt",
+    "gte": "gte",
+    "lt": "lt",
+    "lte": "lte",
+    # logical
+    "and": "and",
+    "or": "or",
 }
 
 
@@ -124,6 +138,17 @@ class SQLGlotParser:
                 expr.this, invoked_functions
             )
             return expr.output_name, aliased_type, aliased_expr
+        elif expr.key in SQL_UNARY_FUNCTIONS:
+            argument_name, argument_type, argument = self._parse_expression(
+                expr.this, invoked_functions
+            )
+            function_name = SQL_UNARY_FUNCTIONS[expr.key]
+            signature, result_type, function_expression = (
+                self._parse_function_invokation(function_name, argument_type, argument)
+            )
+            invoked_functions.add(signature)
+            result_name = f"{function_name}_{argument_name}_{next(self._counter)}"
+            return result_name, result_type, function_expression
         elif expr.key in SQL_BINARY_FUNCTIONS:
             left_name, left_type, left = self._parse_expression(
                 expr.left, invoked_functions
@@ -148,26 +173,45 @@ class SQLGlotParser:
             )
 
     def _parse_function_invokation(
-        self, function_name, left_type, left, right_type, right
+        self, function_name, left_type, left, right_type=None, right=None
     ):
-        signature = f"{function_name}:{left_type.WhichOneof('kind')}_{right_type.WhichOneof('kind')}"
+        binary = False
+        argtypes = [left_type]
+        if right_type or right:
+            binary = True
+            argtypes.append(right_type)
+        signature = self._functions_catalog.signature(function_name, argtypes)
+
         try:
             function_anchor = self._functions_catalog.function_anchor(signature)
         except KeyError:
             # No function found with the exact types, try any1_any1 version
             # TODO: What about cases like i32_any1? What about any instead of any1?
-            signature = f"{function_name}:any1_any1"
+            if binary:
+                signature = f"{function_name}:any1_any1"
+            else:
+                signature = f"{function_name}:any1"
             function_anchor = self._functions_catalog.function_anchor(signature)
+
+        function_return_type = self._functions_catalog.function_return_type(signature)
+        if function_return_type is None:
+            print("No return type for", signature)
+            # TODO: Is this the right way to handle this?
+            function_return_type = left_type
         return (
             signature,
-            left_type,  # TODO: Get the actually returned type from the functions catalog.
+            function_return_type,
             proto.Expression(
                 scalar_function=proto.Expression.ScalarFunction(
                     function_reference=function_anchor,
-                    arguments=[
-                        proto.FunctionArgument(value=left),
-                        proto.FunctionArgument(value=right),
-                    ],
+                    arguments=(
+                        [
+                            proto.FunctionArgument(value=left),
+                            proto.FunctionArgument(value=right),
+                        ]
+                        if binary
+                        else [proto.FunctionArgument(value=left)]
+                    ),
                 )
             ),
         )

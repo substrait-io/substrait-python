@@ -203,6 +203,7 @@ class SQLGlotParser:
         except KeyError:
             # No function found with the exact types, try any1_any1 version
             # TODO: What about cases like i32_any1? What about any instead of any1?
+            # TODO: What about optional arguments? IE: "i32_i32?"
             signature = f"{function_name}:{'_'.join(['any1']*len(arguments))}"
             function_anchor = self._functions_catalog.function_anchor(signature)
 

@@ -52,7 +52,10 @@ class FunctionsCatalog:
                 for impl in function.get("impls", []):
                     # TODO: There seem to be some functions that have arguments without type. What to do?
                     # TODO: improve support complext type like LIST?<any>
-                    argtypes = [t.get("value", "unknown").strip("?") for t in impl.get("args", [])]
+                    argtypes = [
+                        t.get("value", "unknown").strip("?")
+                        for t in impl.get("args", [])
+                    ]
                     if not argtypes:
                         signature = function_name
                     else:

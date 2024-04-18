@@ -19,7 +19,7 @@ SQL_BINARY_FUNCTIONS = {
     # Comparisons
     "eq": "equal",
     "nullsafeeq": "is_not_distinct_from",
-    "new": "not_equal",
+    "neq": "not_equal",
     "gt": "gt",
     "gte": "gte",
     "lt": "lt",

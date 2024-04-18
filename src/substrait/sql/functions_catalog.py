@@ -35,7 +35,6 @@ class FunctionsCatalog:
         self._registered_extensions = {}
         self._functions = {}
         self._functions_return_type = {}
-        self._register_builtins()
 
     def load_standard_extensions(self, dirpath):
         for ext in self.STANDARD_EXTENSIONS:
@@ -52,7 +51,8 @@ class FunctionsCatalog:
                 function_name = function["name"]
                 for impl in function.get("impls", []):
                     # TODO: There seem to be some functions that have arguments without type. What to do?
-                    argtypes = [t.get("value", "unknown") for t in impl.get("args", [])]
+                    # TODO: improve support complext type like LIST?<any>
+                    argtypes = [t.get("value", "unknown").strip("?") for t in impl.get("args", [])]
                     if not argtypes:
                         signature = function_name
                     else:
@@ -95,17 +95,6 @@ class FunctionsCatalog:
                 )
             )
             self._functions_return_type[function] = functions_return_type[function]
-
-    def _register_builtins(self):
-        self._functions["not:boolean"] = (
-            proto.SimpleExtensionDeclaration.ExtensionFunction(
-                name="not",
-                function_anchor=len(self._functions) + 1,
-            )
-        )
-        self._functions_return_type["not:boolean"] = proto.Type(
-            bool=proto.Type.Boolean()
-        )
 
     def _type_from_name(self, typename):
         nullable = False

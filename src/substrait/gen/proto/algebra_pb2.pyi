@@ -607,7 +607,7 @@ class FetchRel(google.protobuf.message.Message):
     offset: builtins.int
     'the offset expressed in number of records'
     count: builtins.int
-    'the amount of records to return'
+    'the amount of records to return\n    use -1 to signal that ALL records should be returned\n    '
 
     @property
     def advanced_extension(self) -> proto.extensions.extensions_pb2.AdvancedExtension:
@@ -2289,6 +2289,7 @@ class Expression(google.protobuf.message.Message):
             TYPE_REFERENCE_FIELD_NUMBER: builtins.int
             TYPE_PARAMETERS_FIELD_NUMBER: builtins.int
             VALUE_FIELD_NUMBER: builtins.int
+            STRUCT_FIELD_NUMBER: builtins.int
             type_reference: builtins.int
             'points to a type_anchor defined in this plan'
 
@@ -2300,17 +2301,22 @@ class Expression(google.protobuf.message.Message):
 
             @property
             def value(self) -> google.protobuf.any_pb2.Any:
-                """the value of the literal, serialized using some type-specific
-                protobuf message
-                """
+                """the value of the literal, serialized using some type-specific protobuf message"""
 
-            def __init__(self, *, type_reference: builtins.int=..., type_parameters: collections.abc.Iterable[proto.type_pb2.Type.Parameter] | None=..., value: google.protobuf.any_pb2.Any | None=...) -> None:
+            @property
+            def struct(self) -> global___Expression.Literal.Struct:
+                """the value of the literal, serialized using the structure definition in its declaration"""
+
+            def __init__(self, *, type_reference: builtins.int=..., type_parameters: collections.abc.Iterable[proto.type_pb2.Type.Parameter] | None=..., value: google.protobuf.any_pb2.Any | None=..., struct: global___Expression.Literal.Struct | None=...) -> None:
                 ...
 
-            def HasField(self, field_name: typing_extensions.Literal['value', b'value']) -> builtins.bool:
+            def HasField(self, field_name: typing_extensions.Literal['struct', b'struct', 'val', b'val', 'value', b'value']) -> builtins.bool:
                 ...
 
-            def ClearField(self, field_name: typing_extensions.Literal['type_parameters', b'type_parameters', 'type_reference', b'type_reference', 'value', b'value']) -> None:
+            def ClearField(self, field_name: typing_extensions.Literal['struct', b'struct', 'type_parameters', b'type_parameters', 'type_reference', b'type_reference', 'val', b'val', 'value', b'value']) -> None:
+                ...
+
+            def WhichOneof(self, oneof_group: typing_extensions.Literal['val', b'val']) -> typing_extensions.Literal['value', 'struct'] | None:
                 ...
         BOOLEAN_FIELD_NUMBER: builtins.int
         I8_FIELD_NUMBER: builtins.int
@@ -2411,7 +2417,7 @@ class Expression(google.protobuf.message.Message):
         def user_defined(self) -> global___Expression.Literal.UserDefined:
             ...
         nullable: builtins.bool
-        'whether the literal type should be treated as a nullable type. Applies to\n        all members of union other than the Typed null (which should directly\n        declare nullability).\n        '
+        'Whether the literal_type above should be treated as a nullable type.\n        Applies to all members of the literal_type oneof EXCEPT:\n         * Type null             (must be nullable by definition)\n         * Type.List empty_list  (use Type.List::nullability)\n         * Type.Map empty_map    (use Type.Map::nullability)\n        '
         type_variation_reference: builtins.int
         'optionally points to a type_variation_anchor defined in this plan.\n        Applies to all members of union other than the Typed null (which should\n        directly declare the type variation).\n        '
 

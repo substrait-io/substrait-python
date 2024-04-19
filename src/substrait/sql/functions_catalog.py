@@ -56,11 +56,16 @@ class FunctionsCatalog:
                         t.get("value", "unknown").strip("?")
                         for t in impl.get("args", [])
                     ]
+                    if impl.get("variadic", False):
+                        # TODO: Variadic functions.
+                        argtypes *= 2
+
                     if not argtypes:
                         signature = function_name
                     else:
                         signature = f"{function_name}:{'_'.join(argtypes)}"
                     loaded_functions.add(signature)
+                    print("Loaded function", signature)
                     functions_return_type[signature] = self._type_from_name(
                         impl["return"]
                     )

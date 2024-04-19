@@ -92,19 +92,11 @@ class SQLGlotParser:
         self._schema = schema
         self._counter = itertools.count()
 
+        self._parse_expression = self.DISPATCH_REGISTRY.bind(self)
+
     def expression_from_sqlglot(self, sqlglot_node):
         """Parse a SQLGlot expression into a Substrait Expression."""
         return self._parse_expression(sqlglot_node)
-
-    def _parse_expression(self, expr):
-        """Parse a SQLGlot node and return a Substrait expression.
-
-        This is the internal implementation, expected to be
-        invoked in a recursive manner to parse the whole
-        expression tree.
-        """
-        expr_class = expr.__class__
-        return self.DISPATCH_REGISTRY[expr_class](self, expr)
 
     @DISPATCH_REGISTRY.register(sqlglot.expressions.Literal)
     def _parse_Literal(self, expr):
@@ -112,17 +104,13 @@ class SQLGlotParser:
             return ParsedSubstraitExpression(
                 f"literal${next(self._counter)}",
                 proto.Type(string=proto.Type.String()),
-                proto.Expression(
-                    literal=proto.Expression.Literal(string=expr.text)
-                ),
+                proto.Expression(literal=proto.Expression.Literal(string=expr.text)),
             )
         elif expr.is_int:
             return ParsedSubstraitExpression(
                 f"literal${next(self._counter)}",
                 proto.Type(i32=proto.Type.I32()),
-                proto.Expression(
-                    literal=proto.Expression.Literal(i32=int(expr.name))
-                ),
+                proto.Expression(literal=proto.Expression.Literal(i32=int(expr.name))),
             )
         elif sqlglot.helper.is_float(expr.name):
             return ParsedSubstraitExpression(
@@ -134,7 +122,7 @@ class SQLGlotParser:
             )
         else:
             raise ValueError(f"Unsupporter literal: {expr.text}")
-    
+
     @DISPATCH_REGISTRY.register(sqlglot.expressions.Column)
     def _parse_Column(self, expr):
         column_name = expr.output_name
@@ -164,10 +152,8 @@ class SQLGlotParser:
         left_parsed_expr = self._parse_expression(expr.left)
         right_parsed_expr = self._parse_expression(expr.right)
         function_name = SQL_BINARY_FUNCTIONS[expr.key]
-        signature, result_type, function_expression = (
-            self._parse_function_invokation(
-                function_name, left_parsed_expr, right_parsed_expr
-            )
+        signature, result_type, function_expression = self._parse_function_invokation(
+            function_name, left_parsed_expr, right_parsed_expr
         )
         result_name = f"{function_name}_{left_parsed_expr.output_name}_{right_parsed_expr.output_name}_{next(self._counter)}"
         return ParsedSubstraitExpression(
@@ -183,10 +169,12 @@ class SQLGlotParser:
     def _parse_Unary(self, expr):
         argument_parsed_expr = self._parse_expression(expr.this)
         function_name = SQL_UNARY_FUNCTIONS[expr.key]
-        signature, result_type, function_expression = (
-            self._parse_function_invokation(function_name, argument_parsed_expr)
+        signature, result_type, function_expression = self._parse_function_invokation(
+            function_name, argument_parsed_expr
         )
-        result_name = f"{function_name}_{argument_parsed_expr.output_name}_{next(self._counter)}"
+        result_name = (
+            f"{function_name}_{argument_parsed_expr.output_name}_{next(self._counter)}"
+        )
         return ParsedSubstraitExpression(
             result_name,
             result_type,

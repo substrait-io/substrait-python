@@ -194,30 +194,20 @@ class SQLGlotParser:
         invokation expression itself.
         """
         arguments = [argument_parsed_expr] + list(additional_arguments)
-        signature = self._functions_catalog.signature(
+        signature = self._functions_catalog.make_signature(
             function_name, proto_argtypes=[arg.type for arg in arguments]
         )
 
-        try:
-            function_anchor = self._functions_catalog.function_anchor(signature)
-        except KeyError:
-            # No function found with the exact types, try any1_any1 version
-            # TODO: What about cases like i32_any1? What about any instead of any1?
-            # TODO: What about optional arguments? IE: "i32_i32?"
-            signature = f"{function_name}:{'_'.join(['any1']*len(arguments))}"
-            function_anchor = self._functions_catalog.function_anchor(signature)
+        registered_function = self._functions_catalog.lookup_function(signature)
+        if registered_function is None:
+            raise KeyError(f"Function not found: {signature}")
 
-        function_return_type = self._functions_catalog.function_return_type(signature)
-        if function_return_type is None:
-            print("No return type for", signature)
-            # TODO: Is this the right way to handle this?
-            function_return_type = left_type
         return (
-            signature,
-            function_return_type,
+            registered_function.signature,
+            registered_function.return_type,
             proto.Expression(
                 scalar_function=proto.Expression.ScalarFunction(
-                    function_reference=function_anchor,
+                    function_reference=registered_function.function_anchor,
                     arguments=[
                         proto.FunctionArgument(value=arg.expression)
                         for arg in arguments
@@ -255,3 +245,6 @@ class ParsedSubstraitExpression:
             expression or self.expression,
             invoked_functions or self.invoked_functions,
         )
+
+    def __repr__(self):
+        return f"<ParsedSubstraitExpression {self.output_name} {self.type}>"

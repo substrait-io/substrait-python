@@ -32,7 +32,9 @@ class DispatchRegistry:
             if isinstance(argument, dispatch_cls):
                 return func
         else:
-            raise ValueError(f"Unsupported SQL Node type: {cls}")
+            raise ValueError(
+                f"Unsupported SQL Node type: {argument.__class__.__name__} -> {argument}"
+            )
 
     def __call__(self, obj, dispatch_argument, *args, **kwargs):
         return self[dispatch_argument](obj, dispatch_argument, *args, **kwargs)

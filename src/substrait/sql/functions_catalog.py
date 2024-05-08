@@ -47,6 +47,10 @@ class RegisteredSubstraitFunction:
         return [self._type_from_name(arg) for arg in self.arguments]
 
     def _type_from_name(self, typename: str) -> SubstraitType | None:
+        # TODO: improve support complext type like LIST?<any>
+        typename, *_ = typename.split("<", 1)
+        typename = typename.lower()
+
         nullable = False
         if typename.endswith("?"):
             nullable = True

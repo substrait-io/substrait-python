@@ -25,6 +25,7 @@ SQL_FUNCTIONS = {
     sqlglot.expressions.GTE: "gte",
     sqlglot.expressions.LT: "lt",
     sqlglot.expressions.LTE: "lte",
+    sqlglot.expressions.IsNan: "is_nan",
     # logical
     sqlglot.expressions.And: "and",
     sqlglot.expressions.Or: "or",
@@ -146,6 +147,28 @@ class SQLGlotParser:
     def _parse_Alias(self, expr):
         parsed_expression = self._parse_expression(expr.this)
         return parsed_expression.duplicate(output_name=expr.output_name)
+
+    @DISPATCH_REGISTRY.register(sqlglot.expressions.Is)
+    def _parse_IS(self, expr):
+        # IS NULL is a special case because in SQLGlot is a binary expression with argument
+        # while in Substrait there are only the is_null and is_not_null unary functions
+        argument_parsed_expr = self._parse_expression(expr.left)
+        if isinstance(expr.right, sqlglot.expressions.Null):
+            function_name = "is_null"
+        else:
+            raise ValueError(f"Unsupported IS expression: {expr}")
+        signature, result_type, function_expression = self._parse_function_invokation(
+            function_name, argument_parsed_expr
+        )
+        result_name = (
+            f"{function_name}_{argument_parsed_expr.output_name}_{next(self._counter)}"
+        )
+        return ParsedSubstraitExpression(
+            result_name,
+            result_type,
+            function_expression,
+            argument_parsed_expr.invoked_functions | {signature},
+        )
 
     @DISPATCH_REGISTRY.register(sqlglot.expressions.Binary)
     def _parser_Binary(self, expr):

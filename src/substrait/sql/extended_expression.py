@@ -105,7 +105,7 @@ class SQLGlotParser:
             return ParsedSubstraitExpression(
                 f"literal${next(self._counter)}",
                 proto.Type(string=proto.Type.String()),
-                proto.Expression(literal=proto.Expression.Literal(string=expr.text)),
+                proto.Expression(literal=proto.Expression.Literal(string=expr.name)),
             )
         elif expr.is_int:
             return ParsedSubstraitExpression(

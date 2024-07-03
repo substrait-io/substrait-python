@@ -3,8 +3,10 @@
 isort:skip_file
 SPDX-License-Identifier: Apache-2.0"""
 import builtins
+import collections.abc
 import google.protobuf.any_pb2
 import google.protobuf.descriptor
+import google.protobuf.internal.containers
 import google.protobuf.message
 import sys
 if sys.version_info >= (3, 8):
@@ -133,7 +135,7 @@ class AdvancedExtension(google.protobuf.message.Message):
     ENHANCEMENT_FIELD_NUMBER: builtins.int
 
     @property
-    def optimization(self) -> google.protobuf.any_pb2.Any:
+    def optimization(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[google.protobuf.any_pb2.Any]:
         """An optimization is helpful information that don't influence semantics. May
         be ignored by a consumer.
         """
@@ -142,10 +144,10 @@ class AdvancedExtension(google.protobuf.message.Message):
     def enhancement(self) -> google.protobuf.any_pb2.Any:
         """An enhancement alter semantics. Cannot be ignored by a consumer."""
 
-    def __init__(self, *, optimization: google.protobuf.any_pb2.Any | None=..., enhancement: google.protobuf.any_pb2.Any | None=...) -> None:
+    def __init__(self, *, optimization: collections.abc.Iterable[google.protobuf.any_pb2.Any] | None=..., enhancement: google.protobuf.any_pb2.Any | None=...) -> None:
         ...
 
-    def HasField(self, field_name: typing_extensions.Literal['enhancement', b'enhancement', 'optimization', b'optimization']) -> builtins.bool:
+    def HasField(self, field_name: typing_extensions.Literal['enhancement', b'enhancement']) -> builtins.bool:
         ...
 
     def ClearField(self, field_name: typing_extensions.Literal['enhancement', b'enhancement', 'optimization', b'optimization']) -> None:

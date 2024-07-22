@@ -1,13 +1,10 @@
 #!/bin/bash
 
-if [[ -z "$1" ]]; then
-    echo "Usage: bash update.sh <version>" 1>&2
-    echo ""
-    echo "Example: bash update.sh v0.34.0" 1>&2
-    exit 1
+if ! command -v curl > /dev/null 2>&1; then
+    echo "curl is required to grab the latest version tag"
 fi
 
-VERSION=$1
+VERSION=$(curl -s https://api.github.com/repos/substrait-io/substrait/releases/latest | grep 'tag_name' | cut -d '"' -f 4)
 
 echo "Updating substrait submodule..."
 git submodule update --remote third_party/substrait

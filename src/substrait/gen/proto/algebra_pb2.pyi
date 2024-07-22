@@ -130,6 +130,7 @@ class RelCommon(google.protobuf.message.Message):
                 ...
         STATS_FIELD_NUMBER: builtins.int
         CONSTRAINT_FIELD_NUMBER: builtins.int
+        ALIAS_FIELD_NUMBER: builtins.int
         ADVANCED_EXTENSION_FIELD_NUMBER: builtins.int
 
         @property
@@ -139,18 +140,20 @@ class RelCommon(google.protobuf.message.Message):
         @property
         def constraint(self) -> global___RelCommon.Hint.RuntimeConstraint:
             ...
+        alias: builtins.str
+        "Name (alias) for this relation. Can be used for e.g. qualifying the relation (see e.g.\n        Spark's SubqueryAlias), or debugging.\n        "
 
         @property
         def advanced_extension(self) -> proto.extensions.extensions_pb2.AdvancedExtension:
             ...
 
-        def __init__(self, *, stats: global___RelCommon.Hint.Stats | None=..., constraint: global___RelCommon.Hint.RuntimeConstraint | None=..., advanced_extension: proto.extensions.extensions_pb2.AdvancedExtension | None=...) -> None:
+        def __init__(self, *, stats: global___RelCommon.Hint.Stats | None=..., constraint: global___RelCommon.Hint.RuntimeConstraint | None=..., alias: builtins.str=..., advanced_extension: proto.extensions.extensions_pb2.AdvancedExtension | None=...) -> None:
             ...
 
         def HasField(self, field_name: typing_extensions.Literal['advanced_extension', b'advanced_extension', 'constraint', b'constraint', 'stats', b'stats']) -> builtins.bool:
             ...
 
-        def ClearField(self, field_name: typing_extensions.Literal['advanced_extension', b'advanced_extension', 'constraint', b'constraint', 'stats', b'stats']) -> None:
+        def ClearField(self, field_name: typing_extensions.Literal['advanced_extension', b'advanced_extension', 'alias', b'alias', 'constraint', b'constraint', 'stats', b'stats']) -> None:
             ...
     DIRECT_FIELD_NUMBER: builtins.int
     EMIT_FIELD_NUMBER: builtins.int
@@ -2186,6 +2189,22 @@ class Expression(google.protobuf.message.Message):
                 ...
 
         @typing_extensions.final
+        class PrecisionTimestamp(google.protobuf.message.Message):
+            DESCRIPTOR: google.protobuf.descriptor.Descriptor
+            PRECISION_FIELD_NUMBER: builtins.int
+            VALUE_FIELD_NUMBER: builtins.int
+            precision: builtins.int
+            'Sub-second precision, 0 means the value given is in seconds, 3 is milliseconds, 6 microseconds, 9 is nanoseconds'
+            value: builtins.int
+            'Time passed since 1970-01-01 00:00:00.000000 in UTC for PrecisionTimestampTZ and unspecified timezone for PrecisionTimestamp'
+
+            def __init__(self, *, precision: builtins.int=..., value: builtins.int=...) -> None:
+                ...
+
+            def ClearField(self, field_name: typing_extensions.Literal['precision', b'precision', 'value', b'value']) -> None:
+                ...
+
+        @typing_extensions.final
         class Map(google.protobuf.message.Message):
             DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -2382,9 +2401,14 @@ class Expression(google.protobuf.message.Message):
         @property
         def decimal(self) -> global___Expression.Literal.Decimal:
             ...
-        precision_timestamp: builtins.int
-        'If the precision is 6 or less then this is the microseconds since the UNIX epoch\n        If the precision is more than 6 then this is the nanoseconds since the UNIX epoch\n        '
-        precision_timestamp_tz: builtins.int
+
+        @property
+        def precision_timestamp(self) -> global___Expression.Literal.PrecisionTimestamp:
+            ...
+
+        @property
+        def precision_timestamp_tz(self) -> global___Expression.Literal.PrecisionTimestamp:
+            ...
 
         @property
         def struct(self) -> global___Expression.Literal.Struct:
@@ -2421,7 +2445,7 @@ class Expression(google.protobuf.message.Message):
         type_variation_reference: builtins.int
         'optionally points to a type_variation_anchor defined in this plan.\n        Applies to all members of union other than the Typed null (which should\n        directly declare the type variation).\n        '
 
-        def __init__(self, *, boolean: builtins.bool=..., i8: builtins.int=..., i16: builtins.int=..., i32: builtins.int=..., i64: builtins.int=..., fp32: builtins.float=..., fp64: builtins.float=..., string: builtins.str=..., binary: builtins.bytes=..., timestamp: builtins.int=..., date: builtins.int=..., time: builtins.int=..., interval_year_to_month: global___Expression.Literal.IntervalYearToMonth | None=..., interval_day_to_second: global___Expression.Literal.IntervalDayToSecond | None=..., fixed_char: builtins.str=..., var_char: global___Expression.Literal.VarChar | None=..., fixed_binary: builtins.bytes=..., decimal: global___Expression.Literal.Decimal | None=..., precision_timestamp: builtins.int=..., precision_timestamp_tz: builtins.int=..., struct: global___Expression.Literal.Struct | None=..., map: global___Expression.Literal.Map | None=..., timestamp_tz: builtins.int=..., uuid: builtins.bytes=..., null: proto.type_pb2.Type | None=..., list: global___Expression.Literal.List | None=..., empty_list: proto.type_pb2.Type.List | None=..., empty_map: proto.type_pb2.Type.Map | None=..., user_defined: global___Expression.Literal.UserDefined | None=..., nullable: builtins.bool=..., type_variation_reference: builtins.int=...) -> None:
+        def __init__(self, *, boolean: builtins.bool=..., i8: builtins.int=..., i16: builtins.int=..., i32: builtins.int=..., i64: builtins.int=..., fp32: builtins.float=..., fp64: builtins.float=..., string: builtins.str=..., binary: builtins.bytes=..., timestamp: builtins.int=..., date: builtins.int=..., time: builtins.int=..., interval_year_to_month: global___Expression.Literal.IntervalYearToMonth | None=..., interval_day_to_second: global___Expression.Literal.IntervalDayToSecond | None=..., fixed_char: builtins.str=..., var_char: global___Expression.Literal.VarChar | None=..., fixed_binary: builtins.bytes=..., decimal: global___Expression.Literal.Decimal | None=..., precision_timestamp: global___Expression.Literal.PrecisionTimestamp | None=..., precision_timestamp_tz: global___Expression.Literal.PrecisionTimestamp | None=..., struct: global___Expression.Literal.Struct | None=..., map: global___Expression.Literal.Map | None=..., timestamp_tz: builtins.int=..., uuid: builtins.bytes=..., null: proto.type_pb2.Type | None=..., list: global___Expression.Literal.List | None=..., empty_list: proto.type_pb2.Type.List | None=..., empty_map: proto.type_pb2.Type.Map | None=..., user_defined: global___Expression.Literal.UserDefined | None=..., nullable: builtins.bool=..., type_variation_reference: builtins.int=...) -> None:
             ...
 
         def HasField(self, field_name: typing_extensions.Literal['binary', b'binary', 'boolean', b'boolean', 'date', b'date', 'decimal', b'decimal', 'empty_list', b'empty_list', 'empty_map', b'empty_map', 'fixed_binary', b'fixed_binary', 'fixed_char', b'fixed_char', 'fp32', b'fp32', 'fp64', b'fp64', 'i16', b'i16', 'i32', b'i32', 'i64', b'i64', 'i8', b'i8', 'interval_day_to_second', b'interval_day_to_second', 'interval_year_to_month', b'interval_year_to_month', 'list', b'list', 'literal_type', b'literal_type', 'map', b'map', 'null', b'null', 'precision_timestamp', b'precision_timestamp', 'precision_timestamp_tz', b'precision_timestamp_tz', 'string', b'string', 'struct', b'struct', 'time', b'time', 'timestamp', b'timestamp', 'timestamp_tz', b'timestamp_tz', 'user_defined', b'user_defined', 'uuid', b'uuid', 'var_char', b'var_char']) -> builtins.bool:

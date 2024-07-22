@@ -335,7 +335,7 @@ class Type(google.protobuf.message.Message):
         TYPE_VARIATION_REFERENCE_FIELD_NUMBER: builtins.int
         NULLABILITY_FIELD_NUMBER: builtins.int
         precision: builtins.int
-        'Defaults to 6'
+        'Sub-second precision, 0 means the value given is in seconds, 3 is milliseconds, 6 microseconds, 9 is nanoseconds'
         type_variation_reference: builtins.int
         nullability: global___Type.Nullability.ValueType
 
@@ -352,7 +352,7 @@ class Type(google.protobuf.message.Message):
         TYPE_VARIATION_REFERENCE_FIELD_NUMBER: builtins.int
         NULLABILITY_FIELD_NUMBER: builtins.int
         precision: builtins.int
-        'Defaults to 6'
+        'Sub-second precision, 0 means the value given is in seconds, 3 is milliseconds, 6 microseconds, 9 is nanoseconds'
         type_variation_reference: builtins.int
         nullability: global___Type.Nullability.ValueType
 
@@ -601,7 +601,7 @@ class Type(google.protobuf.message.Message):
 
     @property
     def precision_timestamp_tz(self) -> global___Type.PrecisionTimestampTZ:
-        ...
+        """value is since UNIX epoch in UTC"""
 
     @property
     def struct(self) -> global___Type.Struct:

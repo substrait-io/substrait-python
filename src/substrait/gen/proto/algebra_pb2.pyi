@@ -299,6 +299,43 @@ class ReadRel(google.protobuf.message.Message):
 
                 def __init__(self) -> None:
                     ...
+
+            @typing_extensions.final
+            class DelimiterSeparatedTextReadOptions(google.protobuf.message.Message):
+                """Delimiter separated files may be compressed.  The reader should
+                autodetect this and decompress as needed.
+                """
+                DESCRIPTOR: google.protobuf.descriptor.Descriptor
+                FIELD_DELIMITER_FIELD_NUMBER: builtins.int
+                MAX_LINE_SIZE_FIELD_NUMBER: builtins.int
+                QUOTE_FIELD_NUMBER: builtins.int
+                HEADER_LINES_TO_SKIP_FIELD_NUMBER: builtins.int
+                ESCAPE_FIELD_NUMBER: builtins.int
+                VALUE_TREATED_AS_NULL_FIELD_NUMBER: builtins.int
+                field_delimiter: builtins.str
+                'The character(s) used to separate fields.  Common values are comma,\n                tab, and pipe.  Multiple characters are allowed.\n                '
+                max_line_size: builtins.int
+                'The maximum number of bytes to read from a single line.  If a line\n                exceeds this limit the resulting behavior is undefined.\n                '
+                quote: builtins.str
+                'The character(s) used to quote strings.  Common values are single\n                and double quotation marks.\n                '
+                header_lines_to_skip: builtins.int
+                'The number of lines to skip at the beginning of the file.'
+                escape: builtins.str
+                'The character used to escape characters in strings.  Backslash is\n                a common value.  Note that a double quote mark can also be used as an\n                escape character but the external quotes should be removed first.\n                '
+                value_treated_as_null: builtins.str
+                'If this value is encountered (including empty string), the resulting\n                value is null instead.  Leave unset to disable.  If this value is\n                provided, the effective schema of this file is comprised entirely of\n                nullable strings.  If not provided, the effective schema is instead\n                made up of non-nullable strings.\n                '
+
+                def __init__(self, *, field_delimiter: builtins.str=..., max_line_size: builtins.int=..., quote: builtins.str=..., header_lines_to_skip: builtins.int=..., escape: builtins.str=..., value_treated_as_null: builtins.str | None=...) -> None:
+                    ...
+
+                def HasField(self, field_name: typing_extensions.Literal['_value_treated_as_null', b'_value_treated_as_null', 'value_treated_as_null', b'value_treated_as_null']) -> builtins.bool:
+                    ...
+
+                def ClearField(self, field_name: typing_extensions.Literal['_value_treated_as_null', b'_value_treated_as_null', 'escape', b'escape', 'field_delimiter', b'field_delimiter', 'header_lines_to_skip', b'header_lines_to_skip', 'max_line_size', b'max_line_size', 'quote', b'quote', 'value_treated_as_null', b'value_treated_as_null']) -> None:
+                    ...
+
+                def WhichOneof(self, oneof_group: typing_extensions.Literal['_value_treated_as_null', b'_value_treated_as_null']) -> typing_extensions.Literal['value_treated_as_null'] | None:
+                    ...
             URI_PATH_FIELD_NUMBER: builtins.int
             URI_PATH_GLOB_FIELD_NUMBER: builtins.int
             URI_FILE_FIELD_NUMBER: builtins.int
@@ -311,6 +348,7 @@ class ReadRel(google.protobuf.message.Message):
             ORC_FIELD_NUMBER: builtins.int
             EXTENSION_FIELD_NUMBER: builtins.int
             DWRF_FIELD_NUMBER: builtins.int
+            TEXT_FIELD_NUMBER: builtins.int
             uri_path: builtins.str
             'A URI that can refer to either a single folder or a single file'
             uri_path_glob: builtins.str
@@ -346,17 +384,21 @@ class ReadRel(google.protobuf.message.Message):
             def dwrf(self) -> global___ReadRel.LocalFiles.FileOrFiles.DwrfReadOptions:
                 ...
 
-            def __init__(self, *, uri_path: builtins.str=..., uri_path_glob: builtins.str=..., uri_file: builtins.str=..., uri_folder: builtins.str=..., partition_index: builtins.int=..., start: builtins.int=..., length: builtins.int=..., parquet: global___ReadRel.LocalFiles.FileOrFiles.ParquetReadOptions | None=..., arrow: global___ReadRel.LocalFiles.FileOrFiles.ArrowReadOptions | None=..., orc: global___ReadRel.LocalFiles.FileOrFiles.OrcReadOptions | None=..., extension: google.protobuf.any_pb2.Any | None=..., dwrf: global___ReadRel.LocalFiles.FileOrFiles.DwrfReadOptions | None=...) -> None:
+            @property
+            def text(self) -> global___ReadRel.LocalFiles.FileOrFiles.DelimiterSeparatedTextReadOptions:
                 ...
 
-            def HasField(self, field_name: typing_extensions.Literal['arrow', b'arrow', 'dwrf', b'dwrf', 'extension', b'extension', 'file_format', b'file_format', 'orc', b'orc', 'parquet', b'parquet', 'path_type', b'path_type', 'uri_file', b'uri_file', 'uri_folder', b'uri_folder', 'uri_path', b'uri_path', 'uri_path_glob', b'uri_path_glob']) -> builtins.bool:
+            def __init__(self, *, uri_path: builtins.str=..., uri_path_glob: builtins.str=..., uri_file: builtins.str=..., uri_folder: builtins.str=..., partition_index: builtins.int=..., start: builtins.int=..., length: builtins.int=..., parquet: global___ReadRel.LocalFiles.FileOrFiles.ParquetReadOptions | None=..., arrow: global___ReadRel.LocalFiles.FileOrFiles.ArrowReadOptions | None=..., orc: global___ReadRel.LocalFiles.FileOrFiles.OrcReadOptions | None=..., extension: google.protobuf.any_pb2.Any | None=..., dwrf: global___ReadRel.LocalFiles.FileOrFiles.DwrfReadOptions | None=..., text: global___ReadRel.LocalFiles.FileOrFiles.DelimiterSeparatedTextReadOptions | None=...) -> None:
                 ...
 
-            def ClearField(self, field_name: typing_extensions.Literal['arrow', b'arrow', 'dwrf', b'dwrf', 'extension', b'extension', 'file_format', b'file_format', 'length', b'length', 'orc', b'orc', 'parquet', b'parquet', 'partition_index', b'partition_index', 'path_type', b'path_type', 'start', b'start', 'uri_file', b'uri_file', 'uri_folder', b'uri_folder', 'uri_path', b'uri_path', 'uri_path_glob', b'uri_path_glob']) -> None:
+            def HasField(self, field_name: typing_extensions.Literal['arrow', b'arrow', 'dwrf', b'dwrf', 'extension', b'extension', 'file_format', b'file_format', 'orc', b'orc', 'parquet', b'parquet', 'path_type', b'path_type', 'text', b'text', 'uri_file', b'uri_file', 'uri_folder', b'uri_folder', 'uri_path', b'uri_path', 'uri_path_glob', b'uri_path_glob']) -> builtins.bool:
+                ...
+
+            def ClearField(self, field_name: typing_extensions.Literal['arrow', b'arrow', 'dwrf', b'dwrf', 'extension', b'extension', 'file_format', b'file_format', 'length', b'length', 'orc', b'orc', 'parquet', b'parquet', 'partition_index', b'partition_index', 'path_type', b'path_type', 'start', b'start', 'text', b'text', 'uri_file', b'uri_file', 'uri_folder', b'uri_folder', 'uri_path', b'uri_path', 'uri_path_glob', b'uri_path_glob']) -> None:
                 ...
 
             @typing.overload
-            def WhichOneof(self, oneof_group: typing_extensions.Literal['file_format', b'file_format']) -> typing_extensions.Literal['parquet', 'arrow', 'orc', 'extension', 'dwrf'] | None:
+            def WhichOneof(self, oneof_group: typing_extensions.Literal['file_format', b'file_format']) -> typing_extensions.Literal['parquet', 'arrow', 'orc', 'extension', 'dwrf', 'text'] | None:
                 ...
 
             @typing.overload
@@ -496,10 +538,12 @@ class JoinRel(google.protobuf.message.Message):
         JOIN_TYPE_OUTER: JoinRel._JoinType.ValueType
         JOIN_TYPE_LEFT: JoinRel._JoinType.ValueType
         JOIN_TYPE_RIGHT: JoinRel._JoinType.ValueType
-        JOIN_TYPE_SEMI: JoinRel._JoinType.ValueType
-        JOIN_TYPE_ANTI: JoinRel._JoinType.ValueType
-        JOIN_TYPE_SINGLE: JoinRel._JoinType.ValueType
-        'This join is useful for nested sub-queries where we need exactly one record in output (or throw exception)\n        See Section 3.2 of https://15721.courses.cs.cmu.edu/spring2018/papers/16-optimizer2/hyperjoins-btw2017.pdf\n        '
+        JOIN_TYPE_LEFT_SEMI: JoinRel._JoinType.ValueType
+        JOIN_TYPE_LEFT_ANTI: JoinRel._JoinType.ValueType
+        JOIN_TYPE_LEFT_SINGLE: JoinRel._JoinType.ValueType
+        JOIN_TYPE_RIGHT_SEMI: JoinRel._JoinType.ValueType
+        JOIN_TYPE_RIGHT_ANTI: JoinRel._JoinType.ValueType
+        JOIN_TYPE_RIGHT_SINGLE: JoinRel._JoinType.ValueType
 
     class JoinType(_JoinType, metaclass=_JoinTypeEnumTypeWrapper):
         ...
@@ -508,10 +552,12 @@ class JoinRel(google.protobuf.message.Message):
     JOIN_TYPE_OUTER: JoinRel.JoinType.ValueType
     JOIN_TYPE_LEFT: JoinRel.JoinType.ValueType
     JOIN_TYPE_RIGHT: JoinRel.JoinType.ValueType
-    JOIN_TYPE_SEMI: JoinRel.JoinType.ValueType
-    JOIN_TYPE_ANTI: JoinRel.JoinType.ValueType
-    JOIN_TYPE_SINGLE: JoinRel.JoinType.ValueType
-    'This join is useful for nested sub-queries where we need exactly one record in output (or throw exception)\n    See Section 3.2 of https://15721.courses.cs.cmu.edu/spring2018/papers/16-optimizer2/hyperjoins-btw2017.pdf\n    '
+    JOIN_TYPE_LEFT_SEMI: JoinRel.JoinType.ValueType
+    JOIN_TYPE_LEFT_ANTI: JoinRel.JoinType.ValueType
+    JOIN_TYPE_LEFT_SINGLE: JoinRel.JoinType.ValueType
+    JOIN_TYPE_RIGHT_SEMI: JoinRel.JoinType.ValueType
+    JOIN_TYPE_RIGHT_ANTI: JoinRel.JoinType.ValueType
+    JOIN_TYPE_RIGHT_SINGLE: JoinRel.JoinType.ValueType
     COMMON_FIELD_NUMBER: builtins.int
     LEFT_FIELD_NUMBER: builtins.int
     RIGHT_FIELD_NUMBER: builtins.int
@@ -1801,6 +1847,8 @@ class HashJoinRel(google.protobuf.message.Message):
         JOIN_TYPE_RIGHT_SEMI: HashJoinRel._JoinType.ValueType
         JOIN_TYPE_LEFT_ANTI: HashJoinRel._JoinType.ValueType
         JOIN_TYPE_RIGHT_ANTI: HashJoinRel._JoinType.ValueType
+        JOIN_TYPE_LEFT_SINGLE: HashJoinRel._JoinType.ValueType
+        JOIN_TYPE_RIGHT_SINGLE: HashJoinRel._JoinType.ValueType
 
     class JoinType(_JoinType, metaclass=_JoinTypeEnumTypeWrapper):
         ...
@@ -1813,6 +1861,8 @@ class HashJoinRel(google.protobuf.message.Message):
     JOIN_TYPE_RIGHT_SEMI: HashJoinRel.JoinType.ValueType
     JOIN_TYPE_LEFT_ANTI: HashJoinRel.JoinType.ValueType
     JOIN_TYPE_RIGHT_ANTI: HashJoinRel.JoinType.ValueType
+    JOIN_TYPE_LEFT_SINGLE: HashJoinRel.JoinType.ValueType
+    JOIN_TYPE_RIGHT_SINGLE: HashJoinRel.JoinType.ValueType
     COMMON_FIELD_NUMBER: builtins.int
     LEFT_FIELD_NUMBER: builtins.int
     RIGHT_FIELD_NUMBER: builtins.int
@@ -1904,6 +1954,8 @@ class MergeJoinRel(google.protobuf.message.Message):
         JOIN_TYPE_RIGHT_SEMI: MergeJoinRel._JoinType.ValueType
         JOIN_TYPE_LEFT_ANTI: MergeJoinRel._JoinType.ValueType
         JOIN_TYPE_RIGHT_ANTI: MergeJoinRel._JoinType.ValueType
+        JOIN_TYPE_LEFT_SINGLE: MergeJoinRel._JoinType.ValueType
+        JOIN_TYPE_RIGHT_SINGLE: MergeJoinRel._JoinType.ValueType
 
     class JoinType(_JoinType, metaclass=_JoinTypeEnumTypeWrapper):
         ...
@@ -1916,6 +1968,8 @@ class MergeJoinRel(google.protobuf.message.Message):
     JOIN_TYPE_RIGHT_SEMI: MergeJoinRel.JoinType.ValueType
     JOIN_TYPE_LEFT_ANTI: MergeJoinRel.JoinType.ValueType
     JOIN_TYPE_RIGHT_ANTI: MergeJoinRel.JoinType.ValueType
+    JOIN_TYPE_LEFT_SINGLE: MergeJoinRel.JoinType.ValueType
+    JOIN_TYPE_RIGHT_SINGLE: MergeJoinRel.JoinType.ValueType
     COMMON_FIELD_NUMBER: builtins.int
     LEFT_FIELD_NUMBER: builtins.int
     RIGHT_FIELD_NUMBER: builtins.int
@@ -2009,6 +2063,8 @@ class NestedLoopJoinRel(google.protobuf.message.Message):
         JOIN_TYPE_RIGHT_SEMI: NestedLoopJoinRel._JoinType.ValueType
         JOIN_TYPE_LEFT_ANTI: NestedLoopJoinRel._JoinType.ValueType
         JOIN_TYPE_RIGHT_ANTI: NestedLoopJoinRel._JoinType.ValueType
+        JOIN_TYPE_LEFT_SINGLE: NestedLoopJoinRel._JoinType.ValueType
+        JOIN_TYPE_RIGHT_SINGLE: NestedLoopJoinRel._JoinType.ValueType
 
     class JoinType(_JoinType, metaclass=_JoinTypeEnumTypeWrapper):
         ...
@@ -2021,6 +2077,8 @@ class NestedLoopJoinRel(google.protobuf.message.Message):
     JOIN_TYPE_RIGHT_SEMI: NestedLoopJoinRel.JoinType.ValueType
     JOIN_TYPE_LEFT_ANTI: NestedLoopJoinRel.JoinType.ValueType
     JOIN_TYPE_RIGHT_ANTI: NestedLoopJoinRel.JoinType.ValueType
+    JOIN_TYPE_LEFT_SINGLE: NestedLoopJoinRel.JoinType.ValueType
+    JOIN_TYPE_RIGHT_SINGLE: NestedLoopJoinRel.JoinType.ValueType
     COMMON_FIELD_NUMBER: builtins.int
     LEFT_FIELD_NUMBER: builtins.int
     RIGHT_FIELD_NUMBER: builtins.int
@@ -2262,14 +2320,50 @@ class Expression(google.protobuf.message.Message):
             DAYS_FIELD_NUMBER: builtins.int
             SECONDS_FIELD_NUMBER: builtins.int
             MICROSECONDS_FIELD_NUMBER: builtins.int
+            PRECISION_FIELD_NUMBER: builtins.int
+            SUBSECONDS_FIELD_NUMBER: builtins.int
             days: builtins.int
             seconds: builtins.int
             microseconds: builtins.int
+            'use precision and subseconds below, they cover and replace microseconds.'
+            precision: builtins.int
+            'Sub-second precision, 0 means the value given is in seconds, 3 is milliseconds, 6 microseconds, 9 is nanoseconds. Should be used with subseconds below.'
+            subseconds: builtins.int
+            'the number of fractional seconds using 1e(-precision) units. Should only be used with precision field, not microseconds.'
 
-            def __init__(self, *, days: builtins.int=..., seconds: builtins.int=..., microseconds: builtins.int=...) -> None:
+            def __init__(self, *, days: builtins.int=..., seconds: builtins.int=..., microseconds: builtins.int=..., precision: builtins.int=..., subseconds: builtins.int=...) -> None:
                 ...
 
-            def ClearField(self, field_name: typing_extensions.Literal['days', b'days', 'microseconds', b'microseconds', 'seconds', b'seconds']) -> None:
+            def HasField(self, field_name: typing_extensions.Literal['microseconds', b'microseconds', 'precision', b'precision', 'precision_mode', b'precision_mode']) -> builtins.bool:
+                ...
+
+            def ClearField(self, field_name: typing_extensions.Literal['days', b'days', 'microseconds', b'microseconds', 'precision', b'precision', 'precision_mode', b'precision_mode', 'seconds', b'seconds', 'subseconds', b'subseconds']) -> None:
+                ...
+
+            def WhichOneof(self, oneof_group: typing_extensions.Literal['precision_mode', b'precision_mode']) -> typing_extensions.Literal['microseconds', 'precision'] | None:
+                ...
+
+        @typing_extensions.final
+        class IntervalCompound(google.protobuf.message.Message):
+            DESCRIPTOR: google.protobuf.descriptor.Descriptor
+            INTERVAL_YEAR_TO_MONTH_FIELD_NUMBER: builtins.int
+            INTERVAL_DAY_TO_SECOND_FIELD_NUMBER: builtins.int
+
+            @property
+            def interval_year_to_month(self) -> global___Expression.Literal.IntervalYearToMonth:
+                ...
+
+            @property
+            def interval_day_to_second(self) -> global___Expression.Literal.IntervalDayToSecond:
+                ...
+
+            def __init__(self, *, interval_year_to_month: global___Expression.Literal.IntervalYearToMonth | None=..., interval_day_to_second: global___Expression.Literal.IntervalDayToSecond | None=...) -> None:
+                ...
+
+            def HasField(self, field_name: typing_extensions.Literal['interval_day_to_second', b'interval_day_to_second', 'interval_year_to_month', b'interval_year_to_month']) -> builtins.bool:
+                ...
+
+            def ClearField(self, field_name: typing_extensions.Literal['interval_day_to_second', b'interval_day_to_second', 'interval_year_to_month', b'interval_year_to_month']) -> None:
                 ...
 
         @typing_extensions.final
@@ -2351,6 +2445,7 @@ class Expression(google.protobuf.message.Message):
         TIME_FIELD_NUMBER: builtins.int
         INTERVAL_YEAR_TO_MONTH_FIELD_NUMBER: builtins.int
         INTERVAL_DAY_TO_SECOND_FIELD_NUMBER: builtins.int
+        INTERVAL_COMPOUND_FIELD_NUMBER: builtins.int
         FIXED_CHAR_FIELD_NUMBER: builtins.int
         VAR_CHAR_FIELD_NUMBER: builtins.int
         FIXED_BINARY_FIELD_NUMBER: builtins.int
@@ -2390,6 +2485,10 @@ class Expression(google.protobuf.message.Message):
 
         @property
         def interval_day_to_second(self) -> global___Expression.Literal.IntervalDayToSecond:
+            ...
+
+        @property
+        def interval_compound(self) -> global___Expression.Literal.IntervalCompound:
             ...
         fixed_char: builtins.str
 
@@ -2445,16 +2544,16 @@ class Expression(google.protobuf.message.Message):
         type_variation_reference: builtins.int
         'optionally points to a type_variation_anchor defined in this plan.\n        Applies to all members of union other than the Typed null (which should\n        directly declare the type variation).\n        '
 
-        def __init__(self, *, boolean: builtins.bool=..., i8: builtins.int=..., i16: builtins.int=..., i32: builtins.int=..., i64: builtins.int=..., fp32: builtins.float=..., fp64: builtins.float=..., string: builtins.str=..., binary: builtins.bytes=..., timestamp: builtins.int=..., date: builtins.int=..., time: builtins.int=..., interval_year_to_month: global___Expression.Literal.IntervalYearToMonth | None=..., interval_day_to_second: global___Expression.Literal.IntervalDayToSecond | None=..., fixed_char: builtins.str=..., var_char: global___Expression.Literal.VarChar | None=..., fixed_binary: builtins.bytes=..., decimal: global___Expression.Literal.Decimal | None=..., precision_timestamp: global___Expression.Literal.PrecisionTimestamp | None=..., precision_timestamp_tz: global___Expression.Literal.PrecisionTimestamp | None=..., struct: global___Expression.Literal.Struct | None=..., map: global___Expression.Literal.Map | None=..., timestamp_tz: builtins.int=..., uuid: builtins.bytes=..., null: proto.type_pb2.Type | None=..., list: global___Expression.Literal.List | None=..., empty_list: proto.type_pb2.Type.List | None=..., empty_map: proto.type_pb2.Type.Map | None=..., user_defined: global___Expression.Literal.UserDefined | None=..., nullable: builtins.bool=..., type_variation_reference: builtins.int=...) -> None:
+        def __init__(self, *, boolean: builtins.bool=..., i8: builtins.int=..., i16: builtins.int=..., i32: builtins.int=..., i64: builtins.int=..., fp32: builtins.float=..., fp64: builtins.float=..., string: builtins.str=..., binary: builtins.bytes=..., timestamp: builtins.int=..., date: builtins.int=..., time: builtins.int=..., interval_year_to_month: global___Expression.Literal.IntervalYearToMonth | None=..., interval_day_to_second: global___Expression.Literal.IntervalDayToSecond | None=..., interval_compound: global___Expression.Literal.IntervalCompound | None=..., fixed_char: builtins.str=..., var_char: global___Expression.Literal.VarChar | None=..., fixed_binary: builtins.bytes=..., decimal: global___Expression.Literal.Decimal | None=..., precision_timestamp: global___Expression.Literal.PrecisionTimestamp | None=..., precision_timestamp_tz: global___Expression.Literal.PrecisionTimestamp | None=..., struct: global___Expression.Literal.Struct | None=..., map: global___Expression.Literal.Map | None=..., timestamp_tz: builtins.int=..., uuid: builtins.bytes=..., null: proto.type_pb2.Type | None=..., list: global___Expression.Literal.List | None=..., empty_list: proto.type_pb2.Type.List | None=..., empty_map: proto.type_pb2.Type.Map | None=..., user_defined: global___Expression.Literal.UserDefined | None=..., nullable: builtins.bool=..., type_variation_reference: builtins.int=...) -> None:
             ...
 
-        def HasField(self, field_name: typing_extensions.Literal['binary', b'binary', 'boolean', b'boolean', 'date', b'date', 'decimal', b'decimal', 'empty_list', b'empty_list', 'empty_map', b'empty_map', 'fixed_binary', b'fixed_binary', 'fixed_char', b'fixed_char', 'fp32', b'fp32', 'fp64', b'fp64', 'i16', b'i16', 'i32', b'i32', 'i64', b'i64', 'i8', b'i8', 'interval_day_to_second', b'interval_day_to_second', 'interval_year_to_month', b'interval_year_to_month', 'list', b'list', 'literal_type', b'literal_type', 'map', b'map', 'null', b'null', 'precision_timestamp', b'precision_timestamp', 'precision_timestamp_tz', b'precision_timestamp_tz', 'string', b'string', 'struct', b'struct', 'time', b'time', 'timestamp', b'timestamp', 'timestamp_tz', b'timestamp_tz', 'user_defined', b'user_defined', 'uuid', b'uuid', 'var_char', b'var_char']) -> builtins.bool:
+        def HasField(self, field_name: typing_extensions.Literal['binary', b'binary', 'boolean', b'boolean', 'date', b'date', 'decimal', b'decimal', 'empty_list', b'empty_list', 'empty_map', b'empty_map', 'fixed_binary', b'fixed_binary', 'fixed_char', b'fixed_char', 'fp32', b'fp32', 'fp64', b'fp64', 'i16', b'i16', 'i32', b'i32', 'i64', b'i64', 'i8', b'i8', 'interval_compound', b'interval_compound', 'interval_day_to_second', b'interval_day_to_second', 'interval_year_to_month', b'interval_year_to_month', 'list', b'list', 'literal_type', b'literal_type', 'map', b'map', 'null', b'null', 'precision_timestamp', b'precision_timestamp', 'precision_timestamp_tz', b'precision_timestamp_tz', 'string', b'string', 'struct', b'struct', 'time', b'time', 'timestamp', b'timestamp', 'timestamp_tz', b'timestamp_tz', 'user_defined', b'user_defined', 'uuid', b'uuid', 'var_char', b'var_char']) -> builtins.bool:
             ...
 
-        def ClearField(self, field_name: typing_extensions.Literal['binary', b'binary', 'boolean', b'boolean', 'date', b'date', 'decimal', b'decimal', 'empty_list', b'empty_list', 'empty_map', b'empty_map', 'fixed_binary', b'fixed_binary', 'fixed_char', b'fixed_char', 'fp32', b'fp32', 'fp64', b'fp64', 'i16', b'i16', 'i32', b'i32', 'i64', b'i64', 'i8', b'i8', 'interval_day_to_second', b'interval_day_to_second', 'interval_year_to_month', b'interval_year_to_month', 'list', b'list', 'literal_type', b'literal_type', 'map', b'map', 'null', b'null', 'nullable', b'nullable', 'precision_timestamp', b'precision_timestamp', 'precision_timestamp_tz', b'precision_timestamp_tz', 'string', b'string', 'struct', b'struct', 'time', b'time', 'timestamp', b'timestamp', 'timestamp_tz', b'timestamp_tz', 'type_variation_reference', b'type_variation_reference', 'user_defined', b'user_defined', 'uuid', b'uuid', 'var_char', b'var_char']) -> None:
+        def ClearField(self, field_name: typing_extensions.Literal['binary', b'binary', 'boolean', b'boolean', 'date', b'date', 'decimal', b'decimal', 'empty_list', b'empty_list', 'empty_map', b'empty_map', 'fixed_binary', b'fixed_binary', 'fixed_char', b'fixed_char', 'fp32', b'fp32', 'fp64', b'fp64', 'i16', b'i16', 'i32', b'i32', 'i64', b'i64', 'i8', b'i8', 'interval_compound', b'interval_compound', 'interval_day_to_second', b'interval_day_to_second', 'interval_year_to_month', b'interval_year_to_month', 'list', b'list', 'literal_type', b'literal_type', 'map', b'map', 'null', b'null', 'nullable', b'nullable', 'precision_timestamp', b'precision_timestamp', 'precision_timestamp_tz', b'precision_timestamp_tz', 'string', b'string', 'struct', b'struct', 'time', b'time', 'timestamp', b'timestamp', 'timestamp_tz', b'timestamp_tz', 'type_variation_reference', b'type_variation_reference', 'user_defined', b'user_defined', 'uuid', b'uuid', 'var_char', b'var_char']) -> None:
             ...
 
-        def WhichOneof(self, oneof_group: typing_extensions.Literal['literal_type', b'literal_type']) -> typing_extensions.Literal['boolean', 'i8', 'i16', 'i32', 'i64', 'fp32', 'fp64', 'string', 'binary', 'timestamp', 'date', 'time', 'interval_year_to_month', 'interval_day_to_second', 'fixed_char', 'var_char', 'fixed_binary', 'decimal', 'precision_timestamp', 'precision_timestamp_tz', 'struct', 'map', 'timestamp_tz', 'uuid', 'null', 'list', 'empty_list', 'empty_map', 'user_defined'] | None:
+        def WhichOneof(self, oneof_group: typing_extensions.Literal['literal_type', b'literal_type']) -> typing_extensions.Literal['boolean', 'i8', 'i16', 'i32', 'i64', 'fp32', 'fp64', 'string', 'binary', 'timestamp', 'date', 'time', 'interval_year_to_month', 'interval_day_to_second', 'interval_compound', 'fixed_char', 'var_char', 'fixed_binary', 'decimal', 'precision_timestamp', 'precision_timestamp_tz', 'struct', 'map', 'timestamp_tz', 'uuid', 'null', 'list', 'empty_list', 'empty_map', 'user_defined'] | None:
             ...
 
     @typing_extensions.final

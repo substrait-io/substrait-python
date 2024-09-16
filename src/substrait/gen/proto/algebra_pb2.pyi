@@ -131,6 +131,7 @@ class RelCommon(google.protobuf.message.Message):
         STATS_FIELD_NUMBER: builtins.int
         CONSTRAINT_FIELD_NUMBER: builtins.int
         ALIAS_FIELD_NUMBER: builtins.int
+        OUTPUT_NAMES_FIELD_NUMBER: builtins.int
         ADVANCED_EXTENSION_FIELD_NUMBER: builtins.int
 
         @property
@@ -144,16 +145,22 @@ class RelCommon(google.protobuf.message.Message):
         "Name (alias) for this relation. Can be used for e.g. qualifying the relation (see e.g.\n        Spark's SubqueryAlias), or debugging.\n        "
 
         @property
+        def output_names(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]:
+            """Assigns alternative output field names for any relation.  Equivalent to the names field
+            in RelRoot but applies to the output of the relation this RelCommon is attached to.
+            """
+
+        @property
         def advanced_extension(self) -> proto.extensions.extensions_pb2.AdvancedExtension:
             ...
 
-        def __init__(self, *, stats: global___RelCommon.Hint.Stats | None=..., constraint: global___RelCommon.Hint.RuntimeConstraint | None=..., alias: builtins.str=..., advanced_extension: proto.extensions.extensions_pb2.AdvancedExtension | None=...) -> None:
+        def __init__(self, *, stats: global___RelCommon.Hint.Stats | None=..., constraint: global___RelCommon.Hint.RuntimeConstraint | None=..., alias: builtins.str=..., output_names: collections.abc.Iterable[builtins.str] | None=..., advanced_extension: proto.extensions.extensions_pb2.AdvancedExtension | None=...) -> None:
             ...
 
         def HasField(self, field_name: typing_extensions.Literal['advanced_extension', b'advanced_extension', 'constraint', b'constraint', 'stats', b'stats']) -> builtins.bool:
             ...
 
-        def ClearField(self, field_name: typing_extensions.Literal['advanced_extension', b'advanced_extension', 'alias', b'alias', 'constraint', b'constraint', 'stats', b'stats']) -> None:
+        def ClearField(self, field_name: typing_extensions.Literal['advanced_extension', b'advanced_extension', 'alias', b'alias', 'constraint', b'constraint', 'output_names', b'output_names', 'stats', b'stats']) -> None:
             ...
     DIRECT_FIELD_NUMBER: builtins.int
     EMIT_FIELD_NUMBER: builtins.int
@@ -544,6 +551,8 @@ class JoinRel(google.protobuf.message.Message):
         JOIN_TYPE_RIGHT_SEMI: JoinRel._JoinType.ValueType
         JOIN_TYPE_RIGHT_ANTI: JoinRel._JoinType.ValueType
         JOIN_TYPE_RIGHT_SINGLE: JoinRel._JoinType.ValueType
+        JOIN_TYPE_LEFT_MARK: JoinRel._JoinType.ValueType
+        JOIN_TYPE_RIGHT_MARK: JoinRel._JoinType.ValueType
 
     class JoinType(_JoinType, metaclass=_JoinTypeEnumTypeWrapper):
         ...
@@ -558,6 +567,8 @@ class JoinRel(google.protobuf.message.Message):
     JOIN_TYPE_RIGHT_SEMI: JoinRel.JoinType.ValueType
     JOIN_TYPE_RIGHT_ANTI: JoinRel.JoinType.ValueType
     JOIN_TYPE_RIGHT_SINGLE: JoinRel.JoinType.ValueType
+    JOIN_TYPE_LEFT_MARK: JoinRel.JoinType.ValueType
+    JOIN_TYPE_RIGHT_MARK: JoinRel.JoinType.ValueType
     COMMON_FIELD_NUMBER: builtins.int
     LEFT_FIELD_NUMBER: builtins.int
     RIGHT_FIELD_NUMBER: builtins.int
@@ -1849,6 +1860,8 @@ class HashJoinRel(google.protobuf.message.Message):
         JOIN_TYPE_RIGHT_ANTI: HashJoinRel._JoinType.ValueType
         JOIN_TYPE_LEFT_SINGLE: HashJoinRel._JoinType.ValueType
         JOIN_TYPE_RIGHT_SINGLE: HashJoinRel._JoinType.ValueType
+        JOIN_TYPE_LEFT_MARK: HashJoinRel._JoinType.ValueType
+        JOIN_TYPE_RIGHT_MARK: HashJoinRel._JoinType.ValueType
 
     class JoinType(_JoinType, metaclass=_JoinTypeEnumTypeWrapper):
         ...
@@ -1863,6 +1876,8 @@ class HashJoinRel(google.protobuf.message.Message):
     JOIN_TYPE_RIGHT_ANTI: HashJoinRel.JoinType.ValueType
     JOIN_TYPE_LEFT_SINGLE: HashJoinRel.JoinType.ValueType
     JOIN_TYPE_RIGHT_SINGLE: HashJoinRel.JoinType.ValueType
+    JOIN_TYPE_LEFT_MARK: HashJoinRel.JoinType.ValueType
+    JOIN_TYPE_RIGHT_MARK: HashJoinRel.JoinType.ValueType
     COMMON_FIELD_NUMBER: builtins.int
     LEFT_FIELD_NUMBER: builtins.int
     RIGHT_FIELD_NUMBER: builtins.int
@@ -1956,6 +1971,8 @@ class MergeJoinRel(google.protobuf.message.Message):
         JOIN_TYPE_RIGHT_ANTI: MergeJoinRel._JoinType.ValueType
         JOIN_TYPE_LEFT_SINGLE: MergeJoinRel._JoinType.ValueType
         JOIN_TYPE_RIGHT_SINGLE: MergeJoinRel._JoinType.ValueType
+        JOIN_TYPE_LEFT_MARK: MergeJoinRel._JoinType.ValueType
+        JOIN_TYPE_RIGHT_MARK: MergeJoinRel._JoinType.ValueType
 
     class JoinType(_JoinType, metaclass=_JoinTypeEnumTypeWrapper):
         ...
@@ -1970,6 +1987,8 @@ class MergeJoinRel(google.protobuf.message.Message):
     JOIN_TYPE_RIGHT_ANTI: MergeJoinRel.JoinType.ValueType
     JOIN_TYPE_LEFT_SINGLE: MergeJoinRel.JoinType.ValueType
     JOIN_TYPE_RIGHT_SINGLE: MergeJoinRel.JoinType.ValueType
+    JOIN_TYPE_LEFT_MARK: MergeJoinRel.JoinType.ValueType
+    JOIN_TYPE_RIGHT_MARK: MergeJoinRel.JoinType.ValueType
     COMMON_FIELD_NUMBER: builtins.int
     LEFT_FIELD_NUMBER: builtins.int
     RIGHT_FIELD_NUMBER: builtins.int
@@ -2065,6 +2084,8 @@ class NestedLoopJoinRel(google.protobuf.message.Message):
         JOIN_TYPE_RIGHT_ANTI: NestedLoopJoinRel._JoinType.ValueType
         JOIN_TYPE_LEFT_SINGLE: NestedLoopJoinRel._JoinType.ValueType
         JOIN_TYPE_RIGHT_SINGLE: NestedLoopJoinRel._JoinType.ValueType
+        JOIN_TYPE_LEFT_MARK: NestedLoopJoinRel._JoinType.ValueType
+        JOIN_TYPE_RIGHT_MARK: NestedLoopJoinRel._JoinType.ValueType
 
     class JoinType(_JoinType, metaclass=_JoinTypeEnumTypeWrapper):
         ...
@@ -2079,6 +2100,8 @@ class NestedLoopJoinRel(google.protobuf.message.Message):
     JOIN_TYPE_RIGHT_ANTI: NestedLoopJoinRel.JoinType.ValueType
     JOIN_TYPE_LEFT_SINGLE: NestedLoopJoinRel.JoinType.ValueType
     JOIN_TYPE_RIGHT_SINGLE: NestedLoopJoinRel.JoinType.ValueType
+    JOIN_TYPE_LEFT_MARK: NestedLoopJoinRel.JoinType.ValueType
+    JOIN_TYPE_RIGHT_MARK: NestedLoopJoinRel.JoinType.ValueType
     COMMON_FIELD_NUMBER: builtins.int
     LEFT_FIELD_NUMBER: builtins.int
     RIGHT_FIELD_NUMBER: builtins.int

@@ -87,6 +87,24 @@ class RelCommon(google.protobuf.message.Message):
         """
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+        class _ComputationType:
+            ValueType = typing.NewType('ValueType', builtins.int)
+            V: typing_extensions.TypeAlias = ValueType
+
+        class _ComputationTypeEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[RelCommon.Hint._ComputationType.ValueType], builtins.type):
+            DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+            COMPUTATION_TYPE_UNSPECIFIED: RelCommon.Hint._ComputationType.ValueType
+            COMPUTATION_TYPE_HASHTABLE: RelCommon.Hint._ComputationType.ValueType
+            COMPUTATION_TYPE_BLOOM_FILTER: RelCommon.Hint._ComputationType.ValueType
+            COMPUTATION_TYPE_UNKNOWN: RelCommon.Hint._ComputationType.ValueType
+
+        class ComputationType(_ComputationType, metaclass=_ComputationTypeEnumTypeWrapper):
+            ...
+        COMPUTATION_TYPE_UNSPECIFIED: RelCommon.Hint.ComputationType.ValueType
+        COMPUTATION_TYPE_HASHTABLE: RelCommon.Hint.ComputationType.ValueType
+        COMPUTATION_TYPE_BLOOM_FILTER: RelCommon.Hint.ComputationType.ValueType
+        COMPUTATION_TYPE_UNKNOWN: RelCommon.Hint.ComputationType.ValueType
+
         @typing_extensions.final
         class Stats(google.protobuf.message.Message):
             """The statistics related to a hint (physical properties of records)"""
@@ -128,11 +146,45 @@ class RelCommon(google.protobuf.message.Message):
 
             def ClearField(self, field_name: typing_extensions.Literal['advanced_extension', b'advanced_extension']) -> None:
                 ...
+
+        @typing_extensions.final
+        class SavedComputation(google.protobuf.message.Message):
+            DESCRIPTOR: google.protobuf.descriptor.Descriptor
+            COMPUTATION_ID_FIELD_NUMBER: builtins.int
+            TYPE_FIELD_NUMBER: builtins.int
+            computation_id: builtins.int
+            'The value corresponds to a plan unique number for that datastructure.  Any particular\n            computation may be saved only once but it may be loaded multiple times.\n            '
+            type: global___RelCommon.Hint.ComputationType.ValueType
+            'The type of this computation.  While a plan may use COMPUTATION_TYPE_UNKNOWN for all\n            of its types it is recommended to use a more specific type so that the optimization\n            is more portable.  The consumer should be able to decide if an unknown type here\n            matches the same unknown type at a different plan and ignore the optimization if they\n            are mismatched.\n            '
+
+            def __init__(self, *, computation_id: builtins.int=..., type: global___RelCommon.Hint.ComputationType.ValueType=...) -> None:
+                ...
+
+            def ClearField(self, field_name: typing_extensions.Literal['computation_id', b'computation_id', 'type', b'type']) -> None:
+                ...
+
+        @typing_extensions.final
+        class LoadedComputation(google.protobuf.message.Message):
+            DESCRIPTOR: google.protobuf.descriptor.Descriptor
+            COMPUTATION_ID_REFERENCE_FIELD_NUMBER: builtins.int
+            TYPE_FIELD_NUMBER: builtins.int
+            computation_id_reference: builtins.int
+            'The value corresponds to a plan unique number for that datastructure.  Any particular\n            computation may be saved only once but it may be loaded multiple times.\n            '
+            type: global___RelCommon.Hint.ComputationType.ValueType
+            'The type of this computation.  While a plan may use COMPUTATION_TYPE_UNKNOWN for all\n            of its types it is recommended to use a more specific type so that the optimization\n            is more portable.  The consumer should be able to decide if an unknown type here\n            matches the same unknown type at a different plan and ignore the optimization if they\n            are mismatched.\n            '
+
+            def __init__(self, *, computation_id_reference: builtins.int=..., type: global___RelCommon.Hint.ComputationType.ValueType=...) -> None:
+                ...
+
+            def ClearField(self, field_name: typing_extensions.Literal['computation_id_reference', b'computation_id_reference', 'type', b'type']) -> None:
+                ...
         STATS_FIELD_NUMBER: builtins.int
         CONSTRAINT_FIELD_NUMBER: builtins.int
         ALIAS_FIELD_NUMBER: builtins.int
         OUTPUT_NAMES_FIELD_NUMBER: builtins.int
         ADVANCED_EXTENSION_FIELD_NUMBER: builtins.int
+        SAVED_COMPUTATIONS_FIELD_NUMBER: builtins.int
+        LOADED_COMPUTATIONS_FIELD_NUMBER: builtins.int
 
         @property
         def stats(self) -> global___RelCommon.Hint.Stats:
@@ -154,13 +206,24 @@ class RelCommon(google.protobuf.message.Message):
         def advanced_extension(self) -> proto.extensions.extensions_pb2.AdvancedExtension:
             ...
 
-        def __init__(self, *, stats: global___RelCommon.Hint.Stats | None=..., constraint: global___RelCommon.Hint.RuntimeConstraint | None=..., alias: builtins.str=..., output_names: collections.abc.Iterable[builtins.str] | None=..., advanced_extension: proto.extensions.extensions_pb2.AdvancedExtension | None=...) -> None:
+        @property
+        def saved_computations(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___RelCommon.Hint.SavedComputation]:
+            """Save or load a system-specific computation for use in optimizing a remote operation.
+            The anchor refers to the source/destination of the computation.  The computation type
+            and number refer to the current relation.
+            """
+
+        @property
+        def loaded_computations(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___RelCommon.Hint.LoadedComputation]:
+            ...
+
+        def __init__(self, *, stats: global___RelCommon.Hint.Stats | None=..., constraint: global___RelCommon.Hint.RuntimeConstraint | None=..., alias: builtins.str=..., output_names: collections.abc.Iterable[builtins.str] | None=..., advanced_extension: proto.extensions.extensions_pb2.AdvancedExtension | None=..., saved_computations: collections.abc.Iterable[global___RelCommon.Hint.SavedComputation] | None=..., loaded_computations: collections.abc.Iterable[global___RelCommon.Hint.LoadedComputation] | None=...) -> None:
             ...
 
         def HasField(self, field_name: typing_extensions.Literal['advanced_extension', b'advanced_extension', 'constraint', b'constraint', 'stats', b'stats']) -> builtins.bool:
             ...
 
-        def ClearField(self, field_name: typing_extensions.Literal['advanced_extension', b'advanced_extension', 'alias', b'alias', 'constraint', b'constraint', 'output_names', b'output_names', 'stats', b'stats']) -> None:
+        def ClearField(self, field_name: typing_extensions.Literal['advanced_extension', b'advanced_extension', 'alias', b'alias', 'constraint', b'constraint', 'loaded_computations', b'loaded_computations', 'output_names', b'output_names', 'saved_computations', b'saved_computations', 'stats', b'stats']) -> None:
             ...
     DIRECT_FIELD_NUMBER: builtins.int
     EMIT_FIELD_NUMBER: builtins.int
@@ -228,19 +291,72 @@ class ReadRel(google.protobuf.message.Message):
             ...
 
     @typing_extensions.final
+    class IcebergTable(google.protobuf.message.Message):
+        """Read an Iceberg Table"""
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        @typing_extensions.final
+        class MetadataFileRead(google.protobuf.message.Message):
+            """Read an Iceberg table using a metadata file. Implicit assumption: required credentials are already known by plan consumer."""
+            DESCRIPTOR: google.protobuf.descriptor.Descriptor
+            METADATA_URI_FIELD_NUMBER: builtins.int
+            SNAPSHOT_ID_FIELD_NUMBER: builtins.int
+            SNAPSHOT_TIMESTAMP_FIELD_NUMBER: builtins.int
+            metadata_uri: builtins.str
+            'the specific uri of a metadata file (e.g. s3://mybucket/mytable/<ver>-<uuid>.metadata.json)'
+            snapshot_id: builtins.str
+            'the snapshot id to read.'
+            snapshot_timestamp: builtins.int
+            'the timestamp that should be used to select the snapshot (Time passed in microseconds since 1970-01-01 00:00:00.000000 in UTC)'
+
+            def __init__(self, *, metadata_uri: builtins.str=..., snapshot_id: builtins.str=..., snapshot_timestamp: builtins.int=...) -> None:
+                ...
+
+            def HasField(self, field_name: typing_extensions.Literal['snapshot', b'snapshot', 'snapshot_id', b'snapshot_id', 'snapshot_timestamp', b'snapshot_timestamp']) -> builtins.bool:
+                ...
+
+            def ClearField(self, field_name: typing_extensions.Literal['metadata_uri', b'metadata_uri', 'snapshot', b'snapshot', 'snapshot_id', b'snapshot_id', 'snapshot_timestamp', b'snapshot_timestamp']) -> None:
+                ...
+
+            def WhichOneof(self, oneof_group: typing_extensions.Literal['snapshot', b'snapshot']) -> typing_extensions.Literal['snapshot_id', 'snapshot_timestamp'] | None:
+                ...
+        DIRECT_FIELD_NUMBER: builtins.int
+
+        @property
+        def direct(self) -> global___ReadRel.IcebergTable.MetadataFileRead:
+            """future: add catalog table types (e.g. rest api, latest metadata in path, etc)"""
+
+        def __init__(self, *, direct: global___ReadRel.IcebergTable.MetadataFileRead | None=...) -> None:
+            ...
+
+        def HasField(self, field_name: typing_extensions.Literal['direct', b'direct', 'table_type', b'table_type']) -> builtins.bool:
+            ...
+
+        def ClearField(self, field_name: typing_extensions.Literal['direct', b'direct', 'table_type', b'table_type']) -> None:
+            ...
+
+        def WhichOneof(self, oneof_group: typing_extensions.Literal['table_type', b'table_type']) -> typing_extensions.Literal['direct'] | None:
+            ...
+
+    @typing_extensions.final
     class VirtualTable(google.protobuf.message.Message):
-        """A table composed of literals."""
+        """A table composed of expressions."""
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
         VALUES_FIELD_NUMBER: builtins.int
+        EXPRESSIONS_FIELD_NUMBER: builtins.int
 
         @property
         def values(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___Expression.Literal.Struct]:
             ...
 
-        def __init__(self, *, values: collections.abc.Iterable[global___Expression.Literal.Struct] | None=...) -> None:
+        @property
+        def expressions(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___Expression.Nested.Struct]:
             ...
 
-        def ClearField(self, field_name: typing_extensions.Literal['values', b'values']) -> None:
+        def __init__(self, *, values: collections.abc.Iterable[global___Expression.Literal.Struct] | None=..., expressions: collections.abc.Iterable[global___Expression.Nested.Struct] | None=...) -> None:
+            ...
+
+        def ClearField(self, field_name: typing_extensions.Literal['expressions', b'expressions', 'values', b'values']) -> None:
             ...
 
     @typing_extensions.final
@@ -440,6 +556,7 @@ class ReadRel(google.protobuf.message.Message):
     LOCAL_FILES_FIELD_NUMBER: builtins.int
     NAMED_TABLE_FIELD_NUMBER: builtins.int
     EXTENSION_TABLE_FIELD_NUMBER: builtins.int
+    ICEBERG_TABLE_FIELD_NUMBER: builtins.int
 
     @property
     def common(self) -> global___RelCommon:
@@ -481,16 +598,20 @@ class ReadRel(google.protobuf.message.Message):
     def extension_table(self) -> global___ReadRel.ExtensionTable:
         ...
 
-    def __init__(self, *, common: global___RelCommon | None=..., base_schema: proto.type_pb2.NamedStruct | None=..., filter: global___Expression | None=..., best_effort_filter: global___Expression | None=..., projection: global___Expression.MaskExpression | None=..., advanced_extension: proto.extensions.extensions_pb2.AdvancedExtension | None=..., virtual_table: global___ReadRel.VirtualTable | None=..., local_files: global___ReadRel.LocalFiles | None=..., named_table: global___ReadRel.NamedTable | None=..., extension_table: global___ReadRel.ExtensionTable | None=...) -> None:
+    @property
+    def iceberg_table(self) -> global___ReadRel.IcebergTable:
         ...
 
-    def HasField(self, field_name: typing_extensions.Literal['advanced_extension', b'advanced_extension', 'base_schema', b'base_schema', 'best_effort_filter', b'best_effort_filter', 'common', b'common', 'extension_table', b'extension_table', 'filter', b'filter', 'local_files', b'local_files', 'named_table', b'named_table', 'projection', b'projection', 'read_type', b'read_type', 'virtual_table', b'virtual_table']) -> builtins.bool:
+    def __init__(self, *, common: global___RelCommon | None=..., base_schema: proto.type_pb2.NamedStruct | None=..., filter: global___Expression | None=..., best_effort_filter: global___Expression | None=..., projection: global___Expression.MaskExpression | None=..., advanced_extension: proto.extensions.extensions_pb2.AdvancedExtension | None=..., virtual_table: global___ReadRel.VirtualTable | None=..., local_files: global___ReadRel.LocalFiles | None=..., named_table: global___ReadRel.NamedTable | None=..., extension_table: global___ReadRel.ExtensionTable | None=..., iceberg_table: global___ReadRel.IcebergTable | None=...) -> None:
         ...
 
-    def ClearField(self, field_name: typing_extensions.Literal['advanced_extension', b'advanced_extension', 'base_schema', b'base_schema', 'best_effort_filter', b'best_effort_filter', 'common', b'common', 'extension_table', b'extension_table', 'filter', b'filter', 'local_files', b'local_files', 'named_table', b'named_table', 'projection', b'projection', 'read_type', b'read_type', 'virtual_table', b'virtual_table']) -> None:
+    def HasField(self, field_name: typing_extensions.Literal['advanced_extension', b'advanced_extension', 'base_schema', b'base_schema', 'best_effort_filter', b'best_effort_filter', 'common', b'common', 'extension_table', b'extension_table', 'filter', b'filter', 'iceberg_table', b'iceberg_table', 'local_files', b'local_files', 'named_table', b'named_table', 'projection', b'projection', 'read_type', b'read_type', 'virtual_table', b'virtual_table']) -> builtins.bool:
         ...
 
-    def WhichOneof(self, oneof_group: typing_extensions.Literal['read_type', b'read_type']) -> typing_extensions.Literal['virtual_table', 'local_files', 'named_table', 'extension_table'] | None:
+    def ClearField(self, field_name: typing_extensions.Literal['advanced_extension', b'advanced_extension', 'base_schema', b'base_schema', 'best_effort_filter', b'best_effort_filter', 'common', b'common', 'extension_table', b'extension_table', 'filter', b'filter', 'iceberg_table', b'iceberg_table', 'local_files', b'local_files', 'named_table', b'named_table', 'projection', b'projection', 'read_type', b'read_type', 'virtual_table', b'virtual_table']) -> None:
+        ...
+
+    def WhichOneof(self, oneof_group: typing_extensions.Literal['read_type', b'read_type']) -> typing_extensions.Literal['virtual_table', 'local_files', 'named_table', 'extension_table', 'iceberg_table'] | None:
         ...
 global___ReadRel = ReadRel
 
@@ -654,7 +775,9 @@ class FetchRel(google.protobuf.message.Message):
     COMMON_FIELD_NUMBER: builtins.int
     INPUT_FIELD_NUMBER: builtins.int
     OFFSET_FIELD_NUMBER: builtins.int
+    OFFSET_EXPR_FIELD_NUMBER: builtins.int
     COUNT_FIELD_NUMBER: builtins.int
+    COUNT_EXPR_FIELD_NUMBER: builtins.int
     ADVANCED_EXTENSION_FIELD_NUMBER: builtins.int
 
     @property
@@ -665,21 +788,46 @@ class FetchRel(google.protobuf.message.Message):
     def input(self) -> global___Rel:
         ...
     offset: builtins.int
-    'the offset expressed in number of records'
+    'the offset expressed in number of records\n    Deprecated: use `offset_expr` instead\n    '
+
+    @property
+    def offset_expr(self) -> global___Expression:
+        """Expression evaluated into a non-negative integer specifying the number
+        of records to skip. An expression evaluating to null is treated as 0.
+        Evaluating to a negative integer should result in an error.
+        Recommended type for offset is int64.
+        """
     count: builtins.int
-    'the amount of records to return\n    use -1 to signal that ALL records should be returned\n    '
+    'the amount of records to return\n    use -1 to signal that ALL records should be returned\n    Deprecated: use `count_expr` instead\n    '
+
+    @property
+    def count_expr(self) -> global___Expression:
+        """Expression evaluated into a non-negative integer specifying the number
+        of records to return. An expression evaluating to null signals that ALL
+        records should be returned.
+        Evaluating to a negative integer should result in an error.
+        Recommended type for count is int64.
+        """
 
     @property
     def advanced_extension(self) -> proto.extensions.extensions_pb2.AdvancedExtension:
         ...
 
-    def __init__(self, *, common: global___RelCommon | None=..., input: global___Rel | None=..., offset: builtins.int=..., count: builtins.int=..., advanced_extension: proto.extensions.extensions_pb2.AdvancedExtension | None=...) -> None:
+    def __init__(self, *, common: global___RelCommon | None=..., input: global___Rel | None=..., offset: builtins.int=..., offset_expr: global___Expression | None=..., count: builtins.int=..., count_expr: global___Expression | None=..., advanced_extension: proto.extensions.extensions_pb2.AdvancedExtension | None=...) -> None:
         ...
 
-    def HasField(self, field_name: typing_extensions.Literal['advanced_extension', b'advanced_extension', 'common', b'common', 'input', b'input']) -> builtins.bool:
+    def HasField(self, field_name: typing_extensions.Literal['advanced_extension', b'advanced_extension', 'common', b'common', 'count', b'count', 'count_expr', b'count_expr', 'count_mode', b'count_mode', 'input', b'input', 'offset', b'offset', 'offset_expr', b'offset_expr', 'offset_mode', b'offset_mode']) -> builtins.bool:
         ...
 
-    def ClearField(self, field_name: typing_extensions.Literal['advanced_extension', b'advanced_extension', 'common', b'common', 'count', b'count', 'input', b'input', 'offset', b'offset']) -> None:
+    def ClearField(self, field_name: typing_extensions.Literal['advanced_extension', b'advanced_extension', 'common', b'common', 'count', b'count', 'count_expr', b'count_expr', 'count_mode', b'count_mode', 'input', b'input', 'offset', b'offset', 'offset_expr', b'offset_expr', 'offset_mode', b'offset_mode']) -> None:
+        ...
+
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing_extensions.Literal['count_mode', b'count_mode']) -> typing_extensions.Literal['count', 'count_expr'] | None:
+        ...
+
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing_extensions.Literal['offset_mode', b'offset_mode']) -> typing_extensions.Literal['offset', 'offset_expr'] | None:
         ...
 global___FetchRel = FetchRel
 
@@ -692,15 +840,22 @@ class AggregateRel(google.protobuf.message.Message):
     class Grouping(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
         GROUPING_EXPRESSIONS_FIELD_NUMBER: builtins.int
+        EXPRESSION_REFERENCES_FIELD_NUMBER: builtins.int
 
         @property
         def grouping_expressions(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___Expression]:
+            """Deprecated in favor of `expression_references` below."""
+
+        @property
+        def expression_references(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.int]:
+            """A list of zero or more references to grouping expressions, i.e., indices
+            into the `grouping_expression` list.
+            """
+
+        def __init__(self, *, grouping_expressions: collections.abc.Iterable[global___Expression] | None=..., expression_references: collections.abc.Iterable[builtins.int] | None=...) -> None:
             ...
 
-        def __init__(self, *, grouping_expressions: collections.abc.Iterable[global___Expression] | None=...) -> None:
-            ...
-
-        def ClearField(self, field_name: typing_extensions.Literal['grouping_expressions', b'grouping_expressions']) -> None:
+        def ClearField(self, field_name: typing_extensions.Literal['expression_references', b'expression_references', 'grouping_expressions', b'grouping_expressions']) -> None:
             ...
 
     @typing_extensions.final
@@ -733,6 +888,7 @@ class AggregateRel(google.protobuf.message.Message):
     INPUT_FIELD_NUMBER: builtins.int
     GROUPINGS_FIELD_NUMBER: builtins.int
     MEASURES_FIELD_NUMBER: builtins.int
+    GROUPING_EXPRESSIONS_FIELD_NUMBER: builtins.int
     ADVANCED_EXTENSION_FIELD_NUMBER: builtins.int
 
     @property
@@ -745,8 +901,9 @@ class AggregateRel(google.protobuf.message.Message):
 
     @property
     def groupings(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___AggregateRel.Grouping]:
-        """A list of one or more grouping expression sets that the aggregation measures should be calculated for.
-        Required if there are no measures.
+        """A list of zero or more grouping sets that the aggregation measures should
+        be calculated for. There must be at least one grouping set if there are no
+        measures (but it can be the empty grouping set).
         """
 
     @property
@@ -756,16 +913,24 @@ class AggregateRel(google.protobuf.message.Message):
         """
 
     @property
+    def grouping_expressions(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___Expression]:
+        """A list of zero or more grouping expressions that grouping sets (i.e.,
+        `Grouping` messages in the `groupings` field) can reference. Each
+        expression in this list must be referred to by at least one
+        `Grouping.expression_references`.
+        """
+
+    @property
     def advanced_extension(self) -> proto.extensions.extensions_pb2.AdvancedExtension:
         ...
 
-    def __init__(self, *, common: global___RelCommon | None=..., input: global___Rel | None=..., groupings: collections.abc.Iterable[global___AggregateRel.Grouping] | None=..., measures: collections.abc.Iterable[global___AggregateRel.Measure] | None=..., advanced_extension: proto.extensions.extensions_pb2.AdvancedExtension | None=...) -> None:
+    def __init__(self, *, common: global___RelCommon | None=..., input: global___Rel | None=..., groupings: collections.abc.Iterable[global___AggregateRel.Grouping] | None=..., measures: collections.abc.Iterable[global___AggregateRel.Measure] | None=..., grouping_expressions: collections.abc.Iterable[global___Expression] | None=..., advanced_extension: proto.extensions.extensions_pb2.AdvancedExtension | None=...) -> None:
         ...
 
     def HasField(self, field_name: typing_extensions.Literal['advanced_extension', b'advanced_extension', 'common', b'common', 'input', b'input']) -> builtins.bool:
         ...
 
-    def ClearField(self, field_name: typing_extensions.Literal['advanced_extension', b'advanced_extension', 'common', b'common', 'groupings', b'groupings', 'input', b'input', 'measures', b'measures']) -> None:
+    def ClearField(self, field_name: typing_extensions.Literal['advanced_extension', b'advanced_extension', 'common', b'common', 'grouping_expressions', b'grouping_expressions', 'groupings', b'groupings', 'input', b'input', 'measures', b'measures']) -> None:
         ...
 global___AggregateRel = AggregateRel
 
@@ -950,9 +1115,11 @@ class SetRel(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         SET_OP_UNSPECIFIED: SetRel._SetOp.ValueType
         SET_OP_MINUS_PRIMARY: SetRel._SetOp.ValueType
+        SET_OP_MINUS_PRIMARY_ALL: SetRel._SetOp.ValueType
         SET_OP_MINUS_MULTISET: SetRel._SetOp.ValueType
         SET_OP_INTERSECTION_PRIMARY: SetRel._SetOp.ValueType
         SET_OP_INTERSECTION_MULTISET: SetRel._SetOp.ValueType
+        SET_OP_INTERSECTION_MULTISET_ALL: SetRel._SetOp.ValueType
         SET_OP_UNION_DISTINCT: SetRel._SetOp.ValueType
         SET_OP_UNION_ALL: SetRel._SetOp.ValueType
 
@@ -960,9 +1127,11 @@ class SetRel(google.protobuf.message.Message):
         ...
     SET_OP_UNSPECIFIED: SetRel.SetOp.ValueType
     SET_OP_MINUS_PRIMARY: SetRel.SetOp.ValueType
+    SET_OP_MINUS_PRIMARY_ALL: SetRel.SetOp.ValueType
     SET_OP_MINUS_MULTISET: SetRel.SetOp.ValueType
     SET_OP_INTERSECTION_PRIMARY: SetRel.SetOp.ValueType
     SET_OP_INTERSECTION_MULTISET: SetRel.SetOp.ValueType
+    SET_OP_INTERSECTION_MULTISET_ALL: SetRel.SetOp.ValueType
     SET_OP_UNION_DISTINCT: SetRel.SetOp.ValueType
     SET_OP_UNION_ALL: SetRel.SetOp.ValueType
     COMMON_FIELD_NUMBER: builtins.int
@@ -1387,6 +1556,7 @@ class Rel(google.protobuf.message.Message):
     REFERENCE_FIELD_NUMBER: builtins.int
     WRITE_FIELD_NUMBER: builtins.int
     DDL_FIELD_NUMBER: builtins.int
+    UPDATE_FIELD_NUMBER: builtins.int
     HASH_JOIN_FIELD_NUMBER: builtins.int
     MERGE_JOIN_FIELD_NUMBER: builtins.int
     NESTED_LOOP_JOIN_FIELD_NUMBER: builtins.int
@@ -1455,6 +1625,10 @@ class Rel(google.protobuf.message.Message):
         ...
 
     @property
+    def update(self) -> global___UpdateRel:
+        ...
+
+    @property
     def hash_join(self) -> global___HashJoinRel:
         """Physical relations"""
 
@@ -1478,16 +1652,16 @@ class Rel(google.protobuf.message.Message):
     def expand(self) -> global___ExpandRel:
         ...
 
-    def __init__(self, *, read: global___ReadRel | None=..., filter: global___FilterRel | None=..., fetch: global___FetchRel | None=..., aggregate: global___AggregateRel | None=..., sort: global___SortRel | None=..., join: global___JoinRel | None=..., project: global___ProjectRel | None=..., set: global___SetRel | None=..., extension_single: global___ExtensionSingleRel | None=..., extension_multi: global___ExtensionMultiRel | None=..., extension_leaf: global___ExtensionLeafRel | None=..., cross: global___CrossRel | None=..., reference: global___ReferenceRel | None=..., write: global___WriteRel | None=..., ddl: global___DdlRel | None=..., hash_join: global___HashJoinRel | None=..., merge_join: global___MergeJoinRel | None=..., nested_loop_join: global___NestedLoopJoinRel | None=..., window: global___ConsistentPartitionWindowRel | None=..., exchange: global___ExchangeRel | None=..., expand: global___ExpandRel | None=...) -> None:
+    def __init__(self, *, read: global___ReadRel | None=..., filter: global___FilterRel | None=..., fetch: global___FetchRel | None=..., aggregate: global___AggregateRel | None=..., sort: global___SortRel | None=..., join: global___JoinRel | None=..., project: global___ProjectRel | None=..., set: global___SetRel | None=..., extension_single: global___ExtensionSingleRel | None=..., extension_multi: global___ExtensionMultiRel | None=..., extension_leaf: global___ExtensionLeafRel | None=..., cross: global___CrossRel | None=..., reference: global___ReferenceRel | None=..., write: global___WriteRel | None=..., ddl: global___DdlRel | None=..., update: global___UpdateRel | None=..., hash_join: global___HashJoinRel | None=..., merge_join: global___MergeJoinRel | None=..., nested_loop_join: global___NestedLoopJoinRel | None=..., window: global___ConsistentPartitionWindowRel | None=..., exchange: global___ExchangeRel | None=..., expand: global___ExpandRel | None=...) -> None:
         ...
 
-    def HasField(self, field_name: typing_extensions.Literal['aggregate', b'aggregate', 'cross', b'cross', 'ddl', b'ddl', 'exchange', b'exchange', 'expand', b'expand', 'extension_leaf', b'extension_leaf', 'extension_multi', b'extension_multi', 'extension_single', b'extension_single', 'fetch', b'fetch', 'filter', b'filter', 'hash_join', b'hash_join', 'join', b'join', 'merge_join', b'merge_join', 'nested_loop_join', b'nested_loop_join', 'project', b'project', 'read', b'read', 'reference', b'reference', 'rel_type', b'rel_type', 'set', b'set', 'sort', b'sort', 'window', b'window', 'write', b'write']) -> builtins.bool:
+    def HasField(self, field_name: typing_extensions.Literal['aggregate', b'aggregate', 'cross', b'cross', 'ddl', b'ddl', 'exchange', b'exchange', 'expand', b'expand', 'extension_leaf', b'extension_leaf', 'extension_multi', b'extension_multi', 'extension_single', b'extension_single', 'fetch', b'fetch', 'filter', b'filter', 'hash_join', b'hash_join', 'join', b'join', 'merge_join', b'merge_join', 'nested_loop_join', b'nested_loop_join', 'project', b'project', 'read', b'read', 'reference', b'reference', 'rel_type', b'rel_type', 'set', b'set', 'sort', b'sort', 'update', b'update', 'window', b'window', 'write', b'write']) -> builtins.bool:
         ...
 
-    def ClearField(self, field_name: typing_extensions.Literal['aggregate', b'aggregate', 'cross', b'cross', 'ddl', b'ddl', 'exchange', b'exchange', 'expand', b'expand', 'extension_leaf', b'extension_leaf', 'extension_multi', b'extension_multi', 'extension_single', b'extension_single', 'fetch', b'fetch', 'filter', b'filter', 'hash_join', b'hash_join', 'join', b'join', 'merge_join', b'merge_join', 'nested_loop_join', b'nested_loop_join', 'project', b'project', 'read', b'read', 'reference', b'reference', 'rel_type', b'rel_type', 'set', b'set', 'sort', b'sort', 'window', b'window', 'write', b'write']) -> None:
+    def ClearField(self, field_name: typing_extensions.Literal['aggregate', b'aggregate', 'cross', b'cross', 'ddl', b'ddl', 'exchange', b'exchange', 'expand', b'expand', 'extension_leaf', b'extension_leaf', 'extension_multi', b'extension_multi', 'extension_single', b'extension_single', 'fetch', b'fetch', 'filter', b'filter', 'hash_join', b'hash_join', 'join', b'join', 'merge_join', b'merge_join', 'nested_loop_join', b'nested_loop_join', 'project', b'project', 'read', b'read', 'reference', b'reference', 'rel_type', b'rel_type', 'set', b'set', 'sort', b'sort', 'update', b'update', 'window', b'window', 'write', b'write']) -> None:
         ...
 
-    def WhichOneof(self, oneof_group: typing_extensions.Literal['rel_type', b'rel_type']) -> typing_extensions.Literal['read', 'filter', 'fetch', 'aggregate', 'sort', 'join', 'project', 'set', 'extension_single', 'extension_multi', 'extension_leaf', 'cross', 'reference', 'write', 'ddl', 'hash_join', 'merge_join', 'nested_loop_join', 'window', 'exchange', 'expand'] | None:
+    def WhichOneof(self, oneof_group: typing_extensions.Literal['rel_type', b'rel_type']) -> typing_extensions.Literal['read', 'filter', 'fetch', 'aggregate', 'sort', 'join', 'project', 'set', 'extension_single', 'extension_multi', 'extension_leaf', 'cross', 'reference', 'write', 'ddl', 'update', 'hash_join', 'merge_join', 'nested_loop_join', 'window', 'exchange', 'expand'] | None:
         ...
 global___Rel = Rel
 
@@ -1603,6 +1777,7 @@ class DdlRel(google.protobuf.message.Message):
     OP_FIELD_NUMBER: builtins.int
     VIEW_DEFINITION_FIELD_NUMBER: builtins.int
     COMMON_FIELD_NUMBER: builtins.int
+    ADVANCED_EXTENSION_FIELD_NUMBER: builtins.int
 
     @property
     def named_object(self) -> global___NamedObjectWrite:
@@ -1636,13 +1811,17 @@ class DdlRel(google.protobuf.message.Message):
     def common(self) -> global___RelCommon:
         ...
 
-    def __init__(self, *, named_object: global___NamedObjectWrite | None=..., extension_object: global___ExtensionObject | None=..., table_schema: proto.type_pb2.NamedStruct | None=..., table_defaults: global___Expression.Literal.Struct | None=..., object: global___DdlRel.DdlObject.ValueType=..., op: global___DdlRel.DdlOp.ValueType=..., view_definition: global___Rel | None=..., common: global___RelCommon | None=...) -> None:
+    @property
+    def advanced_extension(self) -> proto.extensions.extensions_pb2.AdvancedExtension:
         ...
 
-    def HasField(self, field_name: typing_extensions.Literal['common', b'common', 'extension_object', b'extension_object', 'named_object', b'named_object', 'table_defaults', b'table_defaults', 'table_schema', b'table_schema', 'view_definition', b'view_definition', 'write_type', b'write_type']) -> builtins.bool:
+    def __init__(self, *, named_object: global___NamedObjectWrite | None=..., extension_object: global___ExtensionObject | None=..., table_schema: proto.type_pb2.NamedStruct | None=..., table_defaults: global___Expression.Literal.Struct | None=..., object: global___DdlRel.DdlObject.ValueType=..., op: global___DdlRel.DdlOp.ValueType=..., view_definition: global___Rel | None=..., common: global___RelCommon | None=..., advanced_extension: proto.extensions.extensions_pb2.AdvancedExtension | None=...) -> None:
         ...
 
-    def ClearField(self, field_name: typing_extensions.Literal['common', b'common', 'extension_object', b'extension_object', 'named_object', b'named_object', 'object', b'object', 'op', b'op', 'table_defaults', b'table_defaults', 'table_schema', b'table_schema', 'view_definition', b'view_definition', 'write_type', b'write_type']) -> None:
+    def HasField(self, field_name: typing_extensions.Literal['advanced_extension', b'advanced_extension', 'common', b'common', 'extension_object', b'extension_object', 'named_object', b'named_object', 'table_defaults', b'table_defaults', 'table_schema', b'table_schema', 'view_definition', b'view_definition', 'write_type', b'write_type']) -> builtins.bool:
+        ...
+
+    def ClearField(self, field_name: typing_extensions.Literal['advanced_extension', b'advanced_extension', 'common', b'common', 'extension_object', b'extension_object', 'named_object', b'named_object', 'object', b'object', 'op', b'op', 'table_defaults', b'table_defaults', 'table_schema', b'table_schema', 'view_definition', b'view_definition', 'write_type', b'write_type']) -> None:
         ...
 
     def WhichOneof(self, oneof_group: typing_extensions.Literal['write_type', b'write_type']) -> typing_extensions.Literal['named_object', 'extension_object'] | None:
@@ -1684,6 +1863,34 @@ class WriteRel(google.protobuf.message.Message):
     WRITE_OP_CTAS: WriteRel.WriteOp.ValueType
     'The Creation of a new table, and the insert of new records in the table'
 
+    class _CreateMode:
+        ValueType = typing.NewType('ValueType', builtins.int)
+        V: typing_extensions.TypeAlias = ValueType
+
+    class _CreateModeEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[WriteRel._CreateMode.ValueType], builtins.type):
+        DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+        CREATE_MODE_UNSPECIFIED: WriteRel._CreateMode.ValueType
+        CREATE_MODE_APPEND_IF_EXISTS: WriteRel._CreateMode.ValueType
+        'Append the data to the table if it already exists'
+        CREATE_MODE_REPLACE_IF_EXISTS: WriteRel._CreateMode.ValueType
+        'Replace the table if it already exists ("OR REPLACE")'
+        CREATE_MODE_IGNORE_IF_EXISTS: WriteRel._CreateMode.ValueType
+        'Ignore the request if the table already exists ("IF NOT EXISTS")'
+        CREATE_MODE_ERROR_IF_EXISTS: WriteRel._CreateMode.ValueType
+        'Throw an error if the table already exists (default behavior)'
+
+    class CreateMode(_CreateMode, metaclass=_CreateModeEnumTypeWrapper):
+        ...
+    CREATE_MODE_UNSPECIFIED: WriteRel.CreateMode.ValueType
+    CREATE_MODE_APPEND_IF_EXISTS: WriteRel.CreateMode.ValueType
+    'Append the data to the table if it already exists'
+    CREATE_MODE_REPLACE_IF_EXISTS: WriteRel.CreateMode.ValueType
+    'Replace the table if it already exists ("OR REPLACE")'
+    CREATE_MODE_IGNORE_IF_EXISTS: WriteRel.CreateMode.ValueType
+    'Ignore the request if the table already exists ("IF NOT EXISTS")'
+    CREATE_MODE_ERROR_IF_EXISTS: WriteRel.CreateMode.ValueType
+    'Throw an error if the table already exists (default behavior)'
+
     class _OutputMode:
         ValueType = typing.NewType('ValueType', builtins.int)
         V: typing_extensions.TypeAlias = ValueType
@@ -1708,8 +1915,10 @@ class WriteRel(google.protobuf.message.Message):
     TABLE_SCHEMA_FIELD_NUMBER: builtins.int
     OP_FIELD_NUMBER: builtins.int
     INPUT_FIELD_NUMBER: builtins.int
+    CREATE_MODE_FIELD_NUMBER: builtins.int
     OUTPUT_FIELD_NUMBER: builtins.int
     COMMON_FIELD_NUMBER: builtins.int
+    ADVANCED_EXTENSION_FIELD_NUMBER: builtins.int
 
     @property
     def named_table(self) -> global___NamedObjectWrite:
@@ -1732,6 +1941,8 @@ class WriteRel(google.protobuf.message.Message):
         in a ProjectRel at the top of the input. The match must also
         occur in case of DELETE to ensure multi-engine plans are unequivocal.
         """
+    create_mode: global___WriteRel.CreateMode.ValueType
+    'Used with CTAS to determine what to do if the table already exists'
     output: global___WriteRel.OutputMode.ValueType
     'Output mode determines what is the output of executing this rel'
 
@@ -1739,18 +1950,113 @@ class WriteRel(google.protobuf.message.Message):
     def common(self) -> global___RelCommon:
         ...
 
-    def __init__(self, *, named_table: global___NamedObjectWrite | None=..., extension_table: global___ExtensionObject | None=..., table_schema: proto.type_pb2.NamedStruct | None=..., op: global___WriteRel.WriteOp.ValueType=..., input: global___Rel | None=..., output: global___WriteRel.OutputMode.ValueType=..., common: global___RelCommon | None=...) -> None:
+    @property
+    def advanced_extension(self) -> proto.extensions.extensions_pb2.AdvancedExtension:
         ...
 
-    def HasField(self, field_name: typing_extensions.Literal['common', b'common', 'extension_table', b'extension_table', 'input', b'input', 'named_table', b'named_table', 'table_schema', b'table_schema', 'write_type', b'write_type']) -> builtins.bool:
+    def __init__(self, *, named_table: global___NamedObjectWrite | None=..., extension_table: global___ExtensionObject | None=..., table_schema: proto.type_pb2.NamedStruct | None=..., op: global___WriteRel.WriteOp.ValueType=..., input: global___Rel | None=..., create_mode: global___WriteRel.CreateMode.ValueType=..., output: global___WriteRel.OutputMode.ValueType=..., common: global___RelCommon | None=..., advanced_extension: proto.extensions.extensions_pb2.AdvancedExtension | None=...) -> None:
         ...
 
-    def ClearField(self, field_name: typing_extensions.Literal['common', b'common', 'extension_table', b'extension_table', 'input', b'input', 'named_table', b'named_table', 'op', b'op', 'output', b'output', 'table_schema', b'table_schema', 'write_type', b'write_type']) -> None:
+    def HasField(self, field_name: typing_extensions.Literal['advanced_extension', b'advanced_extension', 'common', b'common', 'extension_table', b'extension_table', 'input', b'input', 'named_table', b'named_table', 'table_schema', b'table_schema', 'write_type', b'write_type']) -> builtins.bool:
+        ...
+
+    def ClearField(self, field_name: typing_extensions.Literal['advanced_extension', b'advanced_extension', 'common', b'common', 'create_mode', b'create_mode', 'extension_table', b'extension_table', 'input', b'input', 'named_table', b'named_table', 'op', b'op', 'output', b'output', 'table_schema', b'table_schema', 'write_type', b'write_type']) -> None:
         ...
 
     def WhichOneof(self, oneof_group: typing_extensions.Literal['write_type', b'write_type']) -> typing_extensions.Literal['named_table', 'extension_table'] | None:
         ...
 global___WriteRel = WriteRel
+
+@typing_extensions.final
+class UpdateRel(google.protobuf.message.Message):
+    """The operator that modifies the columns of a table"""
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    @typing_extensions.final
+    class TransformExpression(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+        TRANSFORMATION_FIELD_NUMBER: builtins.int
+        COLUMN_TARGET_FIELD_NUMBER: builtins.int
+
+        @property
+        def transformation(self) -> global___Expression:
+            """the transformation to apply"""
+        column_target: builtins.int
+        'index of the column to apply the transformation to'
+
+        def __init__(self, *, transformation: global___Expression | None=..., column_target: builtins.int=...) -> None:
+            ...
+
+        def HasField(self, field_name: typing_extensions.Literal['transformation', b'transformation']) -> builtins.bool:
+            ...
+
+        def ClearField(self, field_name: typing_extensions.Literal['column_target', b'column_target', 'transformation', b'transformation']) -> None:
+            ...
+    NAMED_TABLE_FIELD_NUMBER: builtins.int
+    TABLE_SCHEMA_FIELD_NUMBER: builtins.int
+    CONDITION_FIELD_NUMBER: builtins.int
+    TRANSFORMATIONS_FIELD_NUMBER: builtins.int
+    ADVANCED_EXTENSION_FIELD_NUMBER: builtins.int
+
+    @property
+    def named_table(self) -> global___NamedTable:
+        ...
+
+    @property
+    def table_schema(self) -> proto.type_pb2.NamedStruct:
+        """The full schema of the named_table"""
+
+    @property
+    def condition(self) -> global___Expression:
+        """condition to be met for the update to be applied on a record"""
+
+    @property
+    def transformations(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___UpdateRel.TransformExpression]:
+        """The list of transformations to apply to the columns of the named_table"""
+
+    @property
+    def advanced_extension(self) -> proto.extensions.extensions_pb2.AdvancedExtension:
+        ...
+
+    def __init__(self, *, named_table: global___NamedTable | None=..., table_schema: proto.type_pb2.NamedStruct | None=..., condition: global___Expression | None=..., transformations: collections.abc.Iterable[global___UpdateRel.TransformExpression] | None=..., advanced_extension: proto.extensions.extensions_pb2.AdvancedExtension | None=...) -> None:
+        ...
+
+    def HasField(self, field_name: typing_extensions.Literal['advanced_extension', b'advanced_extension', 'condition', b'condition', 'named_table', b'named_table', 'table_schema', b'table_schema', 'update_type', b'update_type']) -> builtins.bool:
+        ...
+
+    def ClearField(self, field_name: typing_extensions.Literal['advanced_extension', b'advanced_extension', 'condition', b'condition', 'named_table', b'named_table', 'table_schema', b'table_schema', 'transformations', b'transformations', 'update_type', b'update_type']) -> None:
+        ...
+
+    def WhichOneof(self, oneof_group: typing_extensions.Literal['update_type', b'update_type']) -> typing_extensions.Literal['named_table'] | None:
+        ...
+global___UpdateRel = UpdateRel
+
+@typing_extensions.final
+class NamedTable(google.protobuf.message.Message):
+    """A base table. The list of string is used to represent namespacing (e.g., mydb.mytable).
+    This assumes shared catalog between systems exchanging a message.
+    """
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+    NAMES_FIELD_NUMBER: builtins.int
+    ADVANCED_EXTENSION_FIELD_NUMBER: builtins.int
+
+    @property
+    def names(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]:
+        ...
+
+    @property
+    def advanced_extension(self) -> proto.extensions.extensions_pb2.AdvancedExtension:
+        ...
+
+    def __init__(self, *, names: collections.abc.Iterable[builtins.str] | None=..., advanced_extension: proto.extensions.extensions_pb2.AdvancedExtension | None=...) -> None:
+        ...
+
+    def HasField(self, field_name: typing_extensions.Literal['advanced_extension', b'advanced_extension']) -> builtins.bool:
+        ...
+
+    def ClearField(self, field_name: typing_extensions.Literal['advanced_extension', b'advanced_extension', 'names', b'names']) -> None:
+        ...
+global___NamedTable = NamedTable
 
 @typing_extensions.final
 class ComparisonJoinKey(google.protobuf.message.Message):

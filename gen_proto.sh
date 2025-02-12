@@ -14,7 +14,7 @@ extension_dir=./src/substrait/extensions
 python "$submodule_dir"/tools/proto_prefix.py "$tmp_dir" "$namespace" "$src_dir"
 
 # Remove the old python protobuf files
-rm -rf "$dest_dir"
+rm -rf "$dest_dir/proto"
 
 # Generate the new python protobuf files
 buf generate

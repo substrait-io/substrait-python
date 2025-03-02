@@ -1,0 +1,111 @@
+import substrait.gen.proto.algebra_pb2 as stalg
+import substrait.gen.proto.type_pb2 as stt
+
+
+def infer_literal_type(literal: stalg.Expression.Literal) -> stt.Type:
+    literal_type = literal.WhichOneof("literal_type")
+
+    nullability = (
+        stt.Type.Nullability.NULLABILITY_NULLABLE
+        if literal.nullable
+        else stt.Type.Nullability.NULLABILITY_REQUIRED
+    )
+
+    if literal_type == "boolean":
+        return stt.Type(bool=stt.Type.Boolean(nullability=nullability))
+    elif literal_type == "i8":
+        return stt.Type(i8=stt.Type.I8(nullability=nullability))
+    elif literal_type == "i16":
+        return stt.Type(i16=stt.Type.I16(nullability=nullability))
+    elif literal_type == "i32":
+        return stt.Type(i32=stt.Type.I32(nullability=nullability))
+    elif literal_type == "i64":
+        return stt.Type(i64=stt.Type.I64(nullability=nullability))
+    elif literal_type == "fp32":
+        return stt.Type(fp32=stt.Type.FP32(nullability=nullability))
+    elif literal_type == "fp64":
+        return stt.Type(fp64=stt.Type.FP64(nullability=nullability))
+    elif literal_type == "string":
+        return stt.Type(string=stt.Type.String(nullability=nullability))
+    else:
+        raise Exception(f"Unknown literal_type {literal_type}")
+
+
+def infer_expression_type(
+    expression: stalg.Expression, parent_schema: stt.Type.Struct
+) -> stt.Type:
+    rex_type = expression.WhichOneof("rex_type")
+    if rex_type == "selection":
+        root_type = expression.selection.WhichOneof("root_type")
+        assert root_type == "root_reference"
+
+        reference_type = expression.selection.WhichOneof("reference_type")
+
+        if reference_type == "direct_reference":
+            segment = expression.selection.direct_reference
+
+            segment_reference_type = segment.WhichOneof("reference_type")
+
+            if segment_reference_type == "struct_field":
+                return parent_schema.types[segment.struct_field.field]
+            else:
+                raise Exception(f"Unknown reference_type {reference_type}")
+        else:
+            raise Exception(f"Unknown reference_type {reference_type}")
+
+    elif rex_type == "literal":
+        return infer_literal_type(expression.literal)
+    elif rex_type == "scalar_function":
+        return expression.scalar_function.output_type
+    elif rex_type == "window_function":
+        return expression.window_function.output_type
+    elif rex_type == "if_then":
+        return infer_expression_type(expression.if_then.ifs[0].then)
+    elif rex_type == "switch_expression":
+        return infer_expression_type(expression.switch_expression.ifs[0].then)
+    elif rex_type == "cast":
+        return expression.cast.type
+    elif rex_type == "singular_or_list" or rex_type == "multi_or_list":
+        return stt.Type(
+            bool=stt.Type.Boolean(nullability=stt.Type.Nullability.NULLABILITY_NULLABLE)
+        )
+    # Subquery subquery = 12;
+    # Nested nested = 13;
+    else:
+        raise Exception(f"Unknown rex_type {rex_type}")
+
+
+def infer_rel_schema(rel: stalg.Rel) -> stt.Type.Struct:
+    rel_type = rel.WhichOneof("rel_type")
+
+    if rel_type == "read":
+        (common, struct) = (rel.read.common, rel.read.base_schema.struct)
+    elif rel_type == "filter":
+        (common, struct) = (rel.filter.common, infer_rel_schema(rel.filter.input))
+    elif rel_type == "fetch":
+        (common, struct) = (rel.fetch.common, infer_rel_schema(rel.fetch.input))
+    elif rel_type == "sort":
+        (common, struct) = (rel.sort.common, infer_rel_schema(rel.sort.input))
+    elif rel_type == "project":
+        parent_schema = infer_rel_schema(rel.project.input)
+        expression_types = [
+            infer_expression_type(e, parent_schema) for e in rel.project.expressions
+        ]
+        raw_schema = stt.Type.Struct(
+            types=list(parent_schema.types) + expression_types,
+            nullability=parent_schema.nullability,
+        )
+
+        (common, struct) = (rel.project.common, raw_schema)
+    else:
+        raise Exception(f"Unhandled rel_type {rel_type}")
+
+    emit_kind = common.WhichOneof("emit_kind") or "direct"
+
+    if emit_kind == "direct":
+        return struct
+    else:
+        return stt.Type.Struct(
+            types=[struct.types[i] for i in common.emit.output_mapping],
+            nullability=struct.nullability,
+        )

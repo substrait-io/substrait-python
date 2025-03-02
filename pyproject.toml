@@ -4,7 +4,7 @@ description = "A python package for Substrait."
 authors = [{name = "Substrait contributors", email = "substrait@googlegroups.com"}]
 license = {text = "Apache-2.0"}
 readme = "README.md"
-requires-python = ">=3.8.1"
+requires-python = ">=3.9"
 dependencies = ["protobuf >= 3.20"]
 dynamic = ["version"]
 
@@ -27,7 +27,7 @@ build-backend = "setuptools.build_meta"
 [tool.ruff]
 respect-gitignore = true
 # should target minimum supported version
-target-version = "py38"
+target-version = "py39"
 # never autoformat upstream or generated code
 exclude = ["third_party/", "src/substrait/gen"]
 # do not autofix the following (will still get flagged in lint)

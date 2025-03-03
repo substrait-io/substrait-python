@@ -56,7 +56,7 @@ def infer_literal_type(literal: stalg.Expression.Literal) -> stt.Type:
     elif literal_type == "struct":
         return stt.Type(struct=stt.Type.Struct(types=[infer_literal_type(f) for f in literal.struct.fields], nullability=nullability))
     elif literal_type == "map":
-        return stt.Type(map=stt.Type.Map(key=infer_literal_type(literal.map.key_values[0].key), value=infer_literal_type(literal.map.key_values[0].value)), nullability=nullability)
+        return stt.Type(map=stt.Type.Map(key=infer_literal_type(literal.map.key_values[0].key), value=infer_literal_type(literal.map.key_values[0].value), nullability=nullability))
     elif literal_type == "timestamp_tz":
         return stt.Type(timestamp_tz=stt.Type.TimestampTZ(nullability=nullability))
     elif literal_type == "uuid":

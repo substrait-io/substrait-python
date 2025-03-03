@@ -27,6 +27,48 @@ def infer_literal_type(literal: stalg.Expression.Literal) -> stt.Type:
         return stt.Type(fp64=stt.Type.FP64(nullability=nullability))
     elif literal_type == "string":
         return stt.Type(string=stt.Type.String(nullability=nullability))
+    elif literal_type == "binary":
+        return stt.Type(binary=stt.Type.Binary(nullability=nullability))
+    elif literal_type == "timestamp":
+        return stt.Type(timestamp=stt.Type.Timestamp(nullability=nullability))
+    elif literal_type == "date":
+        return stt.Type(date=stt.Type.Date(nullability=nullability))
+    elif literal_type == "time":
+        return stt.Type(time=stt.Type.Time(nullability=nullability))
+    elif literal_type == "interval_year_to_month":
+        return stt.Type(interval_year=stt.Type.IntervalYear(nullability=nullability))
+    elif literal_type == "interval_day_to_second":
+        return stt.Type(interval_day=stt.Type.IntervalDay(precision=literal.interval_day_to_second.precision, nullability=nullability))
+    elif literal_type == "interval_compound":
+        return stt.Type(interval_compound=stt.Type.IntervalCompound(nullability=nullability, precision=literal.interval_compound.interval_day_to_second.precision))
+    elif literal_type == "fixed_char":
+        return stt.Type(fixed_char=stt.Type.FixedChar(length=len(literal.fixed_char), nullability=nullability))
+    elif literal_type == "var_char":
+        return stt.Type(varchar=stt.Type.VarChar(length=literal.var_char.length, nullability=nullability))
+    elif literal_type == "fixed_binary":
+        return stt.Type(fixed_binary=stt.Type.FixedBinary(length=len(literal.fixed_binary), nullability=nullability))
+    elif literal_type == "decimal":
+        return stt.Type(decimal=stt.Type.Decimal(scale=literal.decimal.scale, precision=literal.decimal.precision, nullability=nullability))
+    elif literal_type == "precision_timestamp":
+        return stt.Type(precision_timestamp=stt.Type.PrecisionTimestamp(precision=literal.precision_timestamp.precision, nullability=nullability))
+    elif literal_type == "precision_timestamp_tz":
+        return stt.Type(precision_timestamp_tz=stt.Type.PrecisionTimestampTZ(precision=literal.precision_timestamp_tz.precision, nullability=nullability))
+    elif literal_type == "struct":
+        return stt.Type(struct=stt.Type.Struct(types=[infer_literal_type(f) for f in literal.struct.fields], nullability=nullability))
+    elif literal_type == "map":
+        return stt.Type(map=stt.Type.Map(key=infer_literal_type(literal.map.key_values[0].key), value=infer_literal_type(literal.map.key_values[0].value)), nullability=nullability)
+    elif literal_type == "timestamp_tz":
+        return stt.Type(timestamp_tz=stt.Type.TimestampTZ(nullability=nullability))
+    elif literal_type == "uuid":
+        return stt.Type(uuid=stt.Type.UUID(nullability=nullability))
+    elif literal_type == "null":
+        return literal.null
+    elif literal_type == "list":
+        return stt.Type(list=stt.Type.List(type=infer_literal_type(literal.list.values[0]), nullability=nullability))
+    elif literal_type == "empty_list":
+        return stt.Type(list=literal.empty_list)
+    elif literal_type == "empty_map":
+        return stt.Type(map=literal.empty_map)
     else:
         raise Exception(f"Unknown literal_type {literal_type}")
 

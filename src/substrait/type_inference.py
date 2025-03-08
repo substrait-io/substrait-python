@@ -152,6 +152,17 @@ def infer_rel_schema(rel: stalg.Rel) -> stt.Type.Struct:
         (common, struct) = (rel.filter.common, infer_rel_schema(rel.filter.input))
     elif rel_type == "fetch":
         (common, struct) = (rel.fetch.common, infer_rel_schema(rel.fetch.input))
+    elif rel_type == "aggregate":
+        parent_schema = infer_rel_schema(rel.aggregate.input)
+        grouping_types = [infer_expression_type(g, parent_schema) for g in rel.aggregate.grouping_expressions]
+        measure_types = [m.measure.output_type for m in rel.aggregate.measures]
+
+        raw_schema = stt.Type.Struct(
+            types=grouping_types + measure_types,
+            nullability=parent_schema.nullability,
+        )
+
+        (common, struct) = (rel.aggregate.common, raw_schema)
     elif rel_type == "sort":
         (common, struct) = (rel.sort.common, infer_rel_schema(rel.sort.input))
     elif rel_type == "project":
@@ -165,6 +176,18 @@ def infer_rel_schema(rel: stalg.Rel) -> stt.Type.Struct:
         )
 
         (common, struct) = (rel.project.common, raw_schema)
+    elif rel_type == "set":
+        (common, struct) = (rel.fetch.common, infer_rel_schema(rel.set.inputs[0]))
+    elif rel_type == "cross":
+        left_schema = infer_rel_schema(rel.cross.left)
+        right_schema = infer_rel_schema(rel.cross.right)
+
+        raw_schema = stt.Type.Struct(
+            types=left_schema.types + right_schema.types,
+            nullability=stt.Type.Nullability.NULLABILITY_REQUIRED,
+        )
+
+        (common, struct) = (rel.cross.common, raw_schema)
     else:
         raise Exception(f"Unhandled rel_type {rel_type}")
 

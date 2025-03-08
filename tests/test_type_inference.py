@@ -97,3 +97,48 @@ def test_inference_project_scalar_function():
     )
 
     assert infer_rel_schema(rel) == expected
+
+def test_inference_aggregate():
+    rel = stalg.Rel(
+        aggregate=stalg.AggregateRel(
+            input=read_rel,
+            grouping_expressions=[
+                stalg.Expression(
+                    selection=stalg.Expression.FieldReference(
+                        root_reference=stalg.Expression.FieldReference.RootReference(),
+                        direct_reference=stalg.Expression.ReferenceSegment(
+                            struct_field=stalg.Expression.ReferenceSegment.StructField(
+                                field=1,
+                            ),
+                        ),
+                    )
+                )
+            ],
+            groupings=[
+                stalg.AggregateRel.Grouping(
+                    expression_references=[0]
+                )
+            ],
+            measures=[
+                stalg.AggregateRel.Measure(
+                    measure=stalg.AggregateFunction(
+                        function_reference=0,
+                        output_type=stt.Type(
+                            bool=stt.Type.Boolean(
+                                nullability=stt.Type.NULLABILITY_REQUIRED
+                            )
+                        ),
+                    )
+                )
+            ],
+        )
+    )
+
+    expected = stt.Type.Struct(
+        types=[
+            stt.Type(string=stt.Type.String(nullability=stt.Type.NULLABILITY_NULLABLE)),
+            stt.Type(bool=stt.Type.Boolean(nullability=stt.Type.NULLABILITY_REQUIRED)),
+        ]
+    )
+
+    assert infer_rel_schema(rel) == expected

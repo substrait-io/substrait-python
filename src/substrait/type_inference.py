@@ -72,6 +72,23 @@ def infer_literal_type(literal: stalg.Expression.Literal) -> stt.Type:
     else:
         raise Exception(f"Unknown literal_type {literal_type}")
 
+def infer_nested_type(nested: stalg.Expression.Nested) -> stt.Type:
+    nested_type = nested.WhichOneof("nested_type")
+
+    nullability = (
+        stt.Type.Nullability.NULLABILITY_NULLABLE
+        if nested.nullable
+        else stt.Type.Nullability.NULLABILITY_REQUIRED
+    )
+
+    if nested_type == "struct":
+        return stt.Type(struct=stt.Type.Struct(types=[infer_expression_type(f) for f in nested.struct.fields], nullability=nullability))
+    elif nested_type == "list":
+        return stt.Type(list=stt.Type.List(type=infer_expression_type(nested.list.values[0]), nullability=nullability))
+    elif nested_type == "map":
+        return stt.Type(map=stt.Type.Map(key=infer_expression_type(nested.map.key_values[0].key), value=infer_expression_type(nested.map.key_values[0].value), nullability=nullability))
+    else:
+        raise Exception(f"Unknown nested_type {nested_type}")
 
 def infer_expression_type(
     expression: stalg.Expression, parent_schema: stt.Type.Struct
@@ -111,11 +128,20 @@ def infer_expression_type(
         return stt.Type(
             bool=stt.Type.Boolean(nullability=stt.Type.Nullability.NULLABILITY_NULLABLE)
         )
-    # Subquery subquery = 12;
-    # Nested nested = 13;
+    elif rex_type == "nested":
+        return infer_nested_type(expression.nested)
+    elif rex_type == "subquery":
+        subquery_type = expression.subquery.WhichOneof('subquery_type')
+
+        if subquery_type == "scalar":
+            scalar_rel = infer_rel_schema(expression.subquery.scalar.input)
+            return scalar_rel.types[0]
+        elif subquery_type == "in_predicate" or subquery_type == "set_comparison" or subquery_type == "set_predicate":
+            stt.Type.Boolean(nullability=stt.Type.Nullability.NULLABILITY_NULLABLE) # can this be a null?
+        else:
+            raise Exception(f"Unknown subquery_type {subquery_type}")
     else:
         raise Exception(f"Unknown rex_type {rex_type}")
-
 
 def infer_rel_schema(rel: stalg.Rel) -> stt.Type.Struct:
     rel_type = rel.WhichOneof("rel_type")

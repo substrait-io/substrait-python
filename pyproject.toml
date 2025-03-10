@@ -12,9 +12,9 @@ dynamic = ["version"]
 write_to = "src/substrait/_version.py"
 
 [project.optional-dependencies]
-extensions = ["antlr4-python3-runtime"]
+extensions = ["antlr4-python3-runtime", "pyyaml"]
 gen_proto = ["protobuf == 3.20.1", "protoletariat >= 2.0.0"]
-test = ["pytest >= 7.0.0", "antlr4-python3-runtime"]
+test = ["pytest >= 7.0.0", "antlr4-python3-runtime", "pyyaml"]
 
 [tool.pytest.ini_options]
 pythonpath = "src"
@@ -31,7 +31,7 @@ target-version = "py39"
 # never autoformat upstream or generated code
 exclude = ["third_party/", "src/substrait/gen"]
 # do not autofix the following (will still get flagged in lint)
-unfixable = [
+lint.unfixable = [
   "F401",  # unused imports
   "T201",  # print statements
 ]

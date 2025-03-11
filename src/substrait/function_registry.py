@@ -50,9 +50,6 @@ def normalize_substrait_type_names(typ: str) -> str:
     return typ
 
 
-id_generator = itertools.count(1)
-
-
 def to_integer_option(txt: str):
     if txt.isnumeric():
         return ParameterizedType.IntegerOption(literal=int(txt))
@@ -153,7 +150,7 @@ def to_parameterized_type(dtype: str):
             user_defined=ParameterizedType.ParameterizedUserDefined()
         )
     else:
-        raise Exception(f"Unkownn type - {dtype}")
+        raise Exception(f"Unknown type - {dtype}")
 
 
 def violates_integer_option(
@@ -210,11 +207,11 @@ def covers(dtype: Type, parameterized_type: ParameterizedType, parameters: dict)
 
 
 class FunctionEntry:
-    def __init__(self, uri: str, name: str, impl: Mapping[str, Any]) -> None:
+    def __init__(self, uri: str, name: str, impl: Mapping[str, Any], anchor: int) -> None:
         self.name = name
         self.normalized_inputs: list = []
         self.uri: str = uri
-        self.anchor = next(id_generator)
+        self.anchor = anchor
         self.arguments = []
         self.rtn = impl["return"]
         self.nullability = impl.get("nullability", False)
@@ -286,7 +283,7 @@ class FunctionRegistry:
         for named_functions in definitions.values():
             for function in named_functions:
                 for impl in function.get("impls", []):
-                    func = FunctionEntry(uri, function["name"], impl)
+                    func = FunctionEntry(uri, function["name"], impl, next(self.id_generator))
                     if (
                         func.uri in self._function_mapping
                         and function["name"] in self._function_mapping[func.uri]

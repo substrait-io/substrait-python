@@ -269,11 +269,59 @@ def infer_rel_schema(rel: stalg.Rel) -> stt.Type.Struct:
         right_schema = infer_rel_schema(rel.cross.right)
 
         raw_schema = stt.Type.Struct(
-            types=left_schema.types + right_schema.types,
+            types=list(left_schema.types) + list(right_schema.types),
             nullability=stt.Type.Nullability.NULLABILITY_REQUIRED,
         )
 
         (common, struct) = (rel.cross.common, raw_schema)
+    elif rel_type == "join":
+        if rel.join.type in [
+            stalg.JoinRel.JOIN_TYPE_INNER,
+            stalg.JoinRel.JOIN_TYPE_OUTER,
+            stalg.JoinRel.JOIN_TYPE_LEFT,
+            stalg.JoinRel.JOIN_TYPE_RIGHT,
+            stalg.JoinRel.JOIN_TYPE_LEFT_SINGLE,
+            stalg.JoinRel.JOIN_TYPE_RIGHT_SINGLE,
+        ]:
+            raw_schema = stt.Type.Struct(
+                types=list(infer_rel_schema(rel.join.left).types)
+                + list(infer_rel_schema(rel.join.right).types),
+                nullability=stt.Type.Nullability.NULLABILITY_REQUIRED,
+            )
+        elif rel.join.type in [
+            stalg.JoinRel.JOIN_TYPE_LEFT_ANTI,
+            stalg.JoinRel.JOIN_TYPE_LEFT_SEMI,
+        ]:
+            raw_schema = stt.Type.Struct(
+                types=infer_rel_schema(rel.join.left).types,
+                nullability=stt.Type.Nullability.NULLABILITY_REQUIRED,
+            )
+        elif rel.join.type in [
+            stalg.JoinRel.JOIN_TYPE_RIGHT_ANTI,
+            stalg.JoinRel.JOIN_TYPE_RIGHT_SEMI,
+        ]:
+            raw_schema = stt.Type.Struct(
+                types=infer_rel_schema(rel.join.right).types,
+                nullability=stt.Type.Nullability.NULLABILITY_REQUIRED,
+            )
+        elif rel.join.type in [
+            stalg.JoinRel.JOIN_TYPE_LEFT_MARK,
+            stalg.JoinRel.JOIN_TYPE_RIGHT_MARK,
+        ]:
+            raw_schema = stt.Type.Struct(
+                types=list(infer_rel_schema(rel.join.left).types)
+                + list(infer_rel_schema(rel.join.right).types)
+                + [
+                    stt.Type(
+                        bool=stt.Type.Boolean(nullability=stt.Type.NULLABILITY_NULLABLE)
+                    )
+                ],
+                nullability=stt.Type.Nullability.NULLABILITY_REQUIRED,
+            )
+        else:
+            raise Exception(f"Unhandled join_type {rel.join.type}")
+
+        (common, struct) = (rel.join.common, raw_schema)
     else:
         raise Exception(f"Unhandled rel_type {rel_type}")
 

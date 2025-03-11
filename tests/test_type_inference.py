@@ -21,6 +21,24 @@ read_rel = stalg.Rel(
     )
 )
 
+right_struct = stt.Type.Struct(
+    types=[
+        stt.Type(i64=stt.Type.I64(nullability=stt.Type.NULLABILITY_REQUIRED)),
+        stt.Type(bool=stt.Type.Boolean(nullability=stt.Type.NULLABILITY_NULLABLE)),
+    ]
+)
+
+right_named_struct = stt.NamedStruct(
+    names=["order_id", "is_refundable"], struct=right_struct
+)
+
+right_read_rel = stalg.Rel(
+    read=stalg.ReadRel(
+        base_schema=right_named_struct,
+        named_table=stalg.ReadRel.NamedTable(names=["table2"]),
+    )
+)
+
 
 def test_inference_read_named_table():
     assert infer_rel_schema(read_rel) == struct
@@ -98,6 +116,7 @@ def test_inference_project_scalar_function():
 
     assert infer_rel_schema(rel) == expected
 
+
 def test_inference_aggregate():
     rel = stalg.Rel(
         aggregate=stalg.AggregateRel(
@@ -114,11 +133,7 @@ def test_inference_aggregate():
                     )
                 )
             ],
-            groupings=[
-                stalg.AggregateRel.Grouping(
-                    expression_references=[0]
-                )
-            ],
+            groupings=[stalg.AggregateRel.Grouping(expression_references=[0])],
             measures=[
                 stalg.AggregateRel.Measure(
                     measure=stalg.AggregateFunction(
@@ -161,12 +176,8 @@ def test_inference_aggregate_multiple_groupings():
                 )
             ],
             groupings=[
-                stalg.AggregateRel.Grouping(
-                    expression_references=[]
-                ),
-                stalg.AggregateRel.Grouping(
-                    expression_references=[0]
-                )
+                stalg.AggregateRel.Grouping(expression_references=[]),
+                stalg.AggregateRel.Grouping(expression_references=[0]),
             ],
             measures=[
                 stalg.AggregateRel.Measure(
@@ -187,8 +198,117 @@ def test_inference_aggregate_multiple_groupings():
         types=[
             stt.Type(string=stt.Type.String(nullability=stt.Type.NULLABILITY_NULLABLE)),
             stt.Type(bool=stt.Type.Boolean(nullability=stt.Type.NULLABILITY_REQUIRED)),
-            stt.Type(i32=stt.Type.I32(nullability=stt.Type.NULLABILITY_REQUIRED))
+            stt.Type(i32=stt.Type.I32(nullability=stt.Type.NULLABILITY_REQUIRED)),
         ]
+    )
+
+    assert infer_rel_schema(rel) == expected
+
+
+def test_inference_cross():
+    rel = stalg.Rel(cross=stalg.CrossRel(left=read_rel, right=right_read_rel))
+
+    expected = stt.Type.Struct(
+        types=[
+            stt.Type(i64=stt.Type.I64(nullability=stt.Type.NULLABILITY_REQUIRED)),
+            stt.Type(string=stt.Type.String(nullability=stt.Type.NULLABILITY_NULLABLE)),
+            stt.Type(fp32=stt.Type.FP32(nullability=stt.Type.NULLABILITY_NULLABLE)),
+            stt.Type(i64=stt.Type.I64(nullability=stt.Type.NULLABILITY_REQUIRED)),
+            stt.Type(bool=stt.Type.Boolean(nullability=stt.Type.NULLABILITY_NULLABLE)),
+        ],
+        nullability=stt.Type.Nullability.NULLABILITY_REQUIRED,
+    )
+
+    assert infer_rel_schema(rel) == expected
+
+
+def test_inference_join_inner():
+    rel = stalg.Rel(
+        join=stalg.JoinRel(
+            left=read_rel,
+            right=right_read_rel,
+            type=stalg.JoinRel.JOIN_TYPE_INNER,
+            expression=None,
+        )
+    )
+
+    expected = stt.Type.Struct(
+        types=[
+            stt.Type(i64=stt.Type.I64(nullability=stt.Type.NULLABILITY_REQUIRED)),
+            stt.Type(string=stt.Type.String(nullability=stt.Type.NULLABILITY_NULLABLE)),
+            stt.Type(fp32=stt.Type.FP32(nullability=stt.Type.NULLABILITY_NULLABLE)),
+            stt.Type(i64=stt.Type.I64(nullability=stt.Type.NULLABILITY_REQUIRED)),
+            stt.Type(bool=stt.Type.Boolean(nullability=stt.Type.NULLABILITY_NULLABLE)),
+        ],
+        nullability=stt.Type.Nullability.NULLABILITY_REQUIRED,
+    )
+
+    assert infer_rel_schema(rel) == expected
+
+
+def test_inference_join_left_anti():
+    rel = stalg.Rel(
+        join=stalg.JoinRel(
+            left=read_rel,
+            right=right_read_rel,
+            type=stalg.JoinRel.JOIN_TYPE_LEFT_ANTI,
+            expression=None,
+        )
+    )
+
+    expected = stt.Type.Struct(
+        types=[
+            stt.Type(i64=stt.Type.I64(nullability=stt.Type.NULLABILITY_REQUIRED)),
+            stt.Type(string=stt.Type.String(nullability=stt.Type.NULLABILITY_NULLABLE)),
+            stt.Type(fp32=stt.Type.FP32(nullability=stt.Type.NULLABILITY_NULLABLE)),
+        ],
+        nullability=stt.Type.Nullability.NULLABILITY_REQUIRED,
+    )
+
+    assert infer_rel_schema(rel) == expected
+
+
+def test_inference_join_right_anti():
+    rel = stalg.Rel(
+        join=stalg.JoinRel(
+            left=read_rel,
+            right=right_read_rel,
+            type=stalg.JoinRel.JOIN_TYPE_RIGHT_ANTI,
+            expression=None,
+        )
+    )
+
+    expected = stt.Type.Struct(
+        types=[
+            stt.Type(i64=stt.Type.I64(nullability=stt.Type.NULLABILITY_REQUIRED)),
+            stt.Type(bool=stt.Type.Boolean(nullability=stt.Type.NULLABILITY_NULLABLE)),
+        ],
+        nullability=stt.Type.Nullability.NULLABILITY_REQUIRED,
+    )
+
+    assert infer_rel_schema(rel) == expected
+
+
+def test_inference_join_left_mark():
+    rel = stalg.Rel(
+        join=stalg.JoinRel(
+            left=read_rel,
+            right=right_read_rel,
+            type=stalg.JoinRel.JOIN_TYPE_LEFT_MARK,
+            expression=None,
+        )
+    )
+
+    expected = stt.Type.Struct(
+        types=[
+            stt.Type(i64=stt.Type.I64(nullability=stt.Type.NULLABILITY_REQUIRED)),
+            stt.Type(string=stt.Type.String(nullability=stt.Type.NULLABILITY_NULLABLE)),
+            stt.Type(fp32=stt.Type.FP32(nullability=stt.Type.NULLABILITY_NULLABLE)),
+            stt.Type(i64=stt.Type.I64(nullability=stt.Type.NULLABILITY_REQUIRED)),
+            stt.Type(bool=stt.Type.Boolean(nullability=stt.Type.NULLABILITY_NULLABLE)),
+            stt.Type(bool=stt.Type.Boolean(nullability=stt.Type.NULLABILITY_NULLABLE)),
+        ],
+        nullability=stt.Type.Nullability.NULLABILITY_REQUIRED,
     )
 
     assert infer_rel_schema(rel) == expected

@@ -11,6 +11,10 @@ from .derivation_expression import evaluate
 import yaml
 import re
 
+
+DEFAULT_URI_PREFIX = "https://github.com/substrait-io/substrait/blob/main/extensions"
+
+
 # mapping from argument types to shortened signature names: https://substrait.io/extensions/#function-signature-compound-names
 _normalized_key_names = {
     "i8": "i8",
@@ -47,7 +51,7 @@ def normalize_substrait_type_names(typ: str) -> str:
     # First strip nullability marker
     typ = typ.strip("?").lower()
     # Strip type specifiers
-    typ = typ.split('<')[0]
+    typ = typ.split("<")[0]
 
     if typ.startswith("any"):
         return "any"
@@ -67,7 +71,7 @@ def to_integer_option(txt: str):
 
 
 def to_parameterized_type(dtype: str):
-    if dtype.endswith('?'):
+    if dtype.endswith("?"):
         dtype = dtype[:-1]
         nullability = Type.NULLABILITY_NULLABLE
     else:
@@ -96,13 +100,17 @@ def to_parameterized_type(dtype: str):
     elif dtype == "time":
         return ParameterizedType(time=Type.Time(nullability=nullability))
     elif dtype == "interval_year":
-        return ParameterizedType(interval_year=Type.IntervalYear(nullability=nullability))
+        return ParameterizedType(
+            interval_year=Type.IntervalYear(nullability=nullability)
+        )
     elif dtype.startswith("decimal") or dtype.startswith("DECIMAL"):
         (_, precision, scale, _) = re.split(r"\W+", dtype)
 
         return ParameterizedType(
             decimal=ParameterizedType.ParameterizedDecimal(
-                scale=to_integer_option(scale), precision=to_integer_option(precision), nullability=nullability
+                scale=to_integer_option(scale),
+                precision=to_integer_option(precision),
+                nullability=nullability,
             )
         )
     elif dtype.startswith("varchar"):
@@ -110,8 +118,7 @@ def to_parameterized_type(dtype: str):
 
         return ParameterizedType(
             varchar=ParameterizedType.ParameterizedVarChar(
-                length=to_integer_option(length),
-                nullability=nullability
+                length=to_integer_option(length), nullability=nullability
             )
         )
     elif dtype.startswith("precision_timestamp"):
@@ -119,8 +126,7 @@ def to_parameterized_type(dtype: str):
 
         return ParameterizedType(
             precision_timestamp=ParameterizedType.ParameterizedPrecisionTimestamp(
-                precision=to_integer_option(precision),
-                nullability=nullability
+                precision=to_integer_option(precision), nullability=nullability
             )
         )
     elif dtype.startswith("precision_timestamp_tz"):
@@ -128,8 +134,7 @@ def to_parameterized_type(dtype: str):
 
         return ParameterizedType(
             precision_timestamp_tz=ParameterizedType.ParameterizedPrecisionTimestampTZ(
-                precision=to_integer_option(precision),
-                nullability=nullability
+                precision=to_integer_option(precision), nullability=nullability
             )
         )
     elif dtype.startswith("fixedchar"):
@@ -137,8 +142,7 @@ def to_parameterized_type(dtype: str):
 
         return ParameterizedType(
             fixed_char=ParameterizedType.ParameterizedFixedChar(
-                length=to_integer_option(length),
-                nullability=nullability
+                length=to_integer_option(length), nullability=nullability
             )
         )
     elif dtype == "string":
@@ -147,8 +151,7 @@ def to_parameterized_type(dtype: str):
         inner_dtype = dtype[5:-1]
         return ParameterizedType(
             list=ParameterizedType.ParameterizedList(
-                type=to_parameterized_type(inner_dtype),
-                nullability=nullability
+                type=to_parameterized_type(inner_dtype), nullability=nullability
             )
         )
     elif dtype.startswith("interval_day"):
@@ -156,8 +159,7 @@ def to_parameterized_type(dtype: str):
 
         return ParameterizedType(
             interval_day=ParameterizedType.ParameterizedIntervalDay(
-                precision=to_integer_option(precision),
-                nullability=nullability
+                precision=to_integer_option(precision), nullability=nullability
             )
         )
     elif dtype.startswith("any"):
@@ -166,7 +168,9 @@ def to_parameterized_type(dtype: str):
         )
     elif dtype.startswith("u!") or dtype == "geometry":
         return ParameterizedType(
-            user_defined=ParameterizedType.ParameterizedUserDefined(nullability=nullability)
+            user_defined=ParameterizedType.ParameterizedUserDefined(
+                nullability=nullability
+            )
         )
     else:
         raise Exception(f"Unknown type - {dtype}")
@@ -226,7 +230,9 @@ def covers(dtype: Type, parameterized_type: ParameterizedType, parameters: dict)
 
 
 class FunctionEntry:
-    def __init__(self, uri: str, name: str, impl: Mapping[str, Any], anchor: int) -> None:
+    def __init__(
+        self, uri: str, name: str, impl: Mapping[str, Any], anchor: int
+    ) -> None:
         self.name = name
         self.normalized_inputs: list = []
         self.uri: str = uri
@@ -283,7 +289,7 @@ class FunctionRegistry:
         for fpath in importlib_files("substrait.extensions").glob(  # type: ignore
             "functions*.yaml"
         ):
-            uri = f"https://github.com/substrait-io/substrait/blob/main/extensions/{fpath.name}"
+            uri = f"{DEFAULT_URI_PREFIX}/{fpath.name}"
             self.uri_aliases[fpath.name] = uri
             self.register_extension_yaml(fpath, uri)
 
@@ -302,7 +308,9 @@ class FunctionRegistry:
         for named_functions in definitions.values():
             for function in named_functions:
                 for impl in function.get("impls", []):
-                    func = FunctionEntry(uri, function["name"], impl, next(self.id_generator))
+                    func = FunctionEntry(
+                        uri, function["name"], impl, next(self.id_generator)
+                    )
                     if (
                         func.uri in self._function_mapping
                         and function["name"] in self._function_mapping[func.uri]

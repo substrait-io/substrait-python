@@ -11,43 +11,50 @@ from .derivation_expression import evaluate
 import yaml
 import re
 
+# mapping from argument types to shortened signature names: https://substrait.io/extensions/#function-signature-compound-names
 _normalized_key_names = {
-    "binary": "vbin",
-    "interval_compound": "icompound",
-    "interval_day": "iday",
-    "interval_year": "iyear",
+    "i8": "i8",
+    "i16": "i16",
+    "i32": "i32",
+    "i64": "i64",
+    "fp32": "fp32",
+    "fp64": "fp64",
     "string": "str",
+    "binary": "vbin",
+    "boolean": "bool",
     "timestamp": "ts",
     "timestamp_tz": "tstz",
+    "date": "date",
+    "time": "time",
+    "interval_year": "iyear",
+    "interval_day": "iday",
+    "interval_compound": "icompound",
+    "uuid": "uuid",
+    "fixedchar": "fchar",
+    "varchar": "vchar",
+    "fixedbinary": "fbin",
+    "decimal": "dec",
+    "precision_time": "pt",
+    "precision_timestamp": "pts",
+    "precision_timestamp_tz": "ptstz",
+    "struct": "struct",
+    "list": "list",
+    "map": "map",
 }
 
 
 def normalize_substrait_type_names(typ: str) -> str:
-    # First strip off any punctuation
+    # First strip nullability marker
     typ = typ.strip("?").lower()
+    # Strip type specifiers
+    typ = typ.split('<')[0]
 
-    # Common prefixes whose information does not matter to an extension function
-    # signature
-    for complex_type, abbr in [
-        ("fixedchar", "fchar"),
-        ("varchar", "vchar"),
-        ("fixedbinary", "fbin"),
-        ("decimal", "dec"),
-        ("precision_timestamp", "pts"),
-        ("precision_timestamp_tz", "ptstz"),
-        ("struct", "struct"),
-        ("list", "list"),
-        ("map", "map"),
-        ("any", "any"),
-        ("boolean", "bool"),
-    ]:
-        if typ.lower().startswith(complex_type):
-            typ = abbr
-
-    # Then pass through the dictionary of mappings, defaulting to just the
-    # existing string
-    typ = _normalized_key_names.get(typ.lower(), typ.lower())
-    return typ
+    if typ.startswith("any"):
+        return "any"
+    elif typ.startswith("u!"):
+        return typ
+    else:
+        return _normalized_key_names[typ]
 
 
 def to_integer_option(txt: str):
@@ -60,36 +67,42 @@ def to_integer_option(txt: str):
 
 
 def to_parameterized_type(dtype: str):
+    if dtype.endswith('?'):
+        dtype = dtype[:-1]
+        nullability = Type.NULLABILITY_NULLABLE
+    else:
+        nullability = Type.NULLABILITY_REQUIRED
+
     if dtype == "boolean":
-        return ParameterizedType(bool=Type.Boolean())
+        return ParameterizedType(bool=Type.Boolean(nullability=nullability))
     elif dtype == "i8":
-        return ParameterizedType(i8=Type.I8())
+        return ParameterizedType(i8=Type.I8(nullability=nullability))
     elif dtype == "i16":
-        return ParameterizedType(i16=Type.I16())
+        return ParameterizedType(i16=Type.I16(nullability=nullability))
     elif dtype == "i32":
-        return ParameterizedType(i32=Type.I32())
+        return ParameterizedType(i32=Type.I32(nullability=nullability))
     elif dtype == "i64":
-        return ParameterizedType(i64=Type.I64())
+        return ParameterizedType(i64=Type.I64(nullability=nullability))
     elif dtype == "fp32":
-        return ParameterizedType(fp32=Type.FP32())
+        return ParameterizedType(fp32=Type.FP32(nullability=nullability))
     elif dtype == "fp64":
-        return ParameterizedType(fp64=Type.FP64())
+        return ParameterizedType(fp64=Type.FP64(nullability=nullability))
     elif dtype == "timestamp":
-        return ParameterizedType(timestamp=Type.Timestamp())
+        return ParameterizedType(timestamp=Type.Timestamp(nullability=nullability))
     elif dtype == "timestamp_tz":
-        return ParameterizedType(timestamp_tz=Type.TimestampTZ())
+        return ParameterizedType(timestamp_tz=Type.TimestampTZ(nullability=nullability))
     elif dtype == "date":
-        return ParameterizedType(date=Type.Date())
+        return ParameterizedType(date=Type.Date(nullability=nullability))
     elif dtype == "time":
-        return ParameterizedType(time=Type.Time())
+        return ParameterizedType(time=Type.Time(nullability=nullability))
     elif dtype == "interval_year":
-        return ParameterizedType(interval_year=Type.IntervalYear())
+        return ParameterizedType(interval_year=Type.IntervalYear(nullability=nullability))
     elif dtype.startswith("decimal") or dtype.startswith("DECIMAL"):
         (_, precision, scale, _) = re.split(r"\W+", dtype)
 
         return ParameterizedType(
             decimal=ParameterizedType.ParameterizedDecimal(
-                scale=to_integer_option(scale), precision=to_integer_option(precision)
+                scale=to_integer_option(scale), precision=to_integer_option(precision), nullability=nullability
             )
         )
     elif dtype.startswith("varchar"):
@@ -97,7 +110,8 @@ def to_parameterized_type(dtype: str):
 
         return ParameterizedType(
             varchar=ParameterizedType.ParameterizedVarChar(
-                length=to_integer_option(length)
+                length=to_integer_option(length),
+                nullability=nullability
             )
         )
     elif dtype.startswith("precision_timestamp"):
@@ -105,7 +119,8 @@ def to_parameterized_type(dtype: str):
 
         return ParameterizedType(
             precision_timestamp=ParameterizedType.ParameterizedPrecisionTimestamp(
-                precision=to_integer_option(precision)
+                precision=to_integer_option(precision),
+                nullability=nullability
             )
         )
     elif dtype.startswith("precision_timestamp_tz"):
@@ -113,7 +128,8 @@ def to_parameterized_type(dtype: str):
 
         return ParameterizedType(
             precision_timestamp_tz=ParameterizedType.ParameterizedPrecisionTimestampTZ(
-                precision=to_integer_option(precision)
+                precision=to_integer_option(precision),
+                nullability=nullability
             )
         )
     elif dtype.startswith("fixedchar"):
@@ -121,16 +137,18 @@ def to_parameterized_type(dtype: str):
 
         return ParameterizedType(
             fixed_char=ParameterizedType.ParameterizedFixedChar(
-                length=to_integer_option(length)
+                length=to_integer_option(length),
+                nullability=nullability
             )
         )
     elif dtype == "string":
-        return ParameterizedType(string=Type.String())
+        return ParameterizedType(string=Type.String(nullability=nullability))
     elif dtype.startswith("list"):
         inner_dtype = dtype[5:-1]
         return ParameterizedType(
             list=ParameterizedType.ParameterizedList(
-                type=to_parameterized_type(inner_dtype)
+                type=to_parameterized_type(inner_dtype),
+                nullability=nullability
             )
         )
     elif dtype.startswith("interval_day"):
@@ -138,7 +156,8 @@ def to_parameterized_type(dtype: str):
 
         return ParameterizedType(
             interval_day=ParameterizedType.ParameterizedIntervalDay(
-                precision=to_integer_option(precision)
+                precision=to_integer_option(precision),
+                nullability=nullability
             )
         )
     elif dtype.startswith("any"):
@@ -147,7 +166,7 @@ def to_parameterized_type(dtype: str):
         )
     elif dtype.startswith("u!") or dtype == "geometry":
         return ParameterizedType(
-            user_defined=ParameterizedType.ParameterizedUserDefined()
+            user_defined=ParameterizedType.ParameterizedUserDefined(nullability=nullability)
         )
     else:
         raise Exception(f"Unknown type - {dtype}")
@@ -219,7 +238,7 @@ class FunctionEntry:
         if input_args := impl.get("args", []):
             for val in input_args:
                 if typ := val.get("value"):
-                    self.arguments.append(to_parameterized_type(typ.strip("?")))
+                    self.arguments.append(to_parameterized_type(typ))
                     self.normalized_inputs.append(normalize_substrait_type_names(typ))
                 elif arg_name := val.get("name", None):
                     self.arguments.append(val.get("options"))

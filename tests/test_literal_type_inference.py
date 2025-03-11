@@ -3,7 +3,7 @@ import substrait.gen.proto.algebra_pb2 as stalg
 import substrait.gen.proto.type_pb2 as stt
 from substrait.type_inference import infer_literal_type
 
-pairs = [
+testcases = [
     (
         stalg.Expression.Literal(boolean=True, nullable=True),
         stt.Type(bool=stt.Type.Boolean(nullability=stt.Type.NULLABILITY_NULLABLE)),
@@ -308,6 +308,6 @@ pairs = [
 ]
 
 
-@pytest.mark.parametrize("pair", pairs)
-def test_inference_literal_bool(pair):
-    assert infer_literal_type(pair[0]) == pair[1]
+@pytest.mark.parametrize("testcase", testcases)
+def test_inference_literal_bool(testcase):
+    assert infer_literal_type(testcase[0]) == testcase[1]

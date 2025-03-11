@@ -38,25 +38,73 @@ def infer_literal_type(literal: stalg.Expression.Literal) -> stt.Type:
     elif literal_type == "interval_year_to_month":
         return stt.Type(interval_year=stt.Type.IntervalYear(nullability=nullability))
     elif literal_type == "interval_day_to_second":
-        return stt.Type(interval_day=stt.Type.IntervalDay(precision=literal.interval_day_to_second.precision, nullability=nullability))
+        return stt.Type(
+            interval_day=stt.Type.IntervalDay(
+                precision=literal.interval_day_to_second.precision,
+                nullability=nullability,
+            )
+        )
     elif literal_type == "interval_compound":
-        return stt.Type(interval_compound=stt.Type.IntervalCompound(nullability=nullability, precision=literal.interval_compound.interval_day_to_second.precision))
+        return stt.Type(
+            interval_compound=stt.Type.IntervalCompound(
+                nullability=nullability,
+                precision=literal.interval_compound.interval_day_to_second.precision,
+            )
+        )
     elif literal_type == "fixed_char":
-        return stt.Type(fixed_char=stt.Type.FixedChar(length=len(literal.fixed_char), nullability=nullability))
+        return stt.Type(
+            fixed_char=stt.Type.FixedChar(
+                length=len(literal.fixed_char), nullability=nullability
+            )
+        )
     elif literal_type == "var_char":
-        return stt.Type(varchar=stt.Type.VarChar(length=literal.var_char.length, nullability=nullability))
+        return stt.Type(
+            varchar=stt.Type.VarChar(
+                length=literal.var_char.length, nullability=nullability
+            )
+        )
     elif literal_type == "fixed_binary":
-        return stt.Type(fixed_binary=stt.Type.FixedBinary(length=len(literal.fixed_binary), nullability=nullability))
+        return stt.Type(
+            fixed_binary=stt.Type.FixedBinary(
+                length=len(literal.fixed_binary), nullability=nullability
+            )
+        )
     elif literal_type == "decimal":
-        return stt.Type(decimal=stt.Type.Decimal(scale=literal.decimal.scale, precision=literal.decimal.precision, nullability=nullability))
+        return stt.Type(
+            decimal=stt.Type.Decimal(
+                scale=literal.decimal.scale,
+                precision=literal.decimal.precision,
+                nullability=nullability,
+            )
+        )
     elif literal_type == "precision_timestamp":
-        return stt.Type(precision_timestamp=stt.Type.PrecisionTimestamp(precision=literal.precision_timestamp.precision, nullability=nullability))
+        return stt.Type(
+            precision_timestamp=stt.Type.PrecisionTimestamp(
+                precision=literal.precision_timestamp.precision, nullability=nullability
+            )
+        )
     elif literal_type == "precision_timestamp_tz":
-        return stt.Type(precision_timestamp_tz=stt.Type.PrecisionTimestampTZ(precision=literal.precision_timestamp_tz.precision, nullability=nullability))
+        return stt.Type(
+            precision_timestamp_tz=stt.Type.PrecisionTimestampTZ(
+                precision=literal.precision_timestamp_tz.precision,
+                nullability=nullability,
+            )
+        )
     elif literal_type == "struct":
-        return stt.Type(struct=stt.Type.Struct(types=[infer_literal_type(f) for f in literal.struct.fields], nullability=nullability))
+        return stt.Type(
+            struct=stt.Type.Struct(
+                types=[infer_literal_type(f) for f in literal.struct.fields],
+                nullability=nullability,
+            )
+        )
     elif literal_type == "map":
-        return stt.Type(map=stt.Type.Map(key=infer_literal_type(literal.map.key_values[0].key), value=infer_literal_type(literal.map.key_values[0].value), nullability=nullability))
+        return stt.Type(
+            map=stt.Type.Map(
+                key=infer_literal_type(literal.map.key_values[0].key),
+                value=infer_literal_type(literal.map.key_values[0].value),
+                nullability=nullability,
+            )
+        )
     elif literal_type == "timestamp_tz":
         return stt.Type(timestamp_tz=stt.Type.TimestampTZ(nullability=nullability))
     elif literal_type == "uuid":
@@ -64,13 +112,18 @@ def infer_literal_type(literal: stalg.Expression.Literal) -> stt.Type:
     elif literal_type == "null":
         return literal.null
     elif literal_type == "list":
-        return stt.Type(list=stt.Type.List(type=infer_literal_type(literal.list.values[0]), nullability=nullability))
+        return stt.Type(
+            list=stt.Type.List(
+                type=infer_literal_type(literal.list.values[0]), nullability=nullability
+            )
+        )
     elif literal_type == "empty_list":
         return stt.Type(list=literal.empty_list)
     elif literal_type == "empty_map":
         return stt.Type(map=literal.empty_map)
     else:
         raise Exception(f"Unknown literal_type {literal_type}")
+
 
 def infer_nested_type(nested: stalg.Expression.Nested) -> stt.Type:
     nested_type = nested.WhichOneof("nested_type")
@@ -82,13 +135,30 @@ def infer_nested_type(nested: stalg.Expression.Nested) -> stt.Type:
     )
 
     if nested_type == "struct":
-        return stt.Type(struct=stt.Type.Struct(types=[infer_expression_type(f) for f in nested.struct.fields], nullability=nullability))
+        return stt.Type(
+            struct=stt.Type.Struct(
+                types=[infer_expression_type(f) for f in nested.struct.fields],
+                nullability=nullability,
+            )
+        )
     elif nested_type == "list":
-        return stt.Type(list=stt.Type.List(type=infer_expression_type(nested.list.values[0]), nullability=nullability))
+        return stt.Type(
+            list=stt.Type.List(
+                type=infer_expression_type(nested.list.values[0]),
+                nullability=nullability,
+            )
+        )
     elif nested_type == "map":
-        return stt.Type(map=stt.Type.Map(key=infer_expression_type(nested.map.key_values[0].key), value=infer_expression_type(nested.map.key_values[0].value), nullability=nullability))
+        return stt.Type(
+            map=stt.Type.Map(
+                key=infer_expression_type(nested.map.key_values[0].key),
+                value=infer_expression_type(nested.map.key_values[0].value),
+                nullability=nullability,
+            )
+        )
     else:
         raise Exception(f"Unknown nested_type {nested_type}")
+
 
 def infer_expression_type(
     expression: stalg.Expression, parent_schema: stt.Type.Struct
@@ -131,17 +201,24 @@ def infer_expression_type(
     elif rex_type == "nested":
         return infer_nested_type(expression.nested)
     elif rex_type == "subquery":
-        subquery_type = expression.subquery.WhichOneof('subquery_type')
+        subquery_type = expression.subquery.WhichOneof("subquery_type")
 
         if subquery_type == "scalar":
             scalar_rel = infer_rel_schema(expression.subquery.scalar.input)
             return scalar_rel.types[0]
-        elif subquery_type == "in_predicate" or subquery_type == "set_comparison" or subquery_type == "set_predicate":
-            stt.Type.Boolean(nullability=stt.Type.Nullability.NULLABILITY_NULLABLE) # can this be a null?
+        elif (
+            subquery_type == "in_predicate"
+            or subquery_type == "set_comparison"
+            or subquery_type == "set_predicate"
+        ):
+            stt.Type.Boolean(
+                nullability=stt.Type.Nullability.NULLABILITY_NULLABLE
+            )  # can this be a null?
         else:
             raise Exception(f"Unknown subquery_type {subquery_type}")
     else:
         raise Exception(f"Unknown rex_type {rex_type}")
+
 
 def infer_rel_schema(rel: stalg.Rel) -> stt.Type.Struct:
     rel_type = rel.WhichOneof("rel_type")
@@ -154,11 +231,20 @@ def infer_rel_schema(rel: stalg.Rel) -> stt.Type.Struct:
         (common, struct) = (rel.fetch.common, infer_rel_schema(rel.fetch.input))
     elif rel_type == "aggregate":
         parent_schema = infer_rel_schema(rel.aggregate.input)
-        grouping_types = [infer_expression_type(g, parent_schema) for g in rel.aggregate.grouping_expressions]
+        grouping_types = [
+            infer_expression_type(g, parent_schema)
+            for g in rel.aggregate.grouping_expressions
+        ]
         measure_types = [m.measure.output_type for m in rel.aggregate.measures]
 
+        grouping_identifier_types = (
+            []
+            if len(rel.aggregate.groupings) <= 1
+            else [stt.Type(i32=stt.Type.I32(nullability=stt.Type.NULLABILITY_REQUIRED))]
+        )
+
         raw_schema = stt.Type.Struct(
-            types=grouping_types + measure_types,
+            types=grouping_types + measure_types + grouping_identifier_types,
             nullability=parent_schema.nullability,
         )
 

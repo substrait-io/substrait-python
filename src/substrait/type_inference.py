@@ -257,7 +257,8 @@ def infer_rel_schema(rel: stalg.Rel) -> stt.Type.Struct:
             infer_expression_type(e, parent_schema) for e in rel.project.expressions
         ]
         raw_schema = stt.Type.Struct(
-            types=list(parent_schema.types) + expression_types,
+            # types=list(parent_schema.types) + expression_types, # This is on purpose to reflect the bug in duckdb substrait
+            types=list(expression_types),
             nullability=parent_schema.nullability,
         )
 

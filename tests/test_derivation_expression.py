@@ -24,29 +24,59 @@ def test_ternary():
 
 
 def test_multiline():
-    assert (
-        evaluate(
-            """temp = min(var, 7) + max(var, 7)
+    assert evaluate(
+        """temp = min(var, 7) + max(var, 7)
 decimal<temp + 1, temp - 1>""",
-            {"var": 5},
+        {"var": 5},
+    ) == Type(
+        decimal=Type.Decimal(
+            precision=13, scale=11, nullability=Type.NULLABILITY_REQUIRED
         )
-        == Type(decimal=Type.Decimal(precision=13, scale=11))
     )
 
 
 def test_simple_data_types():
-    assert evaluate("i8") == Type(i8=Type.I8())
-    assert evaluate("i16") == Type(i16=Type.I16())
-    assert evaluate("i32") == Type(i32=Type.I32())
-    assert evaluate("i64") == Type(i64=Type.I64())
-    assert evaluate("fp32") == Type(fp32=Type.FP32())
-    assert evaluate("fp64") == Type(fp64=Type.FP64())
-    assert evaluate("boolean") == Type(bool=Type.Boolean())
+    assert evaluate("i8") == Type(i8=Type.I8(nullability=Type.NULLABILITY_REQUIRED))
+    assert evaluate("i16") == Type(i16=Type.I16(nullability=Type.NULLABILITY_REQUIRED))
+    assert evaluate("i32") == Type(i32=Type.I32(nullability=Type.NULLABILITY_REQUIRED))
+    assert evaluate("i64") == Type(i64=Type.I64(nullability=Type.NULLABILITY_REQUIRED))
+    assert evaluate("fp32") == Type(
+        fp32=Type.FP32(nullability=Type.NULLABILITY_REQUIRED)
+    )
+    assert evaluate("fp64") == Type(
+        fp64=Type.FP64(nullability=Type.NULLABILITY_REQUIRED)
+    )
+    assert evaluate("boolean") == Type(
+        bool=Type.Boolean(nullability=Type.NULLABILITY_REQUIRED)
+    )
+    assert evaluate("i8?") == Type(i8=Type.I8(nullability=Type.NULLABILITY_NULLABLE))
+    assert evaluate("i16?") == Type(i16=Type.I16(nullability=Type.NULLABILITY_NULLABLE))
+    assert evaluate("i32?") == Type(i32=Type.I32(nullability=Type.NULLABILITY_NULLABLE))
+    assert evaluate("i64?") == Type(i64=Type.I64(nullability=Type.NULLABILITY_NULLABLE))
+    assert evaluate("fp32?") == Type(
+        fp32=Type.FP32(nullability=Type.NULLABILITY_NULLABLE)
+    )
+    assert evaluate("fp64?") == Type(
+        fp64=Type.FP64(nullability=Type.NULLABILITY_NULLABLE)
+    )
+    assert evaluate("boolean?") == Type(
+        bool=Type.Boolean(nullability=Type.NULLABILITY_NULLABLE)
+    )
 
 
 def test_data_type():
     assert evaluate("decimal<P + 1, S + 1>", {"S": 10, "P": 20}) == Type(
-        decimal=Type.Decimal(precision=21, scale=11)
+        decimal=Type.Decimal(
+            precision=21, scale=11, nullability=Type.NULLABILITY_REQUIRED
+        )
+    )
+
+
+def test_data_type_nullable():
+    assert evaluate("decimal?<P + 1, S + 1>", {"S": 10, "P": 20}) == Type(
+        decimal=Type.Decimal(
+            precision=21, scale=11, nullability=Type.NULLABILITY_NULLABLE
+        )
     )
 
 
@@ -59,7 +89,11 @@ def test_decimal_example():
         prec = min(init_prec, 38)
         scale_after_borrow = max(init_scale - delta, min_scale)
         scale = scale_after_borrow if init_prec > 38 else init_scale
-        return Type(decimal=Type.Decimal(precision=prec, scale=scale))
+        return Type(
+            decimal=Type.Decimal(
+                precision=prec, scale=scale, nullability=Type.NULLABILITY_REQUIRED
+            )
+        )
 
     args = {"P1": 10, "S1": 8, "P2": 14, "S2": 2}
 

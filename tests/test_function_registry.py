@@ -1,7 +1,8 @@
 import yaml
 
 from substrait.gen.proto.type_pb2 import Type
-from substrait.function_registry import FunctionRegistry
+from substrait.function_registry import FunctionRegistry, covers
+from substrait.derivation_expression import _parse
 
 content = """%YAML 1.2
 ---
@@ -307,3 +308,28 @@ def test_function_with_discrete_nullability():
         )
         is None
     )
+
+
+def test_covers():
+    params = {}
+    assert covers(i8(), _parse("i8"), params)
+    assert params == {}
+
+
+def test_covers_nullability():
+    assert not covers(i8(nullable=True), _parse("i8"), {}, check_nullability=True)
+    assert covers(i8(nullable=True), _parse("i8?"), {}, check_nullability=True)
+
+
+def test_covers_decimal():
+    assert not covers(decimal(10, 8), _parse("decimal<11, A>"), {})
+
+
+def test_covers_decimal_happy_path():
+    params = {}
+    assert covers(decimal(10, 8), _parse("decimal<10, A>"), params)
+    assert params == {"A": 8}
+
+
+def test_covers_any():
+    assert covers(decimal(10, 8), _parse("any"), {})

@@ -37,7 +37,6 @@ def _evaluate(x, values: dict):
     elif type(x) == SubstraitTypeParser.FunctionCallContext:
         exprs = [_evaluate(e, values) for e in x.expr()]
         func = x.Identifier().symbol.text
-
         if func == "min":
             return min(*exprs)
         elif func == "max":
@@ -103,12 +102,18 @@ def _evaluate(x, values: dict):
         return _evaluate(x.finalType, values)
     elif type(x) == SubstraitTypeParser.TypeLiteralContext:
         return _evaluate(x.type_(), values)
+    elif type(x) == SubstraitTypeParser.NumericLiteralContext:
+        return int(str(x.Number()))
     else:
         raise Exception(f"Unknown token type {type(x)}")
 
 
-def evaluate(x: str, values: Optional[dict] = None):
+def _parse(x: str):
     lexer = SubstraitTypeLexer(InputStream(x))
     stream = CommonTokenStream(lexer)
     parser = SubstraitTypeParser(stream)
-    return _evaluate(parser.expr(), values)
+    return parser.expr()
+
+
+def evaluate(x: str, values: Optional[dict] = None):
+    return _evaluate(_parse(x), values)

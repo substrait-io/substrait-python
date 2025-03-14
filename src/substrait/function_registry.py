@@ -48,10 +48,10 @@ _normalized_key_names = {
 
 
 def normalize_substrait_type_names(typ: str) -> str:
-    # First strip nullability marker
-    typ = typ.strip("?").lower()
     # Strip type specifiers
     typ = typ.split("<")[0]
+    # First strip nullability marker
+    typ = typ.strip("?").lower()
 
     if typ.startswith("any"):
         return "any"
@@ -70,9 +70,10 @@ def to_integer_option(txt: str):
         )
 
 
+# TODO try using antlr grammar here as well
 def to_parameterized_type(dtype: str):
-    if dtype.endswith("?"):
-        dtype = dtype[:-1]
+    if "?" in dtype:
+        dtype = dtype.replace("?", "")
         nullability = Type.NULLABILITY_NULLABLE
     else:
         nullability = Type.NULLABILITY_REQUIRED
@@ -193,11 +194,17 @@ def violates_integer_option(
     return False
 
 
-def covers(dtype: Type, parameterized_type: ParameterizedType, parameters: dict):
+def covers(
+    dtype: Type,
+    parameterized_type: ParameterizedType,
+    parameters: dict,
+    check_nullability=False,
+):
     expected_kind = parameterized_type.WhichOneof("kind")
 
     if expected_kind == "type_parameter":
         parameter_name = parameterized_type.type_parameter.name
+        # TODO figure out how to do nullability checks with "any" types
         if parameter_name == "any":
             return True
         else:
@@ -211,9 +218,20 @@ def covers(dtype: Type, parameterized_type: ParameterizedType, parameters: dict)
                 parameters[parameter_name] = dtype
                 return True
 
+    expected_nullability = parameterized_type.__getattribute__(
+        parameterized_type.WhichOneof("kind")
+    ).nullability
+
     kind = dtype.WhichOneof("kind")
 
     if kind != expected_kind:
+        return False
+
+    if (
+        check_nullability
+        and dtype.__getattribute__(dtype.WhichOneof("kind")).nullability
+        != expected_nullability
+    ):
         return False
 
     if kind == "decimal":
@@ -225,7 +243,6 @@ def covers(dtype: Type, parameterized_type: ParameterizedType, parameters: dict)
             return False
 
     # TODO handle all types
-
     return True
 
 
@@ -239,7 +256,7 @@ class FunctionEntry:
         self.anchor = anchor
         self.arguments = []
         self.rtn = impl["return"]
-        self.nullability = impl.get("nullability", False)
+        self.nullability = impl.get("nullability", "MIRROR")
         self.variadic = impl.get("variadic", False)
         if input_args := impl.get("args", []):
             for val in input_args:
@@ -273,10 +290,30 @@ class FunctionEntry:
                 if y not in x:
                     return None
             else:
-                if not covers(y, x, parameters):
+                if not covers(
+                    y, x, parameters, check_nullability=self.nullability == "DISCRETE"
+                ):
                     return None
 
-        return evaluate(self.rtn, parameters)
+        output_type = evaluate(self.rtn, parameters)
+        print(output_type)
+
+        if self.nullability == "MIRROR":
+            sig_contains_nullable = any(
+                [
+                    p.__getattribute__(p.WhichOneof("kind")).nullability
+                    == Type.NULLABILITY_NULLABLE
+                    for p in signature
+                    if type(p) == Type
+                ]
+            )
+            output_type.__getattribute__(output_type.WhichOneof("kind")).nullability = (
+                Type.NULLABILITY_NULLABLE
+                if sig_contains_nullable
+                else Type.NULLABILITY_REQUIRED
+            )
+
+        return output_type
 
 
 class FunctionRegistry:

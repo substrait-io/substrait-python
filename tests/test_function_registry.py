@@ -72,7 +72,35 @@ scalar_functions:
           - name: x
             value: i8
         return: i8
-
+  - name: "add_declared"
+    description: "Add two values."
+    impls:
+      - args:
+          - name: x
+            value: i8
+          - name: y
+            value: i8
+        nullability: DECLARED_OUTPUT
+        return: i8?
+  - name: "add_discrete"
+    description: "Add two values."
+    impls:
+      - args:
+          - name: x
+            value: i8?
+          - name: y
+            value: i8
+        nullability: DISCRETE
+        return: i8?
+  - name: "test_decimal_discrete"
+    impls:
+      - args:
+          - name: x
+            value: decimal?<P1,S1>
+          - name: y
+            value: decimal<S1,S2>
+        nullability: DISCRETE
+        return: decimal?<P1 + 1,S2 + 1>
 """
 
 
@@ -81,20 +109,46 @@ registry = FunctionRegistry()
 registry.register_extension_dict(yaml.safe_load(content), uri="test")
 
 
-def i8():
-    return Type(i8=Type.I8())
+def i8(nullable=False):
+    return Type(
+        i8=Type.I8(
+            nullability=Type.NULLABILITY_REQUIRED
+            if not nullable
+            else Type.NULLABILITY_NULLABLE
+        )
+    )
 
 
-def i16():
-    return Type(i16=Type.I16())
+def i16(nullable=False):
+    return Type(
+        i16=Type.I16(
+            nullability=Type.NULLABILITY_REQUIRED
+            if not nullable
+            else Type.NULLABILITY_NULLABLE
+        )
+    )
 
 
-def bool():
-    return Type(bool=Type.Boolean())
+def bool(nullable=False):
+    return Type(
+        bool=Type.Boolean(
+            nullability=Type.NULLABILITY_REQUIRED
+            if not nullable
+            else Type.NULLABILITY_NULLABLE
+        )
+    )
 
 
-def decimal(precision, scale):
-    return Type(decimal=Type.Decimal(scale=scale, precision=precision))
+def decimal(precision, scale, nullable=False):
+    return Type(
+        decimal=Type.Decimal(
+            scale=scale,
+            precision=precision,
+            nullability=Type.NULLABILITY_REQUIRED
+            if not nullable
+            else Type.NULLABILITY_NULLABLE,
+        )
+    )
 
 
 def test_non_existing_uri():
@@ -125,13 +179,13 @@ def test_non_existing_function_signature():
 def test_exact_match():
     assert registry.lookup_function(
         uri="test", function_name="add", signature=[i8(), i8()]
-    )[1] == Type(i8=Type.I8())
+    )[1] == Type(i8=Type.I8(nullability=Type.NULLABILITY_REQUIRED))
 
 
 def test_wildcard_match():
     assert registry.lookup_function(
         uri="test", function_name="add", signature=[i8(), i8(), bool()]
-    )[1] == Type(i16=Type.I16())
+    )[1] == Type(i16=Type.I16(nullability=Type.NULLABILITY_REQUIRED))
 
 
 def test_wildcard_match_fails_with_constraits():
@@ -198,6 +252,14 @@ def test_decimal_violates_constraint():
     )
 
 
+def test_decimal_happy_path_discrete():
+    assert registry.lookup_function(
+        uri="test",
+        function_name="test_decimal_discrete",
+        signature=[decimal(10, 8, nullable=True), decimal(8, 6)],
+    )[1] == decimal(11, 7, nullable=True)
+
+
 def test_enum_with_valid_option():
     assert (
         registry.lookup_function(
@@ -215,6 +277,33 @@ def test_enum_with_nonexistent_option():
             uri="test",
             function_name="test_enum",
             signature=["NONEXISTENT", i8()],
+        )
+        is None
+    )
+
+
+def test_function_with_nullable_args():
+    assert registry.lookup_function(
+        uri="test", function_name="add", signature=[i8(nullable=True), i8()]
+    )[1] == i8(nullable=True)
+
+
+def test_function_with_declared_output_nullability():
+    assert registry.lookup_function(
+        uri="test", function_name="add_declared", signature=[i8(), i8()]
+    )[1] == i8(nullable=True)
+
+
+def test_function_with_discrete_nullability():
+    assert registry.lookup_function(
+        uri="test", function_name="add_discrete", signature=[i8(nullable=True), i8()]
+    )[1] == i8(nullable=True)
+
+
+def test_function_with_discrete_nullability():
+    assert (
+        registry.lookup_function(
+            uri="test", function_name="add_discrete", signature=[i8(), i8()]
         )
         is None
     )

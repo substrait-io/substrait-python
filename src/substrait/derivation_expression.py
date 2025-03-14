@@ -48,27 +48,39 @@ def _evaluate(x, values: dict):
         scalar_type = x.scalarType()
         parametrized_type = x.parameterizedType()
         if scalar_type:
+            nullability = (
+                Type.NULLABILITY_NULLABLE if x.isnull else Type.NULLABILITY_REQUIRED
+            )
             if isinstance(scalar_type, SubstraitTypeParser.I8Context):
-                return Type(i8=Type.I8())
+                return Type(i8=Type.I8(nullability=nullability))
             elif isinstance(scalar_type, SubstraitTypeParser.I16Context):
-                return Type(i16=Type.I16())
+                return Type(i16=Type.I16(nullability=nullability))
             elif isinstance(scalar_type, SubstraitTypeParser.I32Context):
-                return Type(i32=Type.I32())
+                return Type(i32=Type.I32(nullability=nullability))
             elif isinstance(scalar_type, SubstraitTypeParser.I64Context):
-                return Type(i64=Type.I64())
+                return Type(i64=Type.I64(nullability=nullability))
             elif isinstance(scalar_type, SubstraitTypeParser.Fp32Context):
-                return Type(fp32=Type.FP32())
+                return Type(fp32=Type.FP32(nullability=nullability))
             elif isinstance(scalar_type, SubstraitTypeParser.Fp64Context):
-                return Type(fp64=Type.FP64())
+                return Type(fp64=Type.FP64(nullability=nullability))
             elif isinstance(scalar_type, SubstraitTypeParser.BooleanContext):
-                return Type(bool=Type.Boolean())
+                return Type(bool=Type.Boolean(nullability=nullability))
             else:
                 raise Exception(f"Unknown scalar type {type(scalar_type)}")
         elif parametrized_type:
             if isinstance(parametrized_type, SubstraitTypeParser.DecimalContext):
                 precision = _evaluate(parametrized_type.precision, values)
                 scale = _evaluate(parametrized_type.scale, values)
-                return Type(decimal=Type.Decimal(precision=precision, scale=scale))
+                nullability = (
+                    Type.NULLABILITY_NULLABLE
+                    if parametrized_type.isnull
+                    else Type.NULLABILITY_REQUIRED
+                )
+                return Type(
+                    decimal=Type.Decimal(
+                        precision=precision, scale=scale, nullability=nullability
+                    )
+                )
             raise Exception(f"Unknown parametrized type {type(parametrized_type)}")
         else:
             raise Exception("either scalar_type or parametrized_type is required")

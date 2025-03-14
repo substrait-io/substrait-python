@@ -317,18 +317,19 @@ class FunctionEntry:
 
 
 class FunctionRegistry:
-    def __init__(self) -> None:
+    def __init__(self, load_default_extensions=True) -> None:
         self._function_mapping: dict = defaultdict(dict)
-        self.id_generator = itertools.count(1)
+        self._id_generator = itertools.count(1)
 
-        self.uri_aliases = {}
+        self._uri_aliases = {}
 
-        for fpath in importlib_files("substrait.extensions").glob(  # type: ignore
-            "functions*.yaml"
-        ):
-            uri = f"{DEFAULT_URI_PREFIX}/{fpath.name}"
-            self.uri_aliases[fpath.name] = uri
-            self.register_extension_yaml(fpath, uri)
+        if load_default_extensions:
+            for fpath in importlib_files("substrait.extensions").glob(  # type: ignore
+                "functions*.yaml"
+            ):
+                uri = f"{DEFAULT_URI_PREFIX}/{fpath.name}"
+                self._uri_aliases[fpath.name] = uri
+                self.register_extension_yaml(fpath, uri)
 
     def register_extension_yaml(
         self,
@@ -346,7 +347,7 @@ class FunctionRegistry:
             for function in named_functions:
                 for impl in function.get("impls", []):
                     func = FunctionEntry(
-                        uri, function["name"], impl, next(self.id_generator)
+                        uri, function["name"], impl, next(self._id_generator)
                     )
                     if (
                         func.uri in self._function_mapping
@@ -360,7 +361,7 @@ class FunctionRegistry:
     def lookup_function(
         self, uri: str, function_name: str, signature: tuple
     ) -> Optional[tuple[FunctionEntry, Type]]:
-        uri = self.uri_aliases.get(uri, uri)
+        uri = self._uri_aliases.get(uri, uri)
 
         if (
             uri not in self._function_mapping

@@ -55,7 +55,8 @@ def test_column_no_nesting():
                             )
                         ),
                     )
-                )
+                ),
+                output_names=["description"],
             )
         ],
         base_schema=named_struct,
@@ -75,7 +76,29 @@ def test_column_nesting():
                             )
                         ),
                     )
-                )
+                ),
+                output_names=["order_total"],
+            )
+        ],
+        base_schema=nested_named_struct,
+    )
+
+
+def test_column_nested_struct():
+    assert column("shop_details")(nested_named_struct) == stee.ExtendedExpression(
+        referred_expr=[
+            stee.ExpressionReference(
+                expression=stalg.Expression(
+                    selection=stalg.Expression.FieldReference(
+                        root_reference=stalg.Expression.FieldReference.RootReference(),
+                        direct_reference=stalg.Expression.ReferenceSegment(
+                            struct_field=stalg.Expression.ReferenceSegment.StructField(
+                                field=1
+                            )
+                        ),
+                    )
+                ),
+                output_names=["shop_details", "shop_id", "shop_total"],
             )
         ],
         base_schema=nested_named_struct,

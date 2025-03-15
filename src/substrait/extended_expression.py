@@ -10,6 +10,14 @@ def column(name: str):
         column_index = list(base_schema.names).index(name)
         lengths = [type_num_names(t) for t in base_schema.struct.types]
         flat_indices = [0] + list(itertools.accumulate(lengths))[:-1]
+        field_index = flat_indices.index(column_index)
+
+        names_start = flat_indices[field_index]
+        names_end = (
+            flat_indices[field_index + 1]
+            if len(flat_indices) > field_index + 1
+            else None
+        )
 
         return stee.ExtendedExpression(
             referred_expr=[
@@ -19,11 +27,12 @@ def column(name: str):
                             root_reference=stalg.Expression.FieldReference.RootReference(),
                             direct_reference=stalg.Expression.ReferenceSegment(
                                 struct_field=stalg.Expression.ReferenceSegment.StructField(
-                                    field=flat_indices.index(column_index)
+                                    field=field_index
                                 )
                             ),
                         )
-                    )
+                    ),
+                    output_names=list(base_schema.names)[names_start:names_end],
                 )
             ],
             base_schema=base_schema,

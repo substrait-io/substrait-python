@@ -43,7 +43,7 @@ nested_named_struct = stt.NamedStruct(
 
 
 def test_column_no_nesting():
-    assert column("description")(named_struct) == stee.ExtendedExpression(
+    assert column("description")(named_struct, None) == stee.ExtendedExpression(
         referred_expr=[
             stee.ExpressionReference(
                 expression=stalg.Expression(
@@ -64,7 +64,7 @@ def test_column_no_nesting():
 
 
 def test_column_nesting():
-    assert column("order_total")(nested_named_struct) == stee.ExtendedExpression(
+    assert column("order_total")(nested_named_struct, None) == stee.ExtendedExpression(
         referred_expr=[
             stee.ExpressionReference(
                 expression=stalg.Expression(
@@ -85,7 +85,7 @@ def test_column_nesting():
 
 
 def test_column_nested_struct():
-    assert column("shop_details")(nested_named_struct) == stee.ExtendedExpression(
+    assert column("shop_details")(nested_named_struct, None) == stee.ExtendedExpression(
         referred_expr=[
             stee.ExpressionReference(
                 expression=stalg.Expression(

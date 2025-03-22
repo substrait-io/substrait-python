@@ -1,4 +1,5 @@
 import substrait.gen.proto.algebra_pb2 as stalg
+import substrait.gen.proto.extended_expression_pb2 as stee
 import substrait.gen.proto.type_pb2 as stt
 
 
@@ -218,6 +219,17 @@ def infer_expression_type(
             raise Exception(f"Unknown subquery_type {subquery_type}")
     else:
         raise Exception(f"Unknown rex_type {rex_type}")
+
+
+def infer_extended_expression_schema(ee: stee.ExtendedExpression) -> stt.Type.Struct:
+    exprs = [e for e in ee.referred_expr]
+
+    types = [infer_expression_type(e.expression, ee.base_schema.struct) for e in exprs]
+
+    return stt.Type.Struct(
+        types=types,
+        nullability=stt.Type.NULLABILITY_REQUIRED,
+    )
 
 
 def infer_rel_schema(rel: stalg.Rel) -> stt.Type.Struct:

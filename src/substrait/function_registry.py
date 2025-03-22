@@ -1,4 +1,3 @@
-from substrait.gen.proto.parameterized_types_pb2 import ParameterizedType
 from substrait.gen.proto.type_pb2 import Type
 from importlib.resources import files as importlib_files
 import itertools
@@ -227,6 +226,9 @@ class FunctionEntry:
 
 class FunctionRegistry:
     def __init__(self, load_default_extensions=True) -> None:
+        self._uri_mapping: dict = defaultdict(dict)
+        self._uri_id_generator = itertools.count(1)
+
         self._function_mapping: dict = defaultdict(dict)
         self._id_generator = itertools.count(1)
 
@@ -252,6 +254,8 @@ class FunctionRegistry:
         self.register_extension_dict(extension_definitions, uri)
 
     def register_extension_dict(self, definitions: dict, uri: str) -> None:
+        self._uri_mapping[uri] = next(self._uri_id_generator)
+        
         for named_functions in definitions.values():
             for function in named_functions:
                 for impl in function.get("impls", []):
@@ -285,3 +289,7 @@ class FunctionRegistry:
                 return (f, rtn)
 
         return None
+    
+    def lookup_uri(self, uri: str) -> Optional[int]:
+        uri = self._uri_aliases.get(uri, uri)
+        return self._uri_mapping.get(uri, None)

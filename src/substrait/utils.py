@@ -15,6 +15,10 @@ def type_num_names(typ: stp.Type):
         return 1
 
 def merge_extension_uris(*extension_uris: Iterable[ste.SimpleExtensionURI]):
+    """Merges multiple sets of SimpleExtensionURI objects into a single set.
+    The order of extensions is kept intact, while duplicates are discarded.
+    Assumes that there are no collisions (different extensions having identical anchors).
+    """
     seen_uris = set()
     ret = []
 
@@ -27,6 +31,11 @@ def merge_extension_uris(*extension_uris: Iterable[ste.SimpleExtensionURI]):
     return ret
 
 def merge_extension_declarations(*extension_declarations: Iterable[ste.SimpleExtensionDeclaration]):
+    """Merges multiple sets of SimpleExtensionDeclaration objects into a single set.
+    The order of extension declarations is kept intact, while duplicates are discarded.
+    Assumes that there are no collisions (different extension declarations having identical anchors).
+    """
+
     seen_extension_functions = set()
     ret = []
 
@@ -38,7 +47,7 @@ def merge_extension_declarations(*extension_declarations: Iterable[ste.SimpleExt
                     seen_extension_functions.add(ident)
                     ret.append(declaration)
             else:
-                raise Exception('')
+                raise Exception('') #TODO handle extension types
 
     return ret
     

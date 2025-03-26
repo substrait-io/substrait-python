@@ -6,11 +6,12 @@ import substrait.gen.proto.extensions.extensions_pb2 as ste
 from substrait.function_registry import FunctionRegistry
 from substrait.utils import type_num_names, merge_extension_uris, merge_extension_declarations
 from substrait.type_inference import infer_extended_expression_schema
-from typing import Callable, Any
+from typing import Callable, Any, Union
 
 UnboundExpression = Callable[[stp.NamedStruct, FunctionRegistry], stee.ExtendedExpression]
 
 def literal(value: Any, type: stp.Type, alias: str = None) -> UnboundExpression:
+    """Builds a resolver for ExtendedExpression containing a literal expression"""
     def resolve(base_schema: stp.NamedStruct, registry: FunctionRegistry) -> stee.ExtendedExpression:
         kind = type.WhichOneof('kind')
 
@@ -47,12 +48,19 @@ def literal(value: Any, type: stp.Type, alias: str = None) -> UnboundExpression:
 
     return resolve
 
-def column(name: str):
+def column(field: Union[str, int]):
+    """Builds a resolver for ExtendedExpression containing a FieldReference expression
+    
+    Accepts either an index or a field name of a desired field.
+    """
     def resolve(base_schema: stp.NamedStruct, registry: FunctionRegistry) -> stee.ExtendedExpression:
-        column_index = list(base_schema.names).index(name)
-        lengths = [type_num_names(t) for t in base_schema.struct.types]
-        flat_indices = [0] + list(itertools.accumulate(lengths))[:-1]
-        field_index = flat_indices.index(column_index)
+        if isinstance(field, str):
+            column_index = list(base_schema.names).index(field)
+            lengths = [type_num_names(t) for t in base_schema.struct.types]
+            flat_indices = [0] + list(itertools.accumulate(lengths))[:-1]
+            field_index = flat_indices.index(column_index)
+        else:
+            field_index = field
 
         names_start = flat_indices[field_index]
         names_end = (
@@ -83,6 +91,7 @@ def column(name: str):
     return resolve
 
 def scalar_function(uri: str, function: str, *expressions: UnboundExpression, alias: str = None):
+    """Builds a resolver for ExtendedExpression containing a ScalarFunction expression"""
     def resolve(base_schema: stp.NamedStruct, registry: FunctionRegistry) -> stee.ExtendedExpression:
         bound_expressions: list[stee.ExtendedExpression] = [e(base_schema, registry) for e in expressions]
 

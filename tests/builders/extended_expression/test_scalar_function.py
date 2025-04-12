@@ -4,8 +4,8 @@ import substrait.gen.proto.algebra_pb2 as stalg
 import substrait.gen.proto.type_pb2 as stt
 import substrait.gen.proto.extended_expression_pb2 as stee
 import substrait.gen.proto.extensions.extensions_pb2 as ste
-from substrait.extended_expression import scalar_function, literal
-from substrait.function_registry import FunctionRegistry
+from substrait.builders.extended_expression import scalar_function, literal
+from substrait.extension_registry import ExtensionRegistry
 
 struct = stt.Type.Struct(
     types=[
@@ -39,7 +39,7 @@ scalar_functions:
 """
 
 
-registry = FunctionRegistry(load_default_extensions=False)
+registry = ExtensionRegistry(load_default_extensions=False)
 registry.register_extension_dict(yaml.safe_load(content), uri="test_uri")
 
 def test_sclar_add():

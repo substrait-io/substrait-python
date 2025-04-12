@@ -224,7 +224,7 @@ class FunctionEntry:
         return output_type
 
 
-class FunctionRegistry:
+class ExtensionRegistry:
     def __init__(self, load_default_extensions=True) -> None:
         self._uri_mapping: dict = defaultdict(dict)
         self._uri_id_generator = itertools.count(1)

@@ -1,7 +1,7 @@
 import yaml
 
 from substrait.gen.proto.type_pb2 import Type
-from substrait.function_registry import FunctionRegistry, covers
+from substrait.extension_registry import ExtensionRegistry, covers
 from substrait.derivation_expression import _parse
 
 content = """%YAML 1.2
@@ -105,7 +105,7 @@ scalar_functions:
 """
 
 
-registry = FunctionRegistry()
+registry = ExtensionRegistry()
 
 registry.register_extension_dict(yaml.safe_load(content), uri="test")
 

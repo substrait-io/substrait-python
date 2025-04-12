@@ -1,7 +1,7 @@
 import substrait.gen.proto.algebra_pb2 as stalg
 import substrait.gen.proto.type_pb2 as stt
 import substrait.gen.proto.extended_expression_pb2 as stee
-from substrait.extended_expression import column
+from substrait.builders.extended_expression import column
 
 
 struct = stt.Type.Struct(

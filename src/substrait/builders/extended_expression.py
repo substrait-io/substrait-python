@@ -10,7 +10,17 @@ from typing import Callable, Any, Union, Iterable
 
 UnboundExtendedExpression = Callable[[stp.NamedStruct, ExtensionRegistry], stee.ExtendedExpression]
 
-def literal(value: Any, type: stp.Type, alias: str = None) -> UnboundExtendedExpression:
+def _alias_or_inferred(
+        alias: Union[Iterable[str], str],
+        op: str,
+        args: Iterable[str],
+        ):
+    if alias:
+        return [alias] if isinstance(alias, str) else alias
+    else:
+        return [f'{op}({",".join(args)})']
+
+def literal(value: Any, type: stp.Type, alias: Union[Iterable[str], str] = None) -> UnboundExtendedExpression:
     """Builds a resolver for ExtendedExpression containing a literal expression"""
     def resolve(base_schema: stp.NamedStruct, registry: ExtensionRegistry) -> stee.ExtendedExpression:
         kind = type.WhichOneof('kind')
@@ -40,7 +50,7 @@ def literal(value: Any, type: stp.Type, alias: str = None) -> UnboundExtendedExp
                     expression=stalg.Expression(
                         literal=literal
                     ),
-                    output_names=[alias if alias else f'literal_{kind}'],
+                    output_names=_alias_or_inferred(alias, 'Literal', [str(value)])
                 )
             ],
             base_schema=base_schema,
@@ -48,11 +58,12 @@ def literal(value: Any, type: stp.Type, alias: str = None) -> UnboundExtendedExp
 
     return resolve
 
-def column(field: Union[str, int], alias: str = None):
+def column(field: Union[str, int], alias: Union[Iterable[str], str] = None):
     """Builds a resolver for ExtendedExpression containing a FieldReference expression
 
     Accepts either an index or a field name of a desired field.
     """
+    alias = [alias] if alias and isinstance(alias, str) else alias
 
     def resolve(
         base_schema: stp.NamedStruct, registry: ExtensionRegistry
@@ -88,7 +99,7 @@ def column(field: Union[str, int], alias: str = None):
                     ),
                     output_names=list(base_schema.names)[names_start:names_end]
                     if not alias
-                    else [alias],
+                    else alias,
                 )
             ],
             base_schema=base_schema,
@@ -97,10 +108,9 @@ def column(field: Union[str, int], alias: str = None):
     return resolve
 
 def scalar_function(
-    uri: str, function: str, *expressions: UnboundExtendedExpression, alias: str = None
+    uri: str, function: str, *expressions: UnboundExtendedExpression, alias: Union[Iterable[str], str] = None
 ):
     """Builds a resolver for ExtendedExpression containing a ScalarFunction expression"""
-
     def resolve(
         base_schema: stp.NamedStruct, registry: ExtensionRegistry
     ) -> stee.ExtendedExpression:
@@ -158,7 +168,7 @@ def scalar_function(
                             output_type=func[1],
                         )
                     ),
-                    output_names=[alias if alias else "scalar_function"],
+                    output_names=_alias_or_inferred(alias, function, [e.referred_expr[0].output_names[0] for e in bound_expressions]),
                 )
             ],
             base_schema=base_schema,
@@ -169,10 +179,9 @@ def scalar_function(
     return resolve
 
 def aggregate_function(
-    uri: str, function: str, *expressions: UnboundExtendedExpression, alias: str = None
+    uri: str, function: str, *expressions: UnboundExtendedExpression, alias: Union[Iterable[str], str] = None
 ):
     """Builds a resolver for ExtendedExpression containing a AggregateFunction measure"""
-
     def resolve(
         base_schema: stp.NamedStruct, registry: ExtensionRegistry
     ) -> stee.ExtendedExpression:
@@ -226,7 +235,7 @@ def aggregate_function(
                         ],
                         output_type=func[1],
                     ),
-                    output_names=[alias if alias else "aggregate_function"],
+                    output_names=_alias_or_inferred(alias, 'IfThen', [e.referred_expr[0].output_names[0] for e in bound_expressions]),
                 )
             ],
             base_schema=base_schema,
@@ -243,10 +252,9 @@ def window_function(
     function: str,
     *expressions: UnboundExtendedExpression,
     partitions: Iterable[UnboundExtendedExpression] = [],
-    alias: str = None,
+    alias: Union[Iterable[str], str] = None
 ):
     """Builds a resolver for ExtendedExpression containing a WindowFunction expression"""
-
     def resolve(
         base_schema: stp.NamedStruct, registry: ExtensionRegistry
     ) -> stee.ExtendedExpression:
@@ -313,7 +321,7 @@ def window_function(
                             ],
                         )
                     ),
-                    output_names=[alias if alias else "window_function"],
+                    output_names=_alias_or_inferred(alias, function, [e.referred_expr[0].output_names[0] for e in bound_expressions]),
                 )
             ],
             base_schema=base_schema,
@@ -324,8 +332,8 @@ def window_function(
     return resolve
 
 
-def if_then(ifs: Iterable[tuple[UnboundExtendedExpression, UnboundExtendedExpression]], _else: UnboundExtendedExpression, alias: str = None):
-    """Builds a resolver for ExtendedExpression containing a IfThen expression"""
+def if_then(ifs: Iterable[tuple[UnboundExtendedExpression, UnboundExtendedExpression]], _else: UnboundExtendedExpression, alias: Union[Iterable[str], str] = None):
+    """Builds a resolver for ExtendedExpression containing an IfThen expression"""
     def resolve(
         base_schema: stp.NamedStruct, registry: ExtensionRegistry
     ) -> stee.ExtendedExpression:
@@ -363,7 +371,9 @@ def if_then(ifs: Iterable[tuple[UnboundExtendedExpression, UnboundExtendedExpres
                             'else': bound_else.referred_expr[0].expression
                         })
                     ),
-                    output_names=[alias if alias else "if_then"],
+                    output_names=_alias_or_inferred(alias, 'IfThen', [a for e in bound_ifs for a in [e[0].referred_expr[0].output_names[0], e[1].referred_expr[0].output_names[0]]]
+                                                    + [bound_else.referred_expr[0].output_names[0]]
+                                                    ),
                 )
             ],
             base_schema=base_schema,

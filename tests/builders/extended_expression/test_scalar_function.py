@@ -45,8 +45,7 @@ registry.register_extension_dict(yaml.safe_load(content), uri="test_uri")
 def test_sclar_add():
     e = scalar_function('test_uri', 'test_func', 
                            literal(10, type=stt.Type(i8=stt.Type.I8(nullability=stt.Type.NULLABILITY_REQUIRED))), 
-                           literal(20, type=stt.Type(i8=stt.Type.I8(nullability=stt.Type.NULLABILITY_REQUIRED))),
-                           alias='sum',
+                           literal(20, type=stt.Type(i8=stt.Type.I8(nullability=stt.Type.NULLABILITY_REQUIRED)))
                            )(named_struct, registry)
     
     expected = stee.ExtendedExpression(
@@ -77,7 +76,7 @@ def test_sclar_add():
                         output_type=stt.Type(i8=stt.Type.I8(nullability=stt.Type.NULLABILITY_REQUIRED))
                     )
                 ),
-                output_names=["sum"],
+                output_names=["test_func(Literal(10),Literal(20))"],
             )
         ],
         base_schema=named_struct,

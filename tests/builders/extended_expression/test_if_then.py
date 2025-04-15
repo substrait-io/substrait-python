@@ -17,16 +17,17 @@ named_struct = stt.NamedStruct(
 )
 
 def test_if_else():
-    assert if_then(
+    actual = if_then(
         ifs=[
             (
                 literal(True, type=stt.Type(bool=stt.Type.Boolean(nullability=stt.Type.NULLABILITY_REQUIRED))),
                 literal(10, type=stt.Type(i8=stt.Type.I8(nullability=stt.Type.NULLABILITY_REQUIRED)))
             )
         ],
-        _else=literal(20, type=stt.Type(i8=stt.Type.I8(nullability=stt.Type.NULLABILITY_REQUIRED))),
-        alias='it'
-    )(named_struct, None) == stee.ExtendedExpression(
+        _else=literal(20, type=stt.Type(i8=stt.Type.I8(nullability=stt.Type.NULLABILITY_REQUIRED)))
+    )(named_struct, None)
+
+    expected = stee.ExtendedExpression(
         referred_expr=[
             stee.ExpressionReference(
                 expression=stalg.Expression(
@@ -40,8 +41,10 @@ def test_if_else():
                         'else': stalg.Expression(literal=stalg.Expression.Literal(i8=20, nullable=False))
                     })
                 ),
-                output_names=["it"],
+                output_names=["IfThen(Literal(True),Literal(10),Literal(20))"],
             )
         ],
         base_schema=named_struct,
     )
+
+    assert actual == expected

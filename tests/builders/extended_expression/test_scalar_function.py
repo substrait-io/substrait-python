@@ -4,8 +4,8 @@ import substrait.gen.proto.algebra_pb2 as stalg
 import substrait.gen.proto.type_pb2 as stt
 import substrait.gen.proto.extended_expression_pb2 as stee
 import substrait.gen.proto.extensions.extensions_pb2 as ste
-from substrait.extended_expression import scalar_function, literal
-from substrait.function_registry import FunctionRegistry
+from substrait.builders.extended_expression import scalar_function, literal
+from substrait.extension_registry import ExtensionRegistry
 
 struct = stt.Type.Struct(
     types=[
@@ -39,14 +39,13 @@ scalar_functions:
 """
 
 
-registry = FunctionRegistry(load_default_extensions=False)
+registry = ExtensionRegistry(load_default_extensions=False)
 registry.register_extension_dict(yaml.safe_load(content), uri="test_uri")
 
 def test_sclar_add():
     e = scalar_function('test_uri', 'test_func', 
                            literal(10, type=stt.Type(i8=stt.Type.I8(nullability=stt.Type.NULLABILITY_REQUIRED))), 
-                           literal(20, type=stt.Type(i8=stt.Type.I8(nullability=stt.Type.NULLABILITY_REQUIRED))),
-                           alias='sum',
+                           literal(20, type=stt.Type(i8=stt.Type.I8(nullability=stt.Type.NULLABILITY_REQUIRED)))
                            )(named_struct, registry)
     
     expected = stee.ExtendedExpression(
@@ -77,7 +76,7 @@ def test_sclar_add():
                         output_type=stt.Type(i8=stt.Type.I8(nullability=stt.Type.NULLABILITY_REQUIRED))
                     )
                 ),
-                output_names=["sum"],
+                output_names=["test_func(Literal(10),Literal(20))"],
             )
         ],
         base_schema=named_struct,

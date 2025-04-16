@@ -1,6 +1,7 @@
 import substrait.gen.proto.algebra_pb2 as stalg
 import substrait.gen.proto.extended_expression_pb2 as stee
 import substrait.gen.proto.type_pb2 as stt
+import substrait.gen.proto.plan_pb2 as stp
 
 
 def infer_literal_type(literal: stalg.Expression.Literal) -> stt.Type:
@@ -346,3 +347,8 @@ def infer_rel_schema(rel: stalg.Rel) -> stt.Type.Struct:
             types=[struct.types[i] for i in common.emit.output_mapping],
             nullability=struct.nullability,
         )
+
+def infer_plan_schema(plan: stp.Plan) -> stt.NamedStruct:
+    schema = infer_rel_schema(plan.relations[-1].root.input)
+
+    return stt.NamedStruct(names=plan.relations[-1].root.names, struct=schema)

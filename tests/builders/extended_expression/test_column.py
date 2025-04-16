@@ -3,7 +3,6 @@ import substrait.gen.proto.type_pb2 as stt
 import substrait.gen.proto.extended_expression_pb2 as stee
 from substrait.builders.extended_expression import column
 
-
 struct = stt.Type.Struct(
     types=[
         stt.Type(i64=stt.Type.I64(nullability=stt.Type.NULLABILITY_REQUIRED)),

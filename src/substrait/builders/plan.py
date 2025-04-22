@@ -19,7 +19,7 @@ def _merge_extensions(*objs):
 
 def read_named_table(names: Union[str, Iterable[str]], named_struct: stt.NamedStruct):
     names = [names] if isinstance(names, str) else names
-    
+
     rel = stalg.Rel(
         read=stalg.ReadRel(
             common=stalg.RelCommon(direct=stalg.RelCommon.Direct()),
@@ -29,7 +29,8 @@ def read_named_table(names: Union[str, Iterable[str]], named_struct: stt.NamedSt
     )
 
     return stp.Plan(
-        relations=[stp.PlanRel(root=stalg.RelRoot(input=rel, names=named_struct.names))]
+        relations=[stp.PlanRel(root=stalg.RelRoot(
+            input=rel, names=named_struct.names))]
     )
 
 
@@ -37,7 +38,8 @@ def project(
     plan: stp.Plan, expressions: Iterable[UnboundExtendedExpression], registry: ExtensionRegistry
 ) -> stp.Plan:
     ns = infer_plan_schema(plan)
-    expressions: Iterable[stee.ExtendedExpression] = [e(ns, registry) for e in expressions]
+    expressions: Iterable[stee.ExtendedExpression] = [
+        e(ns, registry) for e in expressions]
 
     start_index = len(plan.relations[-1].root.names)
 
@@ -51,7 +53,8 @@ def project(
                 )
             ),
             input=plan.relations[-1].root.input,
-            expressions=[e.expression for ee in expressions for e in ee.referred_expr],
+            expressions=[
+                e.expression for ee in expressions for e in ee.referred_expr],
         )
     )
 
@@ -59,6 +62,7 @@ def project(
         relations=[stp.PlanRel(root=stalg.RelRoot(input=rel, names=names))],
         **_merge_extensions(plan, *expressions),
     )
+
 
 def filter(
     plan: stp.Plan, expression: UnboundExtendedExpression, registry: ExtensionRegistry
@@ -78,4 +82,179 @@ def filter(
     return stp.Plan(
         relations=[stp.PlanRel(root=stalg.RelRoot(input=rel, names=names))],
         **_merge_extensions(plan, expression),
+    )
+
+
+def sort(
+    plan: stp.Plan, 
+    expressions: Iterable[Union[UnboundExtendedExpression, tuple[UnboundExtendedExpression, stalg.SortField.SortDirection.ValueType]]], 
+    registry: ExtensionRegistry
+) -> stp.Plan:
+    ns = infer_plan_schema(plan)
+    
+    expressions = [(e, stalg.SortField.SORT_DIRECTION_ASC_NULLS_LAST) if not isinstance(e, tuple) else e for e in expressions]    
+    expressions = [(e[0](ns, registry), e[1]) for e in expressions]
+
+    rel = stalg.Rel(
+        sort=stalg.SortRel(
+            input=plan.relations[-1].root.input,
+            sorts=[
+                stalg.SortField(
+                    expr=e[0].referred_expr[0].expression,
+                    direction=e[1],
+                )
+                for e in expressions
+            ],
+        )
+    )
+
+    return stp.Plan(
+        relations=[stp.PlanRel(root=stalg.RelRoot(input=rel, names=ns.names))],
+        **_merge_extensions(plan, *[e[0] for e in expressions]),
+    )
+
+
+def set(inputs: Iterable[stp.Plan], op: stalg.SetRel.SetOp) -> stp.Plan:
+    rel = stalg.Rel(
+        set=stalg.SetRel(
+            inputs=[plan.relations[-1].root.input for plan in inputs], op=op
+        )
+    )
+
+    return stp.Plan(
+        relations=[
+            stp.PlanRel(
+                root=stalg.RelRoot(input=rel, names=inputs[0].relations[-1].root.names)
+            )
+        ],
+        **_merge_extensions(*inputs),
+    )
+
+def fetch(plan: stp.Plan, 
+        offset: UnboundExtendedExpression, 
+        count: UnboundExtendedExpression,
+        registry: ExtensionRegistry):
+    ns = infer_plan_schema(plan)
+    
+    bound_offset = offset(ns, registry)
+    bound_count = count(ns, registry)
+
+    rel = stalg.Rel(
+        fetch=stalg.FetchRel(
+            input=plan.relations[-1].root.input,
+            offset_expr=bound_offset.referred_expr[0].expression,
+            count_expr=bound_count.referred_expr[0].expression
+        )
+    )
+
+    return stp.Plan(
+        relations=[
+            stp.PlanRel(
+                root=stalg.RelRoot(input=rel, names=plan.relations[-1].root.names)
+            )
+        ],
+        **_merge_extensions(plan, bound_offset, bound_count),
+    )
+
+
+def join(
+    left: stp.Plan,
+    right: stp.Plan,
+    expression: UnboundExtendedExpression,
+    type: stalg.JoinRel.JoinType,
+    registry: ExtensionRegistry,
+):
+    left_ns = infer_plan_schema(left)
+    right_ns = infer_plan_schema(right)
+    ns = stt.NamedStruct(
+        struct=stt.Type.Struct(
+            types=list(left_ns.struct.types) + list(right_ns.struct.types),
+            nullability=stt.Type.Nullability.NULLABILITY_REQUIRED,
+        ),
+        names=list(left_ns.names) + list(right_ns.names),
+    )
+    expression: stee.ExtendedExpression = expression(ns, registry)
+
+    rel = stalg.Rel(
+        join=stalg.JoinRel(
+            left=left.relations[-1].root.input,
+            right=right.relations[-1].root.input,
+            expression=expression.referred_expr[0].expression,
+            type=type,
+        )
+    )
+
+    return stp.Plan(
+        relations=[stp.PlanRel(root=stalg.RelRoot(input=rel, names=ns.names))],
+        **_merge_extensions(left, right, expression),
+    )
+
+def cross(
+    left: stp.Plan,
+    right: stp.Plan,
+    registry: ExtensionRegistry,
+):
+    left_ns = infer_plan_schema(left)
+    right_ns = infer_plan_schema(right)
+    
+    ns = stt.NamedStruct(
+        struct=stt.Type.Struct(
+            types=list(left_ns.struct.types) + list(right_ns.struct.types),
+            nullability=stt.Type.Nullability.NULLABILITY_REQUIRED,
+        ),
+        names=list(left_ns.names) + list(right_ns.names),
+    )
+
+    rel = stalg.Rel(
+        cross=stalg.CrossRel(
+            left=left.relations[-1].root.input,
+            right=right.relations[-1].root.input
+            )
+    )
+
+    return stp.Plan(
+        relations=[stp.PlanRel(root=stalg.RelRoot(input=rel, names=ns.names))],
+        **_merge_extensions(left, right),
+    )
+
+# TODO grouping sets
+def aggregate(
+    input: stp.Plan,
+    grouping_expressions: Iterable[UnboundExtendedExpression],
+    measures: Iterable[UnboundExtendedExpression],
+    registry: ExtensionRegistry,
+):
+    ns = infer_plan_schema(input)
+
+    grouping_expressions = [e(ns, registry) for e in grouping_expressions]
+    measures = [e(ns, registry) for e in measures]
+
+    rel = stalg.Rel(
+        aggregate=stalg.AggregateRel(
+            input=input.relations[-1].root.input,
+            grouping_expressions=[
+                e.referred_expr[0].expression for e in grouping_expressions
+            ],
+            groupings=[
+                stalg.AggregateRel.Grouping(
+                    expression_references=range(len(grouping_expressions)),
+                    grouping_expressions=[
+                        e.referred_expr[0].expression for e in grouping_expressions
+                    ],
+                )
+            ],
+            measures=[
+                stalg.AggregateRel.Measure(measure=m.referred_expr[0].measure)
+                for m in measures
+            ],
+        )
+    )
+
+    names = [e.referred_expr[0].output_names[0] for e in grouping_expressions] + [
+        e.referred_expr[0].output_names[0] for e in measures
+    ]
+
+    return stp.Plan(
+        relations=[stp.PlanRel(root=stalg.RelRoot(input=rel, names=names))],
+        **_merge_extensions(input, *grouping_expressions, *measures),
     )

@@ -11,7 +11,7 @@ named_struct = stt.NamedStruct(
 )
 
 def test_read_rel():
-    actual = read_named_table('example_table', named_struct)
+    actual = read_named_table('example_table', named_struct)(None)
 
     expected = stp.Plan(
         relations=[
@@ -33,7 +33,7 @@ def test_read_rel():
     assert actual == expected
 
 def test_read_rel_db():
-    actual = read_named_table(['example_db', 'example_table'], named_struct)
+    actual = read_named_table(['example_db', 'example_table'], named_struct)(None)
 
     expected = stp.Plan(
         relations=[

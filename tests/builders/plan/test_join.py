@@ -22,7 +22,7 @@ def test_join():
     table = read_named_table('table', named_struct)
     table2 = read_named_table('table2', named_struct_2)
 
-    actual = join(table, table2, literal(True, boolean()), stalg.JoinRel.JOIN_TYPE_INNER, registry=registry)
+    actual = join(table, table2, literal(True, boolean()), stalg.JoinRel.JOIN_TYPE_INNER)(registry)
 
     expected = stp.Plan(
         relations=[
@@ -30,8 +30,8 @@ def test_join():
                 root=stalg.RelRoot(
                     input=stalg.Rel(
                         join=stalg.JoinRel(
-                            left=table.relations[-1].root.input,
-                            right=table2.relations[-1].root.input,
+                            left=table(None).relations[-1].root.input,
+                            right=table2(None).relations[-1].root.input,
                             expression=literal(True, boolean())(None, None).referred_expr[0].expression,
                             type=stalg.JoinRel.JOIN_TYPE_INNER
                         )

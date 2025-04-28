@@ -19,7 +19,7 @@ def test_set():
     table = read_named_table('table', named_struct)
     table2 = read_named_table('table2', named_struct)
 
-    actual = set([table, table2], stalg.SetRel.SET_OP_UNION_ALL)
+    actual = set([table, table2], stalg.SetRel.SET_OP_UNION_ALL)(None)
 
 
     expected = stp.Plan(
@@ -29,8 +29,8 @@ def test_set():
                     input=stalg.Rel(
                         set=stalg.SetRel(
                             inputs=[
-                                table.relations[-1].root.input,
-                                table2.relations[-1].root.input,
+                                table(None).relations[-1].root.input,
+                                table2(None).relations[-1].root.input,
                             ],
                             op=stalg.SetRel.SET_OP_UNION_ALL
                         )

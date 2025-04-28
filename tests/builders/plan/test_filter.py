@@ -17,7 +17,7 @@ named_struct = stt.NamedStruct(
 def test_filter():
     table = read_named_table('table', named_struct)
 
-    actual = filter(table, literal(True, boolean()), registry)
+    actual = filter(table, literal(True, boolean()))(registry)
 
     expected = stp.Plan(
         relations=[
@@ -25,7 +25,7 @@ def test_filter():
                 root=stalg.RelRoot(
                     input=stalg.Rel(
                         filter=stalg.FilterRel(
-                            input=table.relations[-1].root.input,
+                            input=table(None).relations[-1].root.input,
                             condition=stalg.Expression(
                                 literal=stalg.Expression.Literal(
                                     boolean=True,

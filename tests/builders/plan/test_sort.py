@@ -20,7 +20,7 @@ def test_sort_no_direction():
 
     col = column('id')
 
-    actual = sort(table, expressions=[col], registry=registry)
+    actual = sort(table, expressions=[col])(registry)
 
     expected = stp.Plan(
         relations=[
@@ -28,11 +28,11 @@ def test_sort_no_direction():
                 root=stalg.RelRoot(
                     input=stalg.Rel(
                         sort=stalg.SortRel(
-                            input=table.relations[-1].root.input,
+                            input=table(None).relations[-1].root.input,
                             sorts=[
                                 stalg.SortField(
                                     direction=stalg.SortField.SORT_DIRECTION_ASC_NULLS_LAST,
-                                    expr=col(infer_plan_schema(table), registry).referred_expr[0].expression
+                                    expr=col(infer_plan_schema(table(None)), registry).referred_expr[0].expression
                                 )
                             ]
                         )
@@ -50,7 +50,7 @@ def test_sort_direction():
 
     col = column('id')
 
-    actual = sort(table, expressions=[(col, stalg.SortField.SORT_DIRECTION_DESC_NULLS_FIRST)], registry=registry)
+    actual = sort(table, expressions=[(col, stalg.SortField.SORT_DIRECTION_DESC_NULLS_FIRST)])(registry)
 
     expected = stp.Plan(
         relations=[
@@ -58,11 +58,11 @@ def test_sort_direction():
                 root=stalg.RelRoot(
                     input=stalg.Rel(
                         sort=stalg.SortRel(
-                            input=table.relations[-1].root.input,
+                            input=table(None).relations[-1].root.input,
                             sorts=[
                                 stalg.SortField(
                                     direction=stalg.SortField.SORT_DIRECTION_DESC_NULLS_FIRST,
-                                    expr=col(infer_plan_schema(table), registry).referred_expr[0].expression
+                                    expr=col(infer_plan_schema(table(None)), registry).referred_expr[0].expression
                                 )
                             ]
                         )

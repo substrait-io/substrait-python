@@ -21,7 +21,7 @@ def test_fetch():
     offset = literal(10, i64())
     count = literal(5, i64())
 
-    actual = fetch(table, offset=offset, count=count, registry=registry)
+    actual = fetch(table, offset=offset, count=count)(registry)
 
     expected = stp.Plan(
         relations=[
@@ -29,7 +29,7 @@ def test_fetch():
                 root=stalg.RelRoot(
                     input=stalg.Rel(
                         fetch=stalg.FetchRel(
-                            input=table.relations[-1].root.input,
+                            input=table(None).relations[-1].root.input,
                             offset_expr=offset(None, None).referred_expr[0].expression,
                             count_expr=count(None, None).referred_expr[0].expression
                         )

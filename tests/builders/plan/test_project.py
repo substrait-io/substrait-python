@@ -17,7 +17,7 @@ named_struct = stt.NamedStruct(
 def test_project():
     table = read_named_table('table', named_struct)
 
-    actual = project(table, [column('id')], registry=registry)
+    actual = project(table, [column('id')])(registry)
 
     expected = stp.Plan(
         relations=[
@@ -26,7 +26,7 @@ def test_project():
                     input=stalg.Rel(
                         project=stalg.ProjectRel(
                             common=stalg.RelCommon(emit=stalg.RelCommon.Emit(output_mapping=[2])),
-                            input=table.relations[-1].root.input,
+                            input=table(None).relations[-1].root.input,
                             expressions=[
                                 stalg.Expression(
                                     selection=stalg.Expression.FieldReference(

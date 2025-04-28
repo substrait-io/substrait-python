@@ -71,3 +71,6 @@ def list(type: stt.Type, nullable=True):
 
 def map(key: stt.Type, value: stt.Type, nullable=True):
     return stt.Type(map=stt.Type.Map(key=key, value=value, nullability=stt.Type.NULLABILITY_NULLABLE if nullable else stt.Type.NULLABILITY_REQUIRED))
+
+def named_struct(names: Iterable[str], struct: stt.Type):
+    return stt.NamedStruct(names=names, struct=struct.struct)

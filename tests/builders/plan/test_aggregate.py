@@ -42,10 +42,9 @@ def test_aggregate():
 
     actual = aggregate(table, 
                        grouping_expressions=[group_expr],
-                       measures=[measure_expr],
-                       registry=registry)
+                       measures=[measure_expr])(registry)
     
-    ns = infer_plan_schema(table)
+    ns = infer_plan_schema(table(None))
 
     expected = stp.Plan(
         extension_uris=[
@@ -68,7 +67,7 @@ def test_aggregate():
                 root=stalg.RelRoot(
                     input=stalg.Rel(
                         aggregate=stalg.AggregateRel(
-                            input=table.relations[-1].root.input,
+                            input=table(None).relations[-1].root.input,
                             grouping_expressions=[
                                 group_expr(ns, registry).referred_expr[0].expression
                             ],
@@ -93,8 +92,5 @@ def test_aggregate():
             )
         ]
     )
-
-    print(actual)
-    print(expected)
 
     assert actual == expected

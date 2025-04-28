@@ -18,11 +18,11 @@ named_struct_2 = stt.NamedStruct(
     names=["fk_id", "name"], struct=stt.Type.Struct(types=[i64(nullable=False), string()])
 )
 
-def test_join():
+def test_cross_join():
     table = read_named_table('table', named_struct)
     table2 = read_named_table('table2', named_struct_2)
 
-    actual = cross(table, table2, registry=registry)
+    actual = cross(table, table2)(registry)
 
     expected = stp.Plan(
         relations=[
@@ -30,8 +30,8 @@ def test_join():
                 root=stalg.RelRoot(
                     input=stalg.Rel(
                         cross=stalg.CrossRel(
-                            left=table.relations[-1].root.input,
-                            right=table2.relations[-1].root.input,
+                            left=table(None).relations[-1].root.input,
+                            right=table2(None).relations[-1].root.input,
                         )
                     ),
                     names=['id', 'is_applicable', 'fk_id', 'name']

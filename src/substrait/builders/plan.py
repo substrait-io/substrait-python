@@ -1,6 +1,8 @@
 """
 Plan builders take either Plan or UnboundPlan objects as input rather than plain Rels.
 This is to make sure that additional information like extension types of functions are not lost.
+All builders return UnboundPlan objects that can be materialized to a Plan using an ExtensionRegistry.
+See `examples/builder_example.py` for usage.
 """
 
 from typing import Iterable, Union, Callable

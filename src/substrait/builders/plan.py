@@ -1,3 +1,8 @@
+"""
+Plan builders take either Plan or UnboundPlan objects as input rather than plain Rels.
+This is to make sure that additional information like extension types of functions are not lost.
+"""
+
 from typing import Iterable, Union, Callable
 
 import substrait.gen.proto.algebra_pb2 as stalg
@@ -10,6 +15,8 @@ from substrait.type_inference import infer_plan_schema
 from substrait.utils import merge_extension_declarations, merge_extension_uris
 
 UnboundPlan = Callable[[ExtensionRegistry], stp.Plan]
+
+PlanOrUnbound = Union[stp.Plan, UnboundPlan]
 
 def _merge_extensions(*objs):
     return {
@@ -39,7 +46,7 @@ def read_named_table(names: Union[str, Iterable[str]], named_struct: stt.NamedSt
 
 
 def project(
-    plan: Union[stp.Plan, UnboundPlan], expressions: Iterable[UnboundExtendedExpression]
+    plan: PlanOrUnbound, expressions: Iterable[UnboundExtendedExpression]
 ) -> UnboundPlan:
     def resolve(registry: ExtensionRegistry) -> stp.Plan:
         _plan = plan if isinstance(plan, stp.Plan) else plan(registry)
@@ -73,7 +80,7 @@ def project(
 
 
 def filter(
-    plan: Union[stp.Plan, UnboundPlan], expression: UnboundExtendedExpression
+    plan: PlanOrUnbound, expression: UnboundExtendedExpression
 ) -> UnboundPlan:
     def resolve(registry: ExtensionRegistry) -> stp.Plan:
         bound_plan = plan if isinstance(plan, stp.Plan) else plan(registry)
@@ -98,7 +105,7 @@ def filter(
 
 
 def sort(
-    plan: stp.Plan, 
+    plan: PlanOrUnbound,
     expressions: Iterable[Union[UnboundExtendedExpression, tuple[UnboundExtendedExpression, stalg.SortField.SortDirection.ValueType]]]
 ) -> UnboundPlan:    
     def resolve(registry: ExtensionRegistry) -> stp.Plan:
@@ -129,7 +136,7 @@ def sort(
     return resolve
 
 
-def set(inputs: Iterable[Union[stp.Plan, UnboundPlan]], op: stalg.SetRel.SetOp) -> UnboundPlan:
+def set(inputs: Iterable[PlanOrUnbound], op: stalg.SetRel.SetOp) -> UnboundPlan:
     def resolve(registry: ExtensionRegistry) -> stp.Plan:
         bound_inputs = [i if isinstance(i, stp.Plan) else i(registry) for i in inputs]
         rel = stalg.Rel(
@@ -149,7 +156,7 @@ def set(inputs: Iterable[Union[stp.Plan, UnboundPlan]], op: stalg.SetRel.SetOp) 
     
     return resolve
 
-def fetch(plan: stp.Plan, 
+def fetch(plan: PlanOrUnbound, 
         offset: UnboundExtendedExpression, 
         count: UnboundExtendedExpression) -> UnboundPlan:
     def resolve(registry: ExtensionRegistry) -> stp.Plan:
@@ -180,8 +187,8 @@ def fetch(plan: stp.Plan,
 
 
 def join(
-    left: stp.Plan,
-    right: stp.Plan,
+    left: PlanOrUnbound,
+    right: PlanOrUnbound,
     expression: UnboundExtendedExpression,
     type: stalg.JoinRel.JoinType,
 ) -> UnboundPlan:
@@ -217,8 +224,8 @@ def join(
     return resolve
 
 def cross(
-    left: Union[stp.Plan, UnboundPlan],
-    right: Union[stp.Plan, UnboundPlan],
+    left: PlanOrUnbound,
+    right: PlanOrUnbound,
 ) -> UnboundPlan:
     def resolve(registry: ExtensionRegistry) -> stp.Plan:
         bound_left = left if isinstance(left, stp.Plan) else left(registry)
@@ -250,7 +257,7 @@ def cross(
 
 # TODO grouping sets
 def aggregate(
-    input: stp.Plan,
+    input: PlanOrUnbound,
     grouping_expressions: Iterable[UnboundExtendedExpression],
     measures: Iterable[UnboundExtendedExpression],
 ) -> UnboundPlan:

@@ -8,20 +8,29 @@ else:
 # This class defines a complete listener for a parse tree produced by SubstraitTypeParser.
 class SubstraitTypeListener(ParseTreeListener):
 
-    # Enter a parse tree produced by SubstraitTypeParser#start.
-    def enterStart(self, ctx:SubstraitTypeParser.StartContext):
+    # Enter a parse tree produced by SubstraitTypeParser#startRule.
+    def enterStartRule(self, ctx:SubstraitTypeParser.StartRuleContext):
         pass
 
-    # Exit a parse tree produced by SubstraitTypeParser#start.
-    def exitStart(self, ctx:SubstraitTypeParser.StartContext):
+    # Exit a parse tree produced by SubstraitTypeParser#startRule.
+    def exitStartRule(self, ctx:SubstraitTypeParser.StartRuleContext):
         pass
 
 
-    # Enter a parse tree produced by SubstraitTypeParser#Boolean.
+    # Enter a parse tree produced by SubstraitTypeParser#typeStatement.
+    def enterTypeStatement(self, ctx:SubstraitTypeParser.TypeStatementContext):
+        pass
+
+    # Exit a parse tree produced by SubstraitTypeParser#typeStatement.
+    def exitTypeStatement(self, ctx:SubstraitTypeParser.TypeStatementContext):
+        pass
+
+
+    # Enter a parse tree produced by SubstraitTypeParser#boolean.
     def enterBoolean(self, ctx:SubstraitTypeParser.BooleanContext):
         pass
 
-    # Exit a parse tree produced by SubstraitTypeParser#Boolean.
+    # Exit a parse tree produced by SubstraitTypeParser#boolean.
     def exitBoolean(self, ctx:SubstraitTypeParser.BooleanContext):
         pass
 
@@ -152,15 +161,6 @@ class SubstraitTypeListener(ParseTreeListener):
         pass
 
 
-    # Enter a parse tree produced by SubstraitTypeParser#userDefined.
-    def enterUserDefined(self, ctx:SubstraitTypeParser.UserDefinedContext):
-        pass
-
-    # Exit a parse tree produced by SubstraitTypeParser#userDefined.
-    def exitUserDefined(self, ctx:SubstraitTypeParser.UserDefinedContext):
-        pass
-
-
     # Enter a parse tree produced by SubstraitTypeParser#fixedChar.
     def enterFixedChar(self, ctx:SubstraitTypeParser.FixedCharContext):
         pass
@@ -197,21 +197,12 @@ class SubstraitTypeListener(ParseTreeListener):
         pass
 
 
-    # Enter a parse tree produced by SubstraitTypeParser#intervalDay.
-    def enterIntervalDay(self, ctx:SubstraitTypeParser.IntervalDayContext):
+    # Enter a parse tree produced by SubstraitTypeParser#precisionIntervalDay.
+    def enterPrecisionIntervalDay(self, ctx:SubstraitTypeParser.PrecisionIntervalDayContext):
         pass
 
-    # Exit a parse tree produced by SubstraitTypeParser#intervalDay.
-    def exitIntervalDay(self, ctx:SubstraitTypeParser.IntervalDayContext):
-        pass
-
-
-    # Enter a parse tree produced by SubstraitTypeParser#intervalCompound.
-    def enterIntervalCompound(self, ctx:SubstraitTypeParser.IntervalCompoundContext):
-        pass
-
-    # Exit a parse tree produced by SubstraitTypeParser#intervalCompound.
-    def exitIntervalCompound(self, ctx:SubstraitTypeParser.IntervalCompoundContext):
+    # Exit a parse tree produced by SubstraitTypeParser#precisionIntervalDay.
+    def exitPrecisionIntervalDay(self, ctx:SubstraitTypeParser.PrecisionIntervalDayContext):
         pass
 
 
@@ -269,6 +260,15 @@ class SubstraitTypeListener(ParseTreeListener):
         pass
 
 
+    # Enter a parse tree produced by SubstraitTypeParser#userDefined.
+    def enterUserDefined(self, ctx:SubstraitTypeParser.UserDefinedContext):
+        pass
+
+    # Exit a parse tree produced by SubstraitTypeParser#userDefined.
+    def exitUserDefined(self, ctx:SubstraitTypeParser.UserDefinedContext):
+        pass
+
+
     # Enter a parse tree produced by SubstraitTypeParser#numericLiteral.
     def enterNumericLiteral(self, ctx:SubstraitTypeParser.NumericLiteralContext):
         pass
@@ -305,12 +305,12 @@ class SubstraitTypeListener(ParseTreeListener):
         pass
 
 
-    # Enter a parse tree produced by SubstraitTypeParser#type.
-    def enterType(self, ctx:SubstraitTypeParser.TypeContext):
+    # Enter a parse tree produced by SubstraitTypeParser#typeDef.
+    def enterTypeDef(self, ctx:SubstraitTypeParser.TypeDefContext):
         pass
 
-    # Exit a parse tree produced by SubstraitTypeParser#type.
-    def exitType(self, ctx:SubstraitTypeParser.TypeContext):
+    # Exit a parse tree produced by SubstraitTypeParser#typeDef.
+    def exitTypeDef(self, ctx:SubstraitTypeParser.TypeDefContext):
         pass
 
 
@@ -359,21 +359,21 @@ class SubstraitTypeListener(ParseTreeListener):
         pass
 
 
-    # Enter a parse tree produced by SubstraitTypeParser#TypeParam.
-    def enterTypeParam(self, ctx:SubstraitTypeParser.TypeParamContext):
-        pass
-
-    # Exit a parse tree produced by SubstraitTypeParser#TypeParam.
-    def exitTypeParam(self, ctx:SubstraitTypeParser.TypeParamContext):
-        pass
-
-
     # Enter a parse tree produced by SubstraitTypeParser#ParenExpression.
     def enterParenExpression(self, ctx:SubstraitTypeParser.ParenExpressionContext):
         pass
 
     # Exit a parse tree produced by SubstraitTypeParser#ParenExpression.
     def exitParenExpression(self, ctx:SubstraitTypeParser.ParenExpressionContext):
+        pass
+
+
+    # Enter a parse tree produced by SubstraitTypeParser#ParameterName.
+    def enterParameterName(self, ctx:SubstraitTypeParser.ParameterNameContext):
+        pass
+
+    # Exit a parse tree produced by SubstraitTypeParser#ParameterName.
+    def exitParameterName(self, ctx:SubstraitTypeParser.ParameterNameContext):
         pass
 
 

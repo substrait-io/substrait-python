@@ -27,9 +27,9 @@ def _evaluate(x, values: dict):
         else:
             raise Exception(f"Unknown binary op {x.op.text}")
     elif type(x) == SubstraitTypeParser.LiteralNumberContext:
-        return int(x.number.text)
-    elif type(x) == SubstraitTypeParser.TypeParamContext:
-        return values[x.identifier.text]
+        return int(x.Number().symbol.text)
+    elif type(x) == SubstraitTypeParser.ParameterNameContext:
+        return values[x.Identifier().symbol.text]
     elif type(x) == SubstraitTypeParser.NumericParameterNameContext:
         return values[x.Identifier().symbol.text]
     elif type(x) == SubstraitTypeParser.ParenExpressionContext:
@@ -43,9 +43,10 @@ def _evaluate(x, values: dict):
             return max(*exprs)
         else:
             raise Exception(f"Unknown function {func}")
-    elif type(x) == SubstraitTypeParser.TypeContext:
+    elif type(x) == SubstraitTypeParser.TypeDefContext:
         scalar_type = x.scalarType()
         parametrized_type = x.parameterizedType()
+        any_type = x.anyType()
         if scalar_type:
             nullability = (
                 Type.NULLABILITY_NULLABLE if x.isnull else Type.NULLABILITY_REQUIRED
@@ -81,8 +82,14 @@ def _evaluate(x, values: dict):
                     )
                 )
             raise Exception(f"Unknown parametrized type {type(parametrized_type)}")
+        elif any_type:
+            any_var = any_type.AnyVar()
+            if any_var:
+                return values[any_var.symbol.text]
+            else:
+                raise Exception()
         else:
-            raise Exception("either scalar_type or parametrized_type is required")
+            raise Exception(f"either scalar_type, parametrized_type or any_type is required")
     elif type(x) == SubstraitTypeParser.NumericExpressionContext:
         return _evaluate(x.expr(), values)
     elif type(x) == SubstraitTypeParser.TernaryContext:
@@ -101,7 +108,7 @@ def _evaluate(x, values: dict):
 
         return _evaluate(x.finalType, values)
     elif type(x) == SubstraitTypeParser.TypeLiteralContext:
-        return _evaluate(x.type_(), values)
+        return _evaluate(x.typeDef(), values)
     elif type(x) == SubstraitTypeParser.NumericLiteralContext:
         return int(str(x.Number()))
     else:

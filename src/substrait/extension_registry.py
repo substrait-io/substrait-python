@@ -96,25 +96,33 @@ def types_equal(type1: Type, type2: Type, check_nullability=False):
         ).nullability = Type.Nullability.NULLABILITY_UNSPECIFIED
         return x == y
 
+def handle_parameter_cover(covered: Type, parameter_name: str, parameters: dict, check_nullability: bool):
+    if parameter_name in parameters:
+        covering = parameters[parameter_name]
+        return types_equal(covering, covered, check_nullability)
+    else:
+        parameters[parameter_name] = covered
+        return True
 
 def covers(
     covered: Type,
     covering: SubstraitTypeParser.TypeLiteralContext,
     parameters: dict,
     check_nullability=False,
-):
-    if isinstance(covering, SubstraitTypeParser.TypeParamContext):
+):  
+    if isinstance(covering, SubstraitTypeParser.ParameterNameContext):
         parameter_name = str(covering.Identifier())
+        return handle_parameter_cover(covered, parameter_name, parameters, check_nullability)
 
-        if parameter_name in parameters:
-            covering = parameters[parameter_name]
+    covering: SubstraitTypeParser.TypeDefContext = covering.typeDef()
 
-            return types_equal(covering, covered, check_nullability)
+    any_type: SubstraitTypeParser.AnyTypeContext = covering.anyType()
+    if any_type:
+        if any_type.AnyVar():
+            return handle_parameter_cover(covered, any_type.AnyVar().symbol.text, parameters, check_nullability)
         else:
-            parameters[parameter_name] = covered
             return True
 
-    covering = covering.type_()
     scalar_type = covering.scalarType()
     if scalar_type:
         covering = _evaluate(covering, {})
@@ -149,10 +157,6 @@ def covers(
             )
         else:
             raise Exception(f"Unhandled type {type(parameterized_type)}")
-
-    any_type = covering.anyType()
-    if any_type:
-        return True
 
 
 class FunctionEntry:

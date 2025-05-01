@@ -211,6 +211,28 @@ class ParameterizedType(google.protobuf.message.Message):
             ...
 
     @typing_extensions.final
+    class ParameterizedPrecisionTime(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+        PRECISION_FIELD_NUMBER: builtins.int
+        VARIATION_POINTER_FIELD_NUMBER: builtins.int
+        NULLABILITY_FIELD_NUMBER: builtins.int
+
+        @property
+        def precision(self) -> global___ParameterizedType.IntegerOption:
+            ...
+        variation_pointer: builtins.int
+        nullability: proto.type_pb2.Type.Nullability.ValueType
+
+        def __init__(self, *, precision: global___ParameterizedType.IntegerOption | None=..., variation_pointer: builtins.int=..., nullability: proto.type_pb2.Type.Nullability.ValueType=...) -> None:
+            ...
+
+        def HasField(self, field_name: typing_extensions.Literal['precision', b'precision']) -> builtins.bool:
+            ...
+
+        def ClearField(self, field_name: typing_extensions.Literal['nullability', b'nullability', 'precision', b'precision', 'variation_pointer', b'variation_pointer']) -> None:
+            ...
+
+    @typing_extensions.final
     class ParameterizedPrecisionTimestamp(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
         PRECISION_FIELD_NUMBER: builtins.int
@@ -404,6 +426,7 @@ class ParameterizedType(google.protobuf.message.Message):
     VARCHAR_FIELD_NUMBER: builtins.int
     FIXED_BINARY_FIELD_NUMBER: builtins.int
     DECIMAL_FIELD_NUMBER: builtins.int
+    PRECISION_TIME_FIELD_NUMBER: builtins.int
     PRECISION_TIMESTAMP_FIELD_NUMBER: builtins.int
     PRECISION_TIMESTAMP_TZ_FIELD_NUMBER: builtins.int
     STRUCT_FIELD_NUMBER: builtins.int
@@ -459,7 +482,7 @@ class ParameterizedType(google.protobuf.message.Message):
 
     @property
     def time(self) -> proto.type_pb2.Type.Time:
-        ...
+        """Deprecated in favor of `ParameterizedPrecisionTime precision_time`"""
 
     @property
     def interval_year(self) -> proto.type_pb2.Type.IntervalYear:
@@ -498,6 +521,10 @@ class ParameterizedType(google.protobuf.message.Message):
         ...
 
     @property
+    def precision_time(self) -> global___ParameterizedType.ParameterizedPrecisionTime:
+        ...
+
+    @property
     def precision_timestamp(self) -> global___ParameterizedType.ParameterizedPrecisionTimestamp:
         ...
 
@@ -527,15 +554,15 @@ class ParameterizedType(google.protobuf.message.Message):
     def type_parameter(self) -> global___ParameterizedType.TypeParameter:
         ...
 
-    def __init__(self, *, bool: proto.type_pb2.Type.Boolean | None=..., i8: proto.type_pb2.Type.I8 | None=..., i16: proto.type_pb2.Type.I16 | None=..., i32: proto.type_pb2.Type.I32 | None=..., i64: proto.type_pb2.Type.I64 | None=..., fp32: proto.type_pb2.Type.FP32 | None=..., fp64: proto.type_pb2.Type.FP64 | None=..., string: proto.type_pb2.Type.String | None=..., binary: proto.type_pb2.Type.Binary | None=..., timestamp: proto.type_pb2.Type.Timestamp | None=..., date: proto.type_pb2.Type.Date | None=..., time: proto.type_pb2.Type.Time | None=..., interval_year: proto.type_pb2.Type.IntervalYear | None=..., interval_day: global___ParameterizedType.ParameterizedIntervalDay | None=..., interval_compound: global___ParameterizedType.ParameterizedIntervalCompound | None=..., timestamp_tz: proto.type_pb2.Type.TimestampTZ | None=..., uuid: proto.type_pb2.Type.UUID | None=..., fixed_char: global___ParameterizedType.ParameterizedFixedChar | None=..., varchar: global___ParameterizedType.ParameterizedVarChar | None=..., fixed_binary: global___ParameterizedType.ParameterizedFixedBinary | None=..., decimal: global___ParameterizedType.ParameterizedDecimal | None=..., precision_timestamp: global___ParameterizedType.ParameterizedPrecisionTimestamp | None=..., precision_timestamp_tz: global___ParameterizedType.ParameterizedPrecisionTimestampTZ | None=..., struct: global___ParameterizedType.ParameterizedStruct | None=..., list: global___ParameterizedType.ParameterizedList | None=..., map: global___ParameterizedType.ParameterizedMap | None=..., user_defined: global___ParameterizedType.ParameterizedUserDefined | None=..., user_defined_pointer: builtins.int=..., type_parameter: global___ParameterizedType.TypeParameter | None=...) -> None:
+    def __init__(self, *, bool: proto.type_pb2.Type.Boolean | None=..., i8: proto.type_pb2.Type.I8 | None=..., i16: proto.type_pb2.Type.I16 | None=..., i32: proto.type_pb2.Type.I32 | None=..., i64: proto.type_pb2.Type.I64 | None=..., fp32: proto.type_pb2.Type.FP32 | None=..., fp64: proto.type_pb2.Type.FP64 | None=..., string: proto.type_pb2.Type.String | None=..., binary: proto.type_pb2.Type.Binary | None=..., timestamp: proto.type_pb2.Type.Timestamp | None=..., date: proto.type_pb2.Type.Date | None=..., time: proto.type_pb2.Type.Time | None=..., interval_year: proto.type_pb2.Type.IntervalYear | None=..., interval_day: global___ParameterizedType.ParameterizedIntervalDay | None=..., interval_compound: global___ParameterizedType.ParameterizedIntervalCompound | None=..., timestamp_tz: proto.type_pb2.Type.TimestampTZ | None=..., uuid: proto.type_pb2.Type.UUID | None=..., fixed_char: global___ParameterizedType.ParameterizedFixedChar | None=..., varchar: global___ParameterizedType.ParameterizedVarChar | None=..., fixed_binary: global___ParameterizedType.ParameterizedFixedBinary | None=..., decimal: global___ParameterizedType.ParameterizedDecimal | None=..., precision_time: global___ParameterizedType.ParameterizedPrecisionTime | None=..., precision_timestamp: global___ParameterizedType.ParameterizedPrecisionTimestamp | None=..., precision_timestamp_tz: global___ParameterizedType.ParameterizedPrecisionTimestampTZ | None=..., struct: global___ParameterizedType.ParameterizedStruct | None=..., list: global___ParameterizedType.ParameterizedList | None=..., map: global___ParameterizedType.ParameterizedMap | None=..., user_defined: global___ParameterizedType.ParameterizedUserDefined | None=..., user_defined_pointer: builtins.int=..., type_parameter: global___ParameterizedType.TypeParameter | None=...) -> None:
         ...
 
-    def HasField(self, field_name: typing_extensions.Literal['binary', b'binary', 'bool', b'bool', 'date', b'date', 'decimal', b'decimal', 'fixed_binary', b'fixed_binary', 'fixed_char', b'fixed_char', 'fp32', b'fp32', 'fp64', b'fp64', 'i16', b'i16', 'i32', b'i32', 'i64', b'i64', 'i8', b'i8', 'interval_compound', b'interval_compound', 'interval_day', b'interval_day', 'interval_year', b'interval_year', 'kind', b'kind', 'list', b'list', 'map', b'map', 'precision_timestamp', b'precision_timestamp', 'precision_timestamp_tz', b'precision_timestamp_tz', 'string', b'string', 'struct', b'struct', 'time', b'time', 'timestamp', b'timestamp', 'timestamp_tz', b'timestamp_tz', 'type_parameter', b'type_parameter', 'user_defined', b'user_defined', 'user_defined_pointer', b'user_defined_pointer', 'uuid', b'uuid', 'varchar', b'varchar']) -> builtins.bool:
+    def HasField(self, field_name: typing_extensions.Literal['binary', b'binary', 'bool', b'bool', 'date', b'date', 'decimal', b'decimal', 'fixed_binary', b'fixed_binary', 'fixed_char', b'fixed_char', 'fp32', b'fp32', 'fp64', b'fp64', 'i16', b'i16', 'i32', b'i32', 'i64', b'i64', 'i8', b'i8', 'interval_compound', b'interval_compound', 'interval_day', b'interval_day', 'interval_year', b'interval_year', 'kind', b'kind', 'list', b'list', 'map', b'map', 'precision_time', b'precision_time', 'precision_timestamp', b'precision_timestamp', 'precision_timestamp_tz', b'precision_timestamp_tz', 'string', b'string', 'struct', b'struct', 'time', b'time', 'timestamp', b'timestamp', 'timestamp_tz', b'timestamp_tz', 'type_parameter', b'type_parameter', 'user_defined', b'user_defined', 'user_defined_pointer', b'user_defined_pointer', 'uuid', b'uuid', 'varchar', b'varchar']) -> builtins.bool:
         ...
 
-    def ClearField(self, field_name: typing_extensions.Literal['binary', b'binary', 'bool', b'bool', 'date', b'date', 'decimal', b'decimal', 'fixed_binary', b'fixed_binary', 'fixed_char', b'fixed_char', 'fp32', b'fp32', 'fp64', b'fp64', 'i16', b'i16', 'i32', b'i32', 'i64', b'i64', 'i8', b'i8', 'interval_compound', b'interval_compound', 'interval_day', b'interval_day', 'interval_year', b'interval_year', 'kind', b'kind', 'list', b'list', 'map', b'map', 'precision_timestamp', b'precision_timestamp', 'precision_timestamp_tz', b'precision_timestamp_tz', 'string', b'string', 'struct', b'struct', 'time', b'time', 'timestamp', b'timestamp', 'timestamp_tz', b'timestamp_tz', 'type_parameter', b'type_parameter', 'user_defined', b'user_defined', 'user_defined_pointer', b'user_defined_pointer', 'uuid', b'uuid', 'varchar', b'varchar']) -> None:
+    def ClearField(self, field_name: typing_extensions.Literal['binary', b'binary', 'bool', b'bool', 'date', b'date', 'decimal', b'decimal', 'fixed_binary', b'fixed_binary', 'fixed_char', b'fixed_char', 'fp32', b'fp32', 'fp64', b'fp64', 'i16', b'i16', 'i32', b'i32', 'i64', b'i64', 'i8', b'i8', 'interval_compound', b'interval_compound', 'interval_day', b'interval_day', 'interval_year', b'interval_year', 'kind', b'kind', 'list', b'list', 'map', b'map', 'precision_time', b'precision_time', 'precision_timestamp', b'precision_timestamp', 'precision_timestamp_tz', b'precision_timestamp_tz', 'string', b'string', 'struct', b'struct', 'time', b'time', 'timestamp', b'timestamp', 'timestamp_tz', b'timestamp_tz', 'type_parameter', b'type_parameter', 'user_defined', b'user_defined', 'user_defined_pointer', b'user_defined_pointer', 'uuid', b'uuid', 'varchar', b'varchar']) -> None:
         ...
 
-    def WhichOneof(self, oneof_group: typing_extensions.Literal['kind', b'kind']) -> typing_extensions.Literal['bool', 'i8', 'i16', 'i32', 'i64', 'fp32', 'fp64', 'string', 'binary', 'timestamp', 'date', 'time', 'interval_year', 'interval_day', 'interval_compound', 'timestamp_tz', 'uuid', 'fixed_char', 'varchar', 'fixed_binary', 'decimal', 'precision_timestamp', 'precision_timestamp_tz', 'struct', 'list', 'map', 'user_defined', 'user_defined_pointer', 'type_parameter'] | None:
+    def WhichOneof(self, oneof_group: typing_extensions.Literal['kind', b'kind']) -> typing_extensions.Literal['bool', 'i8', 'i16', 'i32', 'i64', 'fp32', 'fp64', 'string', 'binary', 'timestamp', 'date', 'time', 'interval_year', 'interval_day', 'interval_compound', 'timestamp_tz', 'uuid', 'fixed_char', 'varchar', 'fixed_binary', 'decimal', 'precision_time', 'precision_timestamp', 'precision_timestamp_tz', 'struct', 'list', 'map', 'user_defined', 'user_defined_pointer', 'type_parameter'] | None:
         ...
 global___ParameterizedType = ParameterizedType

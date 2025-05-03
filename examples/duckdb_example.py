@@ -1,6 +1,12 @@
-"""
-Install duckdb and pyarrow before running this example 
-"""
+# Install duckdb and pyarrow before running this example
+# /// script
+# dependencies = [
+#   "pyarrow==20.0.0",
+#   "duckdb==1.2.1",
+#   "substrait[extensions] @ file:///${PROJECT_ROOT}/"
+# ]
+# ///
+
 
 import duckdb
 from substrait.builders.plan import read_named_table, project, filter

@@ -1,5 +1,5 @@
 # Install pyarrow, adbc-driver-manager and duckdb before running this example
-# This example  currently can be run only with duckdb<=1.1.3, later vesions of duckdb no longer support substrait in adbc
+# This example  currently can be run only with duckdb<=1.1.3, later versions of duckdb no longer support substrait in adbc
 # /// script
 # dependencies = [
 #   "pyarrow==20.0.0",

@@ -1,3 +1,4 @@
+from datetime import date
 import itertools
 import substrait.gen.proto.algebra_pb2 as stalg
 import substrait.gen.proto.type_pb2 as stp
@@ -41,6 +42,36 @@ def literal(value: Any, type: stp.Type, alias: Union[Iterable[str], str] = None)
             literal = stalg.Expression.Literal(fp64=value, nullable=type.fp64.nullability == stp.Type.NULLABILITY_NULLABLE)
         elif kind == "string":
             literal = stalg.Expression.Literal(string=value, nullable=type.string.nullability == stp.Type.NULLABILITY_NULLABLE)
+        elif kind == "binary":
+            literal = stalg.Expression.Literal(binary=value, nullable=type.binary.nullability == stp.Type.NULLABILITY_NULLABLE)
+        elif kind == "date":
+            date_value = (value - date(1970,1,1)).days if isinstance(value, date) else value
+            literal = stalg.Expression.Literal(date=date_value, nullable=type.date.nullability == stp.Type.NULLABILITY_NULLABLE)
+        # TODO
+        # IntervalYearToMonth interval_year_to_month = 19;
+        # IntervalDayToSecond interval_day_to_second = 20;
+        # IntervalCompound interval_compound = 36;
+        elif kind == "fixed_char":
+            literal = stalg.Expression.Literal(fixed_char=value, nullable=type.fixed_char.nullability == stp.Type.NULLABILITY_NULLABLE)
+        elif kind == "varchar":
+            literal = stalg.Expression.Literal(
+                var_char=stalg.Expression.Literal.VarChar(value=value, length=type.varchar.length), 
+                nullable=type.varchar.nullability == stp.Type.NULLABILITY_NULLABLE
+            )
+        elif kind == "fixed_binary":
+            literal = stalg.Expression.Literal(fixed_binary=value, nullable=type.fixed_binary.nullability == stp.Type.NULLABILITY_NULLABLE)
+        # TODO
+        # Decimal decimal = 24;
+        # PrecisionTime precision_time = 37; // Time in precision units past midnight.
+        # PrecisionTimestamp precision_timestamp = 34;
+        # PrecisionTimestamp precision_timestamp_tz = 35;
+        # Struct struct = 25;
+        # Map map = 26;
+        # bytes uuid = 28;
+        # Type null = 29; // a typed null literal
+        # List list = 30;
+        # Type.List empty_list = 31;
+        # Type.Map empty_map = 32;
         else:
             raise Exception(f"Unknown literal type - {type}")
 

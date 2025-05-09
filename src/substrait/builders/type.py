@@ -55,7 +55,8 @@ def fixed_binary(length: int, nullable=True) -> stt.Type:
 def decimal(scale: int, precision: int, nullable=True) -> stt.Type:
     return stt.Type(decimal=stt.Type.Decimal(scale=scale, precision=precision, nullability=stt.Type.NULLABILITY_NULLABLE if nullable else stt.Type.NULLABILITY_REQUIRED))
 
-# PrecisionTime
+def precision_time(precision: int, nullable=True) -> stt.Type:
+    return stt.Type(precision_time=stt.Type.PrecisionTime(precision=precision, nullability=stt.Type.NULLABILITY_NULLABLE if nullable else stt.Type.NULLABILITY_REQUIRED))
 
 def precision_timestamp(precision: int, nullable=True) -> stt.Type:
     return stt.Type(precision_timestamp=stt.Type.PrecisionTimestamp(precision=precision, nullability=stt.Type.NULLABILITY_NULLABLE if nullable else stt.Type.NULLABILITY_REQUIRED))

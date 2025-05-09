@@ -2576,12 +2576,28 @@ class Expression(google.protobuf.message.Message):
                 ...
 
         @typing_extensions.final
+        class PrecisionTime(google.protobuf.message.Message):
+            DESCRIPTOR: google.protobuf.descriptor.Descriptor
+            PRECISION_FIELD_NUMBER: builtins.int
+            VALUE_FIELD_NUMBER: builtins.int
+            precision: builtins.int
+            'Sub-second precision, 0 means the value given is in seconds, 3 is milliseconds, 6 microseconds, 9 is nanoseconds, 12 is picoseconds'
+            value: builtins.int
+            'Time passed since midnight in precision units.'
+
+            def __init__(self, *, precision: builtins.int=..., value: builtins.int=...) -> None:
+                ...
+
+            def ClearField(self, field_name: typing_extensions.Literal['precision', b'precision', 'value', b'value']) -> None:
+                ...
+
+        @typing_extensions.final
         class PrecisionTimestamp(google.protobuf.message.Message):
             DESCRIPTOR: google.protobuf.descriptor.Descriptor
             PRECISION_FIELD_NUMBER: builtins.int
             VALUE_FIELD_NUMBER: builtins.int
             precision: builtins.int
-            'Sub-second precision, 0 means the value given is in seconds, 3 is milliseconds, 6 microseconds, 9 is nanoseconds'
+            'Sub-second precision, 0 means the value given is in seconds, 3 is milliseconds, 6 microseconds, 9 is nanoseconds, 12 is picoseconds'
             value: builtins.int
             'Time passed since 1970-01-01 00:00:00.000000 in UTC for PrecisionTimestampTZ and unspecified timezone for PrecisionTimestamp'
 
@@ -2779,6 +2795,7 @@ class Expression(google.protobuf.message.Message):
         VAR_CHAR_FIELD_NUMBER: builtins.int
         FIXED_BINARY_FIELD_NUMBER: builtins.int
         DECIMAL_FIELD_NUMBER: builtins.int
+        PRECISION_TIME_FIELD_NUMBER: builtins.int
         PRECISION_TIMESTAMP_FIELD_NUMBER: builtins.int
         PRECISION_TIMESTAMP_TZ_FIELD_NUMBER: builtins.int
         STRUCT_FIELD_NUMBER: builtins.int
@@ -2802,11 +2819,11 @@ class Expression(google.protobuf.message.Message):
         string: builtins.str
         binary: builtins.bytes
         timestamp: builtins.int
-        'Timestamp in units of microseconds since the UNIX epoch.\n        Deprecated in favor of `precision_timestamp`\n        '
+        'Timestamp in units of microseconds since the UNIX epoch.\n        Deprecated in favor of `precision_timestamp`.\n        '
         date: builtins.int
         'Date in units of days since the UNIX epoch.'
         time: builtins.int
-        'Time in units of microseconds past midnight'
+        'Time in units of microseconds past midnight.\n        Deprecated in favor of `precision_time`.\n        '
 
         @property
         def interval_year_to_month(self) -> global___Expression.Literal.IntervalYearToMonth:
@@ -2829,6 +2846,10 @@ class Expression(google.protobuf.message.Message):
         @property
         def decimal(self) -> global___Expression.Literal.Decimal:
             ...
+
+        @property
+        def precision_time(self) -> global___Expression.Literal.PrecisionTime:
+            """Time in precision units past midnight."""
 
         @property
         def precision_timestamp(self) -> global___Expression.Literal.PrecisionTimestamp:
@@ -2873,16 +2894,16 @@ class Expression(google.protobuf.message.Message):
         type_variation_reference: builtins.int
         'optionally points to a type_variation_anchor defined in this plan.\n        Applies to all members of union other than the Typed null (which should\n        directly declare the type variation).\n        '
 
-        def __init__(self, *, boolean: builtins.bool=..., i8: builtins.int=..., i16: builtins.int=..., i32: builtins.int=..., i64: builtins.int=..., fp32: builtins.float=..., fp64: builtins.float=..., string: builtins.str=..., binary: builtins.bytes=..., timestamp: builtins.int=..., date: builtins.int=..., time: builtins.int=..., interval_year_to_month: global___Expression.Literal.IntervalYearToMonth | None=..., interval_day_to_second: global___Expression.Literal.IntervalDayToSecond | None=..., interval_compound: global___Expression.Literal.IntervalCompound | None=..., fixed_char: builtins.str=..., var_char: global___Expression.Literal.VarChar | None=..., fixed_binary: builtins.bytes=..., decimal: global___Expression.Literal.Decimal | None=..., precision_timestamp: global___Expression.Literal.PrecisionTimestamp | None=..., precision_timestamp_tz: global___Expression.Literal.PrecisionTimestamp | None=..., struct: global___Expression.Literal.Struct | None=..., map: global___Expression.Literal.Map | None=..., timestamp_tz: builtins.int=..., uuid: builtins.bytes=..., null: proto.type_pb2.Type | None=..., list: global___Expression.Literal.List | None=..., empty_list: proto.type_pb2.Type.List | None=..., empty_map: proto.type_pb2.Type.Map | None=..., user_defined: global___Expression.Literal.UserDefined | None=..., nullable: builtins.bool=..., type_variation_reference: builtins.int=...) -> None:
+        def __init__(self, *, boolean: builtins.bool=..., i8: builtins.int=..., i16: builtins.int=..., i32: builtins.int=..., i64: builtins.int=..., fp32: builtins.float=..., fp64: builtins.float=..., string: builtins.str=..., binary: builtins.bytes=..., timestamp: builtins.int=..., date: builtins.int=..., time: builtins.int=..., interval_year_to_month: global___Expression.Literal.IntervalYearToMonth | None=..., interval_day_to_second: global___Expression.Literal.IntervalDayToSecond | None=..., interval_compound: global___Expression.Literal.IntervalCompound | None=..., fixed_char: builtins.str=..., var_char: global___Expression.Literal.VarChar | None=..., fixed_binary: builtins.bytes=..., decimal: global___Expression.Literal.Decimal | None=..., precision_time: global___Expression.Literal.PrecisionTime | None=..., precision_timestamp: global___Expression.Literal.PrecisionTimestamp | None=..., precision_timestamp_tz: global___Expression.Literal.PrecisionTimestamp | None=..., struct: global___Expression.Literal.Struct | None=..., map: global___Expression.Literal.Map | None=..., timestamp_tz: builtins.int=..., uuid: builtins.bytes=..., null: proto.type_pb2.Type | None=..., list: global___Expression.Literal.List | None=..., empty_list: proto.type_pb2.Type.List | None=..., empty_map: proto.type_pb2.Type.Map | None=..., user_defined: global___Expression.Literal.UserDefined | None=..., nullable: builtins.bool=..., type_variation_reference: builtins.int=...) -> None:
             ...
 
-        def HasField(self, field_name: typing_extensions.Literal['binary', b'binary', 'boolean', b'boolean', 'date', b'date', 'decimal', b'decimal', 'empty_list', b'empty_list', 'empty_map', b'empty_map', 'fixed_binary', b'fixed_binary', 'fixed_char', b'fixed_char', 'fp32', b'fp32', 'fp64', b'fp64', 'i16', b'i16', 'i32', b'i32', 'i64', b'i64', 'i8', b'i8', 'interval_compound', b'interval_compound', 'interval_day_to_second', b'interval_day_to_second', 'interval_year_to_month', b'interval_year_to_month', 'list', b'list', 'literal_type', b'literal_type', 'map', b'map', 'null', b'null', 'precision_timestamp', b'precision_timestamp', 'precision_timestamp_tz', b'precision_timestamp_tz', 'string', b'string', 'struct', b'struct', 'time', b'time', 'timestamp', b'timestamp', 'timestamp_tz', b'timestamp_tz', 'user_defined', b'user_defined', 'uuid', b'uuid', 'var_char', b'var_char']) -> builtins.bool:
+        def HasField(self, field_name: typing_extensions.Literal['binary', b'binary', 'boolean', b'boolean', 'date', b'date', 'decimal', b'decimal', 'empty_list', b'empty_list', 'empty_map', b'empty_map', 'fixed_binary', b'fixed_binary', 'fixed_char', b'fixed_char', 'fp32', b'fp32', 'fp64', b'fp64', 'i16', b'i16', 'i32', b'i32', 'i64', b'i64', 'i8', b'i8', 'interval_compound', b'interval_compound', 'interval_day_to_second', b'interval_day_to_second', 'interval_year_to_month', b'interval_year_to_month', 'list', b'list', 'literal_type', b'literal_type', 'map', b'map', 'null', b'null', 'precision_time', b'precision_time', 'precision_timestamp', b'precision_timestamp', 'precision_timestamp_tz', b'precision_timestamp_tz', 'string', b'string', 'struct', b'struct', 'time', b'time', 'timestamp', b'timestamp', 'timestamp_tz', b'timestamp_tz', 'user_defined', b'user_defined', 'uuid', b'uuid', 'var_char', b'var_char']) -> builtins.bool:
             ...
 
-        def ClearField(self, field_name: typing_extensions.Literal['binary', b'binary', 'boolean', b'boolean', 'date', b'date', 'decimal', b'decimal', 'empty_list', b'empty_list', 'empty_map', b'empty_map', 'fixed_binary', b'fixed_binary', 'fixed_char', b'fixed_char', 'fp32', b'fp32', 'fp64', b'fp64', 'i16', b'i16', 'i32', b'i32', 'i64', b'i64', 'i8', b'i8', 'interval_compound', b'interval_compound', 'interval_day_to_second', b'interval_day_to_second', 'interval_year_to_month', b'interval_year_to_month', 'list', b'list', 'literal_type', b'literal_type', 'map', b'map', 'null', b'null', 'nullable', b'nullable', 'precision_timestamp', b'precision_timestamp', 'precision_timestamp_tz', b'precision_timestamp_tz', 'string', b'string', 'struct', b'struct', 'time', b'time', 'timestamp', b'timestamp', 'timestamp_tz', b'timestamp_tz', 'type_variation_reference', b'type_variation_reference', 'user_defined', b'user_defined', 'uuid', b'uuid', 'var_char', b'var_char']) -> None:
+        def ClearField(self, field_name: typing_extensions.Literal['binary', b'binary', 'boolean', b'boolean', 'date', b'date', 'decimal', b'decimal', 'empty_list', b'empty_list', 'empty_map', b'empty_map', 'fixed_binary', b'fixed_binary', 'fixed_char', b'fixed_char', 'fp32', b'fp32', 'fp64', b'fp64', 'i16', b'i16', 'i32', b'i32', 'i64', b'i64', 'i8', b'i8', 'interval_compound', b'interval_compound', 'interval_day_to_second', b'interval_day_to_second', 'interval_year_to_month', b'interval_year_to_month', 'list', b'list', 'literal_type', b'literal_type', 'map', b'map', 'null', b'null', 'nullable', b'nullable', 'precision_time', b'precision_time', 'precision_timestamp', b'precision_timestamp', 'precision_timestamp_tz', b'precision_timestamp_tz', 'string', b'string', 'struct', b'struct', 'time', b'time', 'timestamp', b'timestamp', 'timestamp_tz', b'timestamp_tz', 'type_variation_reference', b'type_variation_reference', 'user_defined', b'user_defined', 'uuid', b'uuid', 'var_char', b'var_char']) -> None:
             ...
 
-        def WhichOneof(self, oneof_group: typing_extensions.Literal['literal_type', b'literal_type']) -> typing_extensions.Literal['boolean', 'i8', 'i16', 'i32', 'i64', 'fp32', 'fp64', 'string', 'binary', 'timestamp', 'date', 'time', 'interval_year_to_month', 'interval_day_to_second', 'interval_compound', 'fixed_char', 'var_char', 'fixed_binary', 'decimal', 'precision_timestamp', 'precision_timestamp_tz', 'struct', 'map', 'timestamp_tz', 'uuid', 'null', 'list', 'empty_list', 'empty_map', 'user_defined'] | None:
+        def WhichOneof(self, oneof_group: typing_extensions.Literal['literal_type', b'literal_type']) -> typing_extensions.Literal['boolean', 'i8', 'i16', 'i32', 'i64', 'fp32', 'fp64', 'string', 'binary', 'timestamp', 'date', 'time', 'interval_year_to_month', 'interval_day_to_second', 'interval_compound', 'fixed_char', 'var_char', 'fixed_binary', 'decimal', 'precision_time', 'precision_timestamp', 'precision_timestamp_tz', 'struct', 'map', 'timestamp_tz', 'uuid', 'null', 'list', 'empty_list', 'empty_map', 'user_defined'] | None:
             ...
 
     @typing_extensions.final
@@ -4132,6 +4153,7 @@ class Expression(google.protobuf.message.Message):
     CAST_FIELD_NUMBER: builtins.int
     SUBQUERY_FIELD_NUMBER: builtins.int
     NESTED_FIELD_NUMBER: builtins.int
+    DYNAMIC_PARAMETER_FIELD_NUMBER: builtins.int
     ENUM_FIELD_NUMBER: builtins.int
 
     @property
@@ -4179,24 +4201,53 @@ class Expression(google.protobuf.message.Message):
         ...
 
     @property
+    def dynamic_parameter(self) -> global___DynamicParameter:
+        ...
+
+    @property
     def enum(self) -> global___Expression.Enum:
         """deprecated: enum literals are only sensible in the context of
         function arguments, for which FunctionArgument should now be
         used
         """
 
-    def __init__(self, *, literal: global___Expression.Literal | None=..., selection: global___Expression.FieldReference | None=..., scalar_function: global___Expression.ScalarFunction | None=..., window_function: global___Expression.WindowFunction | None=..., if_then: global___Expression.IfThen | None=..., switch_expression: global___Expression.SwitchExpression | None=..., singular_or_list: global___Expression.SingularOrList | None=..., multi_or_list: global___Expression.MultiOrList | None=..., cast: global___Expression.Cast | None=..., subquery: global___Expression.Subquery | None=..., nested: global___Expression.Nested | None=..., enum: global___Expression.Enum | None=...) -> None:
+    def __init__(self, *, literal: global___Expression.Literal | None=..., selection: global___Expression.FieldReference | None=..., scalar_function: global___Expression.ScalarFunction | None=..., window_function: global___Expression.WindowFunction | None=..., if_then: global___Expression.IfThen | None=..., switch_expression: global___Expression.SwitchExpression | None=..., singular_or_list: global___Expression.SingularOrList | None=..., multi_or_list: global___Expression.MultiOrList | None=..., cast: global___Expression.Cast | None=..., subquery: global___Expression.Subquery | None=..., nested: global___Expression.Nested | None=..., dynamic_parameter: global___DynamicParameter | None=..., enum: global___Expression.Enum | None=...) -> None:
         ...
 
-    def HasField(self, field_name: typing_extensions.Literal['cast', b'cast', 'enum', b'enum', 'if_then', b'if_then', 'literal', b'literal', 'multi_or_list', b'multi_or_list', 'nested', b'nested', 'rex_type', b'rex_type', 'scalar_function', b'scalar_function', 'selection', b'selection', 'singular_or_list', b'singular_or_list', 'subquery', b'subquery', 'switch_expression', b'switch_expression', 'window_function', b'window_function']) -> builtins.bool:
+    def HasField(self, field_name: typing_extensions.Literal['cast', b'cast', 'dynamic_parameter', b'dynamic_parameter', 'enum', b'enum', 'if_then', b'if_then', 'literal', b'literal', 'multi_or_list', b'multi_or_list', 'nested', b'nested', 'rex_type', b'rex_type', 'scalar_function', b'scalar_function', 'selection', b'selection', 'singular_or_list', b'singular_or_list', 'subquery', b'subquery', 'switch_expression', b'switch_expression', 'window_function', b'window_function']) -> builtins.bool:
         ...
 
-    def ClearField(self, field_name: typing_extensions.Literal['cast', b'cast', 'enum', b'enum', 'if_then', b'if_then', 'literal', b'literal', 'multi_or_list', b'multi_or_list', 'nested', b'nested', 'rex_type', b'rex_type', 'scalar_function', b'scalar_function', 'selection', b'selection', 'singular_or_list', b'singular_or_list', 'subquery', b'subquery', 'switch_expression', b'switch_expression', 'window_function', b'window_function']) -> None:
+    def ClearField(self, field_name: typing_extensions.Literal['cast', b'cast', 'dynamic_parameter', b'dynamic_parameter', 'enum', b'enum', 'if_then', b'if_then', 'literal', b'literal', 'multi_or_list', b'multi_or_list', 'nested', b'nested', 'rex_type', b'rex_type', 'scalar_function', b'scalar_function', 'selection', b'selection', 'singular_or_list', b'singular_or_list', 'subquery', b'subquery', 'switch_expression', b'switch_expression', 'window_function', b'window_function']) -> None:
         ...
 
-    def WhichOneof(self, oneof_group: typing_extensions.Literal['rex_type', b'rex_type']) -> typing_extensions.Literal['literal', 'selection', 'scalar_function', 'window_function', 'if_then', 'switch_expression', 'singular_or_list', 'multi_or_list', 'cast', 'subquery', 'nested', 'enum'] | None:
+    def WhichOneof(self, oneof_group: typing_extensions.Literal['rex_type', b'rex_type']) -> typing_extensions.Literal['literal', 'selection', 'scalar_function', 'window_function', 'if_then', 'switch_expression', 'singular_or_list', 'multi_or_list', 'cast', 'subquery', 'nested', 'dynamic_parameter', 'enum'] | None:
         ...
 global___Expression = Expression
+
+@typing_extensions.final
+class DynamicParameter(google.protobuf.message.Message):
+    """Expression that represents a dynamic parameter.
+    Dynamic parameters are identified by a surrogate key within a plan.
+    """
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+    TYPE_FIELD_NUMBER: builtins.int
+    PARAMETER_REFERENCE_FIELD_NUMBER: builtins.int
+
+    @property
+    def type(self) -> proto.type_pb2.Type:
+        """The type of the dynamic parameter."""
+    parameter_reference: builtins.int
+    'The surrogate key used within a plan to reference a specific parameter binding.'
+
+    def __init__(self, *, type: proto.type_pb2.Type | None=..., parameter_reference: builtins.int=...) -> None:
+        ...
+
+    def HasField(self, field_name: typing_extensions.Literal['type', b'type']) -> builtins.bool:
+        ...
+
+    def ClearField(self, field_name: typing_extensions.Literal['parameter_reference', b'parameter_reference', 'type', b'type']) -> None:
+        ...
+global___DynamicParameter = DynamicParameter
 
 @typing_extensions.final
 class SortField(google.protobuf.message.Message):

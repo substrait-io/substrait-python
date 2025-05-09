@@ -358,13 +358,30 @@ class Type(google.protobuf.message.Message):
             ...
 
     @typing_extensions.final
+    class PrecisionTime(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+        PRECISION_FIELD_NUMBER: builtins.int
+        TYPE_VARIATION_REFERENCE_FIELD_NUMBER: builtins.int
+        NULLABILITY_FIELD_NUMBER: builtins.int
+        precision: builtins.int
+        'Sub-second precision, 0 means the value given is in seconds, 3 is milliseconds, 6 microseconds, 9 is nanoseconds, 12 is picoseconds'
+        type_variation_reference: builtins.int
+        nullability: global___Type.Nullability.ValueType
+
+        def __init__(self, *, precision: builtins.int=..., type_variation_reference: builtins.int=..., nullability: global___Type.Nullability.ValueType=...) -> None:
+            ...
+
+        def ClearField(self, field_name: typing_extensions.Literal['nullability', b'nullability', 'precision', b'precision', 'type_variation_reference', b'type_variation_reference']) -> None:
+            ...
+
+    @typing_extensions.final
     class PrecisionTimestamp(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
         PRECISION_FIELD_NUMBER: builtins.int
         TYPE_VARIATION_REFERENCE_FIELD_NUMBER: builtins.int
         NULLABILITY_FIELD_NUMBER: builtins.int
         precision: builtins.int
-        'Sub-second precision, 0 means the value given is in seconds, 3 is milliseconds, 6 microseconds, 9 is nanoseconds'
+        'Sub-second precision, 0 means the value given is in seconds, 3 is milliseconds, 6 microseconds, 9 is nanoseconds, 12 is picoseconds'
         type_variation_reference: builtins.int
         nullability: global___Type.Nullability.ValueType
 
@@ -381,7 +398,7 @@ class Type(google.protobuf.message.Message):
         TYPE_VARIATION_REFERENCE_FIELD_NUMBER: builtins.int
         NULLABILITY_FIELD_NUMBER: builtins.int
         precision: builtins.int
-        'Sub-second precision, 0 means the value given is in seconds, 3 is milliseconds, 6 microseconds, 9 is nanoseconds'
+        'Sub-second precision, 0 means the value given is in seconds, 3 is milliseconds, 6 microseconds, 9 is nanoseconds, 12 is picoseconds'
         type_variation_reference: builtins.int
         nullability: global___Type.Nullability.ValueType
 
@@ -537,6 +554,7 @@ class Type(google.protobuf.message.Message):
     VARCHAR_FIELD_NUMBER: builtins.int
     FIXED_BINARY_FIELD_NUMBER: builtins.int
     DECIMAL_FIELD_NUMBER: builtins.int
+    PRECISION_TIME_FIELD_NUMBER: builtins.int
     PRECISION_TIMESTAMP_FIELD_NUMBER: builtins.int
     PRECISION_TIMESTAMP_TZ_FIELD_NUMBER: builtins.int
     STRUCT_FIELD_NUMBER: builtins.int
@@ -591,7 +609,7 @@ class Type(google.protobuf.message.Message):
 
     @property
     def time(self) -> global___Type.Time:
-        ...
+        """Deprecated in favor of `PrecisionTime precision_time`"""
 
     @property
     def interval_year(self) -> global___Type.IntervalYear:
@@ -630,6 +648,10 @@ class Type(google.protobuf.message.Message):
         ...
 
     @property
+    def precision_time(self) -> global___Type.PrecisionTime:
+        ...
+
+    @property
     def precision_timestamp(self) -> global___Type.PrecisionTimestamp:
         ...
 
@@ -655,16 +677,16 @@ class Type(google.protobuf.message.Message):
     user_defined_type_reference: builtins.int
     'Deprecated in favor of user_defined, which allows nullability and\n    variations to be specified. If user_defined_type_reference is\n    encountered, treat it as being non-nullable and having the default\n    variation.\n    '
 
-    def __init__(self, *, bool: global___Type.Boolean | None=..., i8: global___Type.I8 | None=..., i16: global___Type.I16 | None=..., i32: global___Type.I32 | None=..., i64: global___Type.I64 | None=..., fp32: global___Type.FP32 | None=..., fp64: global___Type.FP64 | None=..., string: global___Type.String | None=..., binary: global___Type.Binary | None=..., timestamp: global___Type.Timestamp | None=..., date: global___Type.Date | None=..., time: global___Type.Time | None=..., interval_year: global___Type.IntervalYear | None=..., interval_day: global___Type.IntervalDay | None=..., interval_compound: global___Type.IntervalCompound | None=..., timestamp_tz: global___Type.TimestampTZ | None=..., uuid: global___Type.UUID | None=..., fixed_char: global___Type.FixedChar | None=..., varchar: global___Type.VarChar | None=..., fixed_binary: global___Type.FixedBinary | None=..., decimal: global___Type.Decimal | None=..., precision_timestamp: global___Type.PrecisionTimestamp | None=..., precision_timestamp_tz: global___Type.PrecisionTimestampTZ | None=..., struct: global___Type.Struct | None=..., list: global___Type.List | None=..., map: global___Type.Map | None=..., user_defined: global___Type.UserDefined | None=..., user_defined_type_reference: builtins.int=...) -> None:
+    def __init__(self, *, bool: global___Type.Boolean | None=..., i8: global___Type.I8 | None=..., i16: global___Type.I16 | None=..., i32: global___Type.I32 | None=..., i64: global___Type.I64 | None=..., fp32: global___Type.FP32 | None=..., fp64: global___Type.FP64 | None=..., string: global___Type.String | None=..., binary: global___Type.Binary | None=..., timestamp: global___Type.Timestamp | None=..., date: global___Type.Date | None=..., time: global___Type.Time | None=..., interval_year: global___Type.IntervalYear | None=..., interval_day: global___Type.IntervalDay | None=..., interval_compound: global___Type.IntervalCompound | None=..., timestamp_tz: global___Type.TimestampTZ | None=..., uuid: global___Type.UUID | None=..., fixed_char: global___Type.FixedChar | None=..., varchar: global___Type.VarChar | None=..., fixed_binary: global___Type.FixedBinary | None=..., decimal: global___Type.Decimal | None=..., precision_time: global___Type.PrecisionTime | None=..., precision_timestamp: global___Type.PrecisionTimestamp | None=..., precision_timestamp_tz: global___Type.PrecisionTimestampTZ | None=..., struct: global___Type.Struct | None=..., list: global___Type.List | None=..., map: global___Type.Map | None=..., user_defined: global___Type.UserDefined | None=..., user_defined_type_reference: builtins.int=...) -> None:
         ...
 
-    def HasField(self, field_name: typing_extensions.Literal['binary', b'binary', 'bool', b'bool', 'date', b'date', 'decimal', b'decimal', 'fixed_binary', b'fixed_binary', 'fixed_char', b'fixed_char', 'fp32', b'fp32', 'fp64', b'fp64', 'i16', b'i16', 'i32', b'i32', 'i64', b'i64', 'i8', b'i8', 'interval_compound', b'interval_compound', 'interval_day', b'interval_day', 'interval_year', b'interval_year', 'kind', b'kind', 'list', b'list', 'map', b'map', 'precision_timestamp', b'precision_timestamp', 'precision_timestamp_tz', b'precision_timestamp_tz', 'string', b'string', 'struct', b'struct', 'time', b'time', 'timestamp', b'timestamp', 'timestamp_tz', b'timestamp_tz', 'user_defined', b'user_defined', 'user_defined_type_reference', b'user_defined_type_reference', 'uuid', b'uuid', 'varchar', b'varchar']) -> builtins.bool:
+    def HasField(self, field_name: typing_extensions.Literal['binary', b'binary', 'bool', b'bool', 'date', b'date', 'decimal', b'decimal', 'fixed_binary', b'fixed_binary', 'fixed_char', b'fixed_char', 'fp32', b'fp32', 'fp64', b'fp64', 'i16', b'i16', 'i32', b'i32', 'i64', b'i64', 'i8', b'i8', 'interval_compound', b'interval_compound', 'interval_day', b'interval_day', 'interval_year', b'interval_year', 'kind', b'kind', 'list', b'list', 'map', b'map', 'precision_time', b'precision_time', 'precision_timestamp', b'precision_timestamp', 'precision_timestamp_tz', b'precision_timestamp_tz', 'string', b'string', 'struct', b'struct', 'time', b'time', 'timestamp', b'timestamp', 'timestamp_tz', b'timestamp_tz', 'user_defined', b'user_defined', 'user_defined_type_reference', b'user_defined_type_reference', 'uuid', b'uuid', 'varchar', b'varchar']) -> builtins.bool:
         ...
 
-    def ClearField(self, field_name: typing_extensions.Literal['binary', b'binary', 'bool', b'bool', 'date', b'date', 'decimal', b'decimal', 'fixed_binary', b'fixed_binary', 'fixed_char', b'fixed_char', 'fp32', b'fp32', 'fp64', b'fp64', 'i16', b'i16', 'i32', b'i32', 'i64', b'i64', 'i8', b'i8', 'interval_compound', b'interval_compound', 'interval_day', b'interval_day', 'interval_year', b'interval_year', 'kind', b'kind', 'list', b'list', 'map', b'map', 'precision_timestamp', b'precision_timestamp', 'precision_timestamp_tz', b'precision_timestamp_tz', 'string', b'string', 'struct', b'struct', 'time', b'time', 'timestamp', b'timestamp', 'timestamp_tz', b'timestamp_tz', 'user_defined', b'user_defined', 'user_defined_type_reference', b'user_defined_type_reference', 'uuid', b'uuid', 'varchar', b'varchar']) -> None:
+    def ClearField(self, field_name: typing_extensions.Literal['binary', b'binary', 'bool', b'bool', 'date', b'date', 'decimal', b'decimal', 'fixed_binary', b'fixed_binary', 'fixed_char', b'fixed_char', 'fp32', b'fp32', 'fp64', b'fp64', 'i16', b'i16', 'i32', b'i32', 'i64', b'i64', 'i8', b'i8', 'interval_compound', b'interval_compound', 'interval_day', b'interval_day', 'interval_year', b'interval_year', 'kind', b'kind', 'list', b'list', 'map', b'map', 'precision_time', b'precision_time', 'precision_timestamp', b'precision_timestamp', 'precision_timestamp_tz', b'precision_timestamp_tz', 'string', b'string', 'struct', b'struct', 'time', b'time', 'timestamp', b'timestamp', 'timestamp_tz', b'timestamp_tz', 'user_defined', b'user_defined', 'user_defined_type_reference', b'user_defined_type_reference', 'uuid', b'uuid', 'varchar', b'varchar']) -> None:
         ...
 
-    def WhichOneof(self, oneof_group: typing_extensions.Literal['kind', b'kind']) -> typing_extensions.Literal['bool', 'i8', 'i16', 'i32', 'i64', 'fp32', 'fp64', 'string', 'binary', 'timestamp', 'date', 'time', 'interval_year', 'interval_day', 'interval_compound', 'timestamp_tz', 'uuid', 'fixed_char', 'varchar', 'fixed_binary', 'decimal', 'precision_timestamp', 'precision_timestamp_tz', 'struct', 'list', 'map', 'user_defined', 'user_defined_type_reference'] | None:
+    def WhichOneof(self, oneof_group: typing_extensions.Literal['kind', b'kind']) -> typing_extensions.Literal['bool', 'i8', 'i16', 'i32', 'i64', 'fp32', 'fp64', 'string', 'binary', 'timestamp', 'date', 'time', 'interval_year', 'interval_day', 'interval_compound', 'timestamp_tz', 'uuid', 'fixed_char', 'varchar', 'fixed_binary', 'decimal', 'precision_time', 'precision_timestamp', 'precision_timestamp_tz', 'struct', 'list', 'map', 'user_defined', 'user_defined_type_reference'] | None:
         ...
 global___Type = Type
 
@@ -689,6 +711,8 @@ class NamedStruct(google.protobuf.message.Message):
 
     * Only struct fields are contained in this field's elements,
     * Map keys should be traversed first, then values when producing/consuming
+    * When used to represent a relation schema, the outermost struct's
+      nullability should be NULLABILITY_REQUIRED.
     """
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
     NAMES_FIELD_NUMBER: builtins.int

@@ -55,6 +55,7 @@ class Plan(google.protobuf.message.Message):
     RELATIONS_FIELD_NUMBER: builtins.int
     ADVANCED_EXTENSIONS_FIELD_NUMBER: builtins.int
     EXPECTED_TYPE_URLS_FIELD_NUMBER: builtins.int
+    PARAMETER_BINDINGS_FIELD_NUMBER: builtins.int
 
     @property
     def version(self) -> global___Version:
@@ -87,13 +88,19 @@ class Plan(google.protobuf.message.Message):
         one or more message types defined here are unknown.
         """
 
-    def __init__(self, *, version: global___Version | None=..., extension_uris: collections.abc.Iterable[proto.extensions.extensions_pb2.SimpleExtensionURI] | None=..., extensions: collections.abc.Iterable[proto.extensions.extensions_pb2.SimpleExtensionDeclaration] | None=..., relations: collections.abc.Iterable[global___PlanRel] | None=..., advanced_extensions: proto.extensions.extensions_pb2.AdvancedExtension | None=..., expected_type_urls: collections.abc.Iterable[builtins.str] | None=...) -> None:
+    @property
+    def parameter_bindings(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___DynamicParameterBinding]:
+        """An optional list of bindings for dynamic parameters used in this plan.
+        Each binding maps a parameter_anchor to its corresponding runtime value.
+        """
+
+    def __init__(self, *, version: global___Version | None=..., extension_uris: collections.abc.Iterable[proto.extensions.extensions_pb2.SimpleExtensionURI] | None=..., extensions: collections.abc.Iterable[proto.extensions.extensions_pb2.SimpleExtensionDeclaration] | None=..., relations: collections.abc.Iterable[global___PlanRel] | None=..., advanced_extensions: proto.extensions.extensions_pb2.AdvancedExtension | None=..., expected_type_urls: collections.abc.Iterable[builtins.str] | None=..., parameter_bindings: collections.abc.Iterable[global___DynamicParameterBinding] | None=...) -> None:
         ...
 
     def HasField(self, field_name: typing_extensions.Literal['advanced_extensions', b'advanced_extensions', 'version', b'version']) -> builtins.bool:
         ...
 
-    def ClearField(self, field_name: typing_extensions.Literal['advanced_extensions', b'advanced_extensions', 'expected_type_urls', b'expected_type_urls', 'extension_uris', b'extension_uris', 'extensions', b'extensions', 'relations', b'relations', 'version', b'version']) -> None:
+    def ClearField(self, field_name: typing_extensions.Literal['advanced_extensions', b'advanced_extensions', 'expected_type_urls', b'expected_type_urls', 'extension_uris', b'extension_uris', 'extensions', b'extensions', 'parameter_bindings', b'parameter_bindings', 'relations', b'relations', 'version', b'version']) -> None:
         ...
 global___Plan = Plan
 
@@ -145,3 +152,29 @@ class Version(google.protobuf.message.Message):
     def ClearField(self, field_name: typing_extensions.Literal['git_hash', b'git_hash', 'major_number', b'major_number', 'minor_number', b'minor_number', 'patch_number', b'patch_number', 'producer', b'producer']) -> None:
         ...
 global___Version = Version
+
+@typing_extensions.final
+class DynamicParameterBinding(google.protobuf.message.Message):
+    """Represents a binding for a dynamic parameter."""
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+    PARAMETER_ANCHOR_FIELD_NUMBER: builtins.int
+    VALUE_FIELD_NUMBER: builtins.int
+    parameter_anchor: builtins.int
+    'The parameter anchor that identifies the dynamic parameter reference.'
+
+    @property
+    def value(self) -> proto.algebra_pb2.Expression.Literal:
+        """The literal value assigned to the parameter at runtime.
+        The type of the literal needs to match the type of the corresponding
+        DynamicParameter expression in the plan.
+        """
+
+    def __init__(self, *, parameter_anchor: builtins.int=..., value: proto.algebra_pb2.Expression.Literal | None=...) -> None:
+        ...
+
+    def HasField(self, field_name: typing_extensions.Literal['value', b'value']) -> builtins.bool:
+        ...
+
+    def ClearField(self, field_name: typing_extensions.Literal['parameter_anchor', b'parameter_anchor', 'value', b'value']) -> None:
+        ...
+global___DynamicParameterBinding = DynamicParameterBinding

@@ -47,7 +47,7 @@ def fixed_char(length: int, nullable=True) -> stt.Type:
     return stt.Type(fixed_char=stt.Type.FixedChar(length=length, nullability=stt.Type.NULLABILITY_NULLABLE if nullable else stt.Type.NULLABILITY_REQUIRED))
 
 def var_char(length: int, nullable=True) -> stt.Type:
-    return stt.Type(var_char=stt.Type.VarChar(length=length, nullability=stt.Type.NULLABILITY_NULLABLE if nullable else stt.Type.NULLABILITY_REQUIRED))
+    return stt.Type(varchar=stt.Type.VarChar(length=length, nullability=stt.Type.NULLABILITY_NULLABLE if nullable else stt.Type.NULLABILITY_REQUIRED))
 
 def fixed_binary(length: int, nullable=True) -> stt.Type:
     return stt.Type(fixed_binary=stt.Type.FixedBinary(length=length, nullability=stt.Type.NULLABILITY_NULLABLE if nullable else stt.Type.NULLABILITY_REQUIRED))

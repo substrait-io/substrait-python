@@ -39,8 +39,8 @@ registry = ExtensionRegistry(load_default_extensions=False)
 registry.register_extension_dict(yaml.safe_load(content), uri="test_uri")
 
 def test_aggregate_count():
-    e = aggregate_function('test_uri', 'count', 
-                           literal(10, type=stt.Type(i8=stt.Type.I8(nullability=stt.Type.NULLABILITY_REQUIRED))),
+    e = aggregate_function('test_uri', 'count',
+                           expressions=[literal(10, type=stt.Type(i8=stt.Type.I8(nullability=stt.Type.NULLABILITY_REQUIRED)))],
                            alias='count',
                            )(named_struct, registry)
     

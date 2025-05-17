@@ -38,7 +38,7 @@ def test_aggregate():
     table = read_named_table('table', named_struct)
 
     group_expr = column('id')
-    measure_expr = aggregate_function('test_uri', 'count', column('is_applicable'), alias=['count'])
+    measure_expr = aggregate_function('test_uri', 'count', expressions=[column('is_applicable')], alias=['count'])
 
     actual = aggregate(table, 
                        grouping_expressions=[group_expr],

@@ -8,7 +8,7 @@ from typing import Any, Optional, Union
 from .derivation_expression import evaluate, _evaluate, _parse
 
 import yaml
-
+from substrait.gen.antlr.SubstraitTypeParser import SubstraitTypeParser
 
 DEFAULT_URI_PREFIX = "https://github.com/substrait-io/substrait/blob/main/extensions"
 
@@ -78,9 +78,6 @@ def violates_integer_option(actual: int, option, parameters: dict):
     return False
 
 
-from substrait.gen.antlr.SubstraitTypeParser import SubstraitTypeParser
-
-
 def types_equal(type1: Type, type2: Type, check_nullability=False):
     if check_nullability:
         return type1 == type2
@@ -96,7 +93,10 @@ def types_equal(type1: Type, type2: Type, check_nullability=False):
         ).nullability = Type.Nullability.NULLABILITY_UNSPECIFIED
         return x == y
 
-def handle_parameter_cover(covered: Type, parameter_name: str, parameters: dict, check_nullability: bool):
+
+def handle_parameter_cover(
+    covered: Type, parameter_name: str, parameters: dict, check_nullability: bool
+):
     if parameter_name in parameters:
         covering = parameters[parameter_name]
         return types_equal(covering, covered, check_nullability)
@@ -104,22 +104,27 @@ def handle_parameter_cover(covered: Type, parameter_name: str, parameters: dict,
         parameters[parameter_name] = covered
         return True
 
+
 def covers(
     covered: Type,
     covering: SubstraitTypeParser.TypeLiteralContext,
     parameters: dict,
     check_nullability=False,
-):  
+):
     if isinstance(covering, SubstraitTypeParser.ParameterNameContext):
         parameter_name = str(covering.Identifier())
-        return handle_parameter_cover(covered, parameter_name, parameters, check_nullability)
+        return handle_parameter_cover(
+            covered, parameter_name, parameters, check_nullability
+        )
 
     covering: SubstraitTypeParser.TypeDefContext = covering.typeDef()
 
     any_type: SubstraitTypeParser.AnyTypeContext = covering.anyType()
     if any_type:
         if any_type.AnyVar():
-            return handle_parameter_cover(covered, any_type.AnyVar().symbol.text, parameters, check_nullability)
+            return handle_parameter_cover(
+                covered, any_type.AnyVar().symbol.text, parameters, check_nullability
+            )
         else:
             return True
 
@@ -176,7 +181,7 @@ class FunctionEntry:
                 if typ := val.get("value"):
                     self.arguments.append(_parse(typ))
                     self.normalized_inputs.append(normalize_substrait_type_names(typ))
-                elif arg_name := val.get("name", None):
+                elif _ := val.get("name", None):
                     self.arguments.append(val.get("options"))
                     self.normalized_inputs.append("req")
 
@@ -199,7 +204,7 @@ class FunctionEntry:
         parameters = {}
 
         for x, y in zipped_args:
-            if type(y) == str:
+            if isinstance(y, str):
                 if y not in x:
                     return None
             else:
@@ -216,7 +221,7 @@ class FunctionEntry:
                     p.__getattribute__(p.WhichOneof("kind")).nullability
                     == Type.NULLABILITY_NULLABLE
                     for p in signature
-                    if type(p) == Type
+                    if isinstance(p, Type)
                 ]
             )
             output_type.__getattribute__(output_type.WhichOneof("kind")).nullability = (
@@ -259,7 +264,7 @@ class ExtensionRegistry:
 
     def register_extension_dict(self, definitions: dict, uri: str) -> None:
         self._uri_mapping[uri] = next(self._uri_id_generator)
-        
+
         for named_functions in definitions.values():
             for function in named_functions:
                 for impl in function.get("impls", []):
@@ -293,7 +298,7 @@ class ExtensionRegistry:
                 return (f, rtn)
 
         return None
-    
+
     def lookup_uri(self, uri: str) -> Optional[int]:
         uri = self._uri_aliases.get(uri, uri)
         return self._uri_mapping.get(uri, None)

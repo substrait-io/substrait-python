@@ -38,25 +38,28 @@ aggregate_functions:
 registry = ExtensionRegistry(load_default_extensions=False)
 registry.register_extension_dict(yaml.safe_load(content), uri="test_uri")
 
+
 def test_aggregate_count():
-    e = aggregate_function('test_uri', 'count',
-                           expressions=[literal(10, type=stt.Type(i8=stt.Type.I8(nullability=stt.Type.NULLABILITY_REQUIRED)))],
-                           alias='count',
-                           )(named_struct, registry)
-    
-    expected = stee.ExtendedExpression(
-        extension_uris=[
-            ste.SimpleExtensionURI(
-                extension_uri_anchor=1,
-                uri='test_uri'
+    e = aggregate_function(
+        "test_uri",
+        "count",
+        expressions=[
+            literal(
+                10,
+                type=stt.Type(
+                    i8=stt.Type.I8(nullability=stt.Type.NULLABILITY_REQUIRED)
+                ),
             )
         ],
+        alias="count",
+    )(named_struct, registry)
+
+    expected = stee.ExtendedExpression(
+        extension_uris=[ste.SimpleExtensionURI(extension_uri_anchor=1, uri="test_uri")],
         extensions=[
             ste.SimpleExtensionDeclaration(
                 extension_function=ste.SimpleExtensionDeclaration.ExtensionFunction(
-                    extension_uri_reference=1,
-                    function_anchor=1,
-                    name='count'
+                    extension_uri_reference=1, function_anchor=1, name="count"
                 )
             )
         ],
@@ -65,9 +68,15 @@ def test_aggregate_count():
                 measure=stalg.AggregateFunction(
                     function_reference=1,
                     arguments=[
-                        stalg.FunctionArgument(value=stalg.Expression(literal=stalg.Expression.Literal(i8=10, nullable=False))),
+                        stalg.FunctionArgument(
+                            value=stalg.Expression(
+                                literal=stalg.Expression.Literal(i8=10, nullable=False)
+                            )
+                        ),
                     ],
-                    output_type=stt.Type(i64=stt.Type.I64(nullability=stt.Type.NULLABILITY_REQUIRED))
+                    output_type=stt.Type(
+                        i64=stt.Type.I64(nullability=stt.Type.NULLABILITY_REQUIRED)
+                    ),
                 ),
                 output_names=["count"],
             )

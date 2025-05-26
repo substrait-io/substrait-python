@@ -42,26 +42,33 @@ scalar_functions:
 registry = ExtensionRegistry(load_default_extensions=False)
 registry.register_extension_dict(yaml.safe_load(content), uri="test_uri")
 
+
 def test_sclar_add():
-    e = scalar_function('test_uri', 'test_func', 
-                        expressions=[
-                            literal(10, type=stt.Type(i8=stt.Type.I8(nullability=stt.Type.NULLABILITY_REQUIRED))), 
-                            literal(20, type=stt.Type(i8=stt.Type.I8(nullability=stt.Type.NULLABILITY_REQUIRED)))
-                        ])(named_struct, registry)
-    
-    expected = stee.ExtendedExpression(
-        extension_uris=[
-            ste.SimpleExtensionURI(
-                extension_uri_anchor=1,
-                uri='test_uri'
-            )
+    e = scalar_function(
+        "test_uri",
+        "test_func",
+        expressions=[
+            literal(
+                10,
+                type=stt.Type(
+                    i8=stt.Type.I8(nullability=stt.Type.NULLABILITY_REQUIRED)
+                ),
+            ),
+            literal(
+                20,
+                type=stt.Type(
+                    i8=stt.Type.I8(nullability=stt.Type.NULLABILITY_REQUIRED)
+                ),
+            ),
         ],
+    )(named_struct, registry)
+
+    expected = stee.ExtendedExpression(
+        extension_uris=[ste.SimpleExtensionURI(extension_uri_anchor=1, uri="test_uri")],
         extensions=[
             ste.SimpleExtensionDeclaration(
                 extension_function=ste.SimpleExtensionDeclaration.ExtensionFunction(
-                    extension_uri_reference=1,
-                    function_anchor=1,
-                    name='test_func'
+                    extension_uri_reference=1, function_anchor=1, name="test_func"
                 )
             )
         ],
@@ -71,10 +78,24 @@ def test_sclar_add():
                     scalar_function=stalg.Expression.ScalarFunction(
                         function_reference=1,
                         arguments=[
-                            stalg.FunctionArgument(value=stalg.Expression(literal=stalg.Expression.Literal(i8=10, nullable=False))),
-                            stalg.FunctionArgument(value=stalg.Expression(literal=stalg.Expression.Literal(i8=20, nullable=False)))
+                            stalg.FunctionArgument(
+                                value=stalg.Expression(
+                                    literal=stalg.Expression.Literal(
+                                        i8=10, nullable=False
+                                    )
+                                )
+                            ),
+                            stalg.FunctionArgument(
+                                value=stalg.Expression(
+                                    literal=stalg.Expression.Literal(
+                                        i8=20, nullable=False
+                                    )
+                                )
+                            ),
                         ],
-                        output_type=stt.Type(i8=stt.Type.I8(nullability=stt.Type.NULLABILITY_REQUIRED))
+                        output_type=stt.Type(
+                            i8=stt.Type.I8(nullability=stt.Type.NULLABILITY_REQUIRED)
+                        ),
                     )
                 ),
                 output_names=["test_func(Literal(10),Literal(20))"],
@@ -87,40 +108,45 @@ def test_sclar_add():
 
 
 def test_nested_scalar_calls():
-    e = scalar_function('test_uri', 'is_positive',
-            expressions=[
-                scalar_function('test_uri', 'test_func',
-                    expressions=[
-                        literal(10, type=stt.Type(i8=stt.Type.I8(nullability=stt.Type.NULLABILITY_REQUIRED))), 
-                        literal(20, type=stt.Type(i8=stt.Type.I8(nullability=stt.Type.NULLABILITY_REQUIRED)))
-                    ]
-                )
-            ],
-            alias='positive'
-        )(named_struct, registry)
-    
-    expected = stee.ExtendedExpression(
-        extension_uris=[
-            ste.SimpleExtensionURI(
-                extension_uri_anchor=1,
-                uri='test_uri'
+    e = scalar_function(
+        "test_uri",
+        "is_positive",
+        expressions=[
+            scalar_function(
+                "test_uri",
+                "test_func",
+                expressions=[
+                    literal(
+                        10,
+                        type=stt.Type(
+                            i8=stt.Type.I8(nullability=stt.Type.NULLABILITY_REQUIRED)
+                        ),
+                    ),
+                    literal(
+                        20,
+                        type=stt.Type(
+                            i8=stt.Type.I8(nullability=stt.Type.NULLABILITY_REQUIRED)
+                        ),
+                    ),
+                ],
             )
         ],
+        alias="positive",
+    )(named_struct, registry)
+
+    expected = stee.ExtendedExpression(
+        extension_uris=[ste.SimpleExtensionURI(extension_uri_anchor=1, uri="test_uri")],
         extensions=[
             ste.SimpleExtensionDeclaration(
                 extension_function=ste.SimpleExtensionDeclaration.ExtensionFunction(
-                    extension_uri_reference=1,
-                    function_anchor=2,
-                    name='is_positive'
-                )                
+                    extension_uri_reference=1, function_anchor=2, name="is_positive"
+                )
             ),
             ste.SimpleExtensionDeclaration(
                 extension_function=ste.SimpleExtensionDeclaration.ExtensionFunction(
-                    extension_uri_reference=1,
-                    function_anchor=1,
-                    name='test_func'
-                )                
-            )            
+                    extension_uri_reference=1, function_anchor=1, name="test_func"
+                )
+            ),
         ],
         referred_expr=[
             stee.ExpressionReference(
@@ -133,15 +159,35 @@ def test_nested_scalar_calls():
                                     scalar_function=stalg.Expression.ScalarFunction(
                                         function_reference=1,
                                         arguments=[
-                                            stalg.FunctionArgument(value=stalg.Expression(literal=stalg.Expression.Literal(i8=10, nullable=False))),
-                                            stalg.FunctionArgument(value=stalg.Expression(literal=stalg.Expression.Literal(i8=20, nullable=False)))
+                                            stalg.FunctionArgument(
+                                                value=stalg.Expression(
+                                                    literal=stalg.Expression.Literal(
+                                                        i8=10, nullable=False
+                                                    )
+                                                )
+                                            ),
+                                            stalg.FunctionArgument(
+                                                value=stalg.Expression(
+                                                    literal=stalg.Expression.Literal(
+                                                        i8=20, nullable=False
+                                                    )
+                                                )
+                                            ),
                                         ],
-                                        output_type=stt.Type(i8=stt.Type.I8(nullability=stt.Type.NULLABILITY_REQUIRED))
+                                        output_type=stt.Type(
+                                            i8=stt.Type.I8(
+                                                nullability=stt.Type.NULLABILITY_REQUIRED
+                                            )
+                                        ),
                                     )
                                 )
                             )
                         ],
-                        output_type=stt.Type(bool=stt.Type.Boolean(nullability=stt.Type.NULLABILITY_REQUIRED))
+                        output_type=stt.Type(
+                            bool=stt.Type.Boolean(
+                                nullability=stt.Type.NULLABILITY_REQUIRED
+                            )
+                        ),
                     )
                 ),
                 output_names=["positive"],

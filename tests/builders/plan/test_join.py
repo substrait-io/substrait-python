@@ -10,19 +10,21 @@ registry = ExtensionRegistry(load_default_extensions=False)
 
 struct = stt.Type.Struct(types=[i64(nullable=False), boolean()])
 
-named_struct = stt.NamedStruct(
-    names=["id", "is_applicable"], struct=struct
-)
+named_struct = stt.NamedStruct(names=["id", "is_applicable"], struct=struct)
 
 named_struct_2 = stt.NamedStruct(
-    names=["fk_id", "name"], struct=stt.Type.Struct(types=[i64(nullable=False), string()])
+    names=["fk_id", "name"],
+    struct=stt.Type.Struct(types=[i64(nullable=False), string()]),
 )
 
-def test_join():
-    table = read_named_table('table', named_struct)
-    table2 = read_named_table('table2', named_struct_2)
 
-    actual = join(table, table2, literal(True, boolean()), stalg.JoinRel.JOIN_TYPE_INNER)(registry)
+def test_join():
+    table = read_named_table("table", named_struct)
+    table2 = read_named_table("table2", named_struct_2)
+
+    actual = join(
+        table, table2, literal(True, boolean()), stalg.JoinRel.JOIN_TYPE_INNER
+    )(registry)
 
     expected = stp.Plan(
         relations=[
@@ -32,15 +34,16 @@ def test_join():
                         join=stalg.JoinRel(
                             left=table(None).relations[-1].root.input,
                             right=table2(None).relations[-1].root.input,
-                            expression=literal(True, boolean())(None, None).referred_expr[0].expression,
-                            type=stalg.JoinRel.JOIN_TYPE_INNER
+                            expression=literal(True, boolean())(None, None)
+                            .referred_expr[0]
+                            .expression,
+                            type=stalg.JoinRel.JOIN_TYPE_INNER,
                         )
                     ),
-                    names=['id', 'is_applicable', 'fk_id', 'name']
+                    names=["id", "is_applicable", "fk_id", "name"],
                 )
             )
         ]
     )
 
     assert actual == expected
-

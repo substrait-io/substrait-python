@@ -16,30 +16,57 @@ named_struct = stt.NamedStruct(
     names=["order_id", "description", "order_total"], struct=struct
 )
 
+
 def test_if_else():
     actual = if_then(
         ifs=[
             (
-                literal(True, type=stt.Type(bool=stt.Type.Boolean(nullability=stt.Type.NULLABILITY_REQUIRED))),
-                literal(10, type=stt.Type(i8=stt.Type.I8(nullability=stt.Type.NULLABILITY_REQUIRED)))
+                literal(
+                    True,
+                    type=stt.Type(
+                        bool=stt.Type.Boolean(nullability=stt.Type.NULLABILITY_REQUIRED)
+                    ),
+                ),
+                literal(
+                    10,
+                    type=stt.Type(
+                        i8=stt.Type.I8(nullability=stt.Type.NULLABILITY_REQUIRED)
+                    ),
+                ),
             )
         ],
-        _else=literal(20, type=stt.Type(i8=stt.Type.I8(nullability=stt.Type.NULLABILITY_REQUIRED)))
+        _else=literal(
+            20, type=stt.Type(i8=stt.Type.I8(nullability=stt.Type.NULLABILITY_REQUIRED))
+        ),
     )(named_struct, None)
 
     expected = stee.ExtendedExpression(
         referred_expr=[
             stee.ExpressionReference(
                 expression=stalg.Expression(
-                    if_then=stalg.Expression.IfThen(**{
-                        'ifs': [
-                            stalg.Expression.IfThen.IfClause(**{
-                                'if': stalg.Expression(literal=stalg.Expression.Literal(boolean=True, nullable=False)),
-                                'then': stalg.Expression(literal=stalg.Expression.Literal(i8=10, nullable=False))
-                            })
-                        ],
-                        'else': stalg.Expression(literal=stalg.Expression.Literal(i8=20, nullable=False))
-                    })
+                    if_then=stalg.Expression.IfThen(
+                        **{
+                            "ifs": [
+                                stalg.Expression.IfThen.IfClause(
+                                    **{
+                                        "if": stalg.Expression(
+                                            literal=stalg.Expression.Literal(
+                                                boolean=True, nullable=False
+                                            )
+                                        ),
+                                        "then": stalg.Expression(
+                                            literal=stalg.Expression.Literal(
+                                                i8=10, nullable=False
+                                            )
+                                        ),
+                                    }
+                                )
+                            ],
+                            "else": stalg.Expression(
+                                literal=stalg.Expression.Literal(i8=20, nullable=False)
+                            ),
+                        }
+                    )
                 ),
                 output_names=["IfThen(Literal(True),Literal(10),Literal(20))"],
             )

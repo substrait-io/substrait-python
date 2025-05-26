@@ -348,6 +348,7 @@ def infer_rel_schema(rel: stalg.Rel) -> stt.Type.Struct:
             nullability=struct.nullability,
         )
 
+
 def infer_plan_schema(plan: stp.Plan) -> stt.NamedStruct:
     schema = infer_rel_schema(plan.relations[-1].root.input)
 

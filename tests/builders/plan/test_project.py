@@ -10,14 +10,13 @@ registry = ExtensionRegistry(load_default_extensions=False)
 
 struct = stt.Type.Struct(types=[i64(nullable=False), boolean()])
 
-named_struct = stt.NamedStruct(
-    names=["id", "is_applicable"], struct=struct
-)
+named_struct = stt.NamedStruct(names=["id", "is_applicable"], struct=struct)
+
 
 def test_project():
-    table = read_named_table('table', named_struct)
+    table = read_named_table("table", named_struct)
 
-    actual = project(table, [column('id')])(registry)
+    actual = project(table, [column("id")])(registry)
 
     expected = stp.Plan(
         relations=[
@@ -25,21 +24,25 @@ def test_project():
                 root=stalg.RelRoot(
                     input=stalg.Rel(
                         project=stalg.ProjectRel(
-                            common=stalg.RelCommon(emit=stalg.RelCommon.Emit(output_mapping=[2])),
+                            common=stalg.RelCommon(
+                                emit=stalg.RelCommon.Emit(output_mapping=[2])
+                            ),
                             input=table(None).relations[-1].root.input,
                             expressions=[
                                 stalg.Expression(
                                     selection=stalg.Expression.FieldReference(
                                         direct_reference=stalg.Expression.ReferenceSegment(
-                                            struct_field=stalg.Expression.ReferenceSegment.StructField(field=0)
+                                            struct_field=stalg.Expression.ReferenceSegment.StructField(
+                                                field=0
+                                            )
                                         ),
-                                        root_reference=stalg.Expression.FieldReference.RootReference()
+                                        root_reference=stalg.Expression.FieldReference.RootReference(),
                                     )
                                 )
-                            ]
+                            ],
                         )
                     ),
-                    names=['id']
+                    names=["id"],
                 )
             )
         ]

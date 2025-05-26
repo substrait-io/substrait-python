@@ -5,69 +5,126 @@ import substrait.gen.proto.type_pb2 as stp
 import substrait.gen.proto.extended_expression_pb2 as stee
 import substrait.gen.proto.extensions.extensions_pb2 as ste
 from substrait.extension_registry import ExtensionRegistry
-from substrait.utils import type_num_names, merge_extension_uris, merge_extension_declarations
+from substrait.utils import (
+    type_num_names,
+    merge_extension_uris,
+    merge_extension_declarations,
+)
 from substrait.type_inference import infer_extended_expression_schema
 from typing import Callable, Any, Union, Iterable
 
-UnboundExtendedExpression = Callable[[stp.NamedStruct, ExtensionRegistry], stee.ExtendedExpression]
+UnboundExtendedExpression = Callable[
+    [stp.NamedStruct, ExtensionRegistry], stee.ExtendedExpression
+]
 ExtendedExpressionOrUnbound = Union[stee.ExtendedExpression, UnboundExtendedExpression]
 
+
 def _alias_or_inferred(
-        alias: Union[Iterable[str], str],
-        op: str,
-        args: Iterable[str],
-        ):
+    alias: Union[Iterable[str], str],
+    op: str,
+    args: Iterable[str],
+):
     if alias:
         return [alias] if isinstance(alias, str) else alias
     else:
-        return [f'{op}({",".join(args)})']
+        return [f"{op}({','.join(args)})"]
+
 
 def resolve_expression(
-        expression: ExtendedExpressionOrUnbound,
-        base_schema: stp.NamedStruct,
-        registry: ExtensionRegistry
-    ) -> stee.ExtendedExpression:
-    return expression if isinstance(expression, stee.ExtendedExpression) else expression(base_schema, registry)
+    expression: ExtendedExpressionOrUnbound,
+    base_schema: stp.NamedStruct,
+    registry: ExtensionRegistry,
+) -> stee.ExtendedExpression:
+    return (
+        expression
+        if isinstance(expression, stee.ExtendedExpression)
+        else expression(base_schema, registry)
+    )
 
-def literal(value: Any, type: stp.Type, alias: Union[Iterable[str], str] = None) -> UnboundExtendedExpression:
+
+def literal(
+    value: Any, type: stp.Type, alias: Union[Iterable[str], str] = None
+) -> UnboundExtendedExpression:
     """Builds a resolver for ExtendedExpression containing a literal expression"""
-    def resolve(base_schema: stp.NamedStruct, registry: ExtensionRegistry) -> stee.ExtendedExpression:
-        kind = type.WhichOneof('kind')
+
+    def resolve(
+        base_schema: stp.NamedStruct, registry: ExtensionRegistry
+    ) -> stee.ExtendedExpression:
+        kind = type.WhichOneof("kind")
 
         if kind == "bool":
-            literal = stalg.Expression.Literal(boolean=value, nullable=type.bool.nullability == stp.Type.NULLABILITY_NULLABLE)
+            literal = stalg.Expression.Literal(
+                boolean=value,
+                nullable=type.bool.nullability == stp.Type.NULLABILITY_NULLABLE,
+            )
         elif kind == "i8":
-            literal = stalg.Expression.Literal(i8=value, nullable=type.i8.nullability == stp.Type.NULLABILITY_NULLABLE)
+            literal = stalg.Expression.Literal(
+                i8=value, nullable=type.i8.nullability == stp.Type.NULLABILITY_NULLABLE
+            )
         elif kind == "i16":
-            literal = stalg.Expression.Literal(i16=value, nullable=type.i16.nullability == stp.Type.NULLABILITY_NULLABLE)
+            literal = stalg.Expression.Literal(
+                i16=value,
+                nullable=type.i16.nullability == stp.Type.NULLABILITY_NULLABLE,
+            )
         elif kind == "i32":
-            literal = stalg.Expression.Literal(i32=value, nullable=type.i32.nullability == stp.Type.NULLABILITY_NULLABLE)
+            literal = stalg.Expression.Literal(
+                i32=value,
+                nullable=type.i32.nullability == stp.Type.NULLABILITY_NULLABLE,
+            )
         elif kind == "i64":
-            literal = stalg.Expression.Literal(i64=value, nullable=type.i64.nullability == stp.Type.NULLABILITY_NULLABLE)
+            literal = stalg.Expression.Literal(
+                i64=value,
+                nullable=type.i64.nullability == stp.Type.NULLABILITY_NULLABLE,
+            )
         elif kind == "fp32":
-            literal = stalg.Expression.Literal(fp32=value, nullable=type.fp32.nullability == stp.Type.NULLABILITY_NULLABLE)
+            literal = stalg.Expression.Literal(
+                fp32=value,
+                nullable=type.fp32.nullability == stp.Type.NULLABILITY_NULLABLE,
+            )
         elif kind == "fp64":
-            literal = stalg.Expression.Literal(fp64=value, nullable=type.fp64.nullability == stp.Type.NULLABILITY_NULLABLE)
+            literal = stalg.Expression.Literal(
+                fp64=value,
+                nullable=type.fp64.nullability == stp.Type.NULLABILITY_NULLABLE,
+            )
         elif kind == "string":
-            literal = stalg.Expression.Literal(string=value, nullable=type.string.nullability == stp.Type.NULLABILITY_NULLABLE)
+            literal = stalg.Expression.Literal(
+                string=value,
+                nullable=type.string.nullability == stp.Type.NULLABILITY_NULLABLE,
+            )
         elif kind == "binary":
-            literal = stalg.Expression.Literal(binary=value, nullable=type.binary.nullability == stp.Type.NULLABILITY_NULLABLE)
+            literal = stalg.Expression.Literal(
+                binary=value,
+                nullable=type.binary.nullability == stp.Type.NULLABILITY_NULLABLE,
+            )
         elif kind == "date":
-            date_value = (value - date(1970,1,1)).days if isinstance(value, date) else value
-            literal = stalg.Expression.Literal(date=date_value, nullable=type.date.nullability == stp.Type.NULLABILITY_NULLABLE)
+            date_value = (
+                (value - date(1970, 1, 1)).days if isinstance(value, date) else value
+            )
+            literal = stalg.Expression.Literal(
+                date=date_value,
+                nullable=type.date.nullability == stp.Type.NULLABILITY_NULLABLE,
+            )
         # TODO
         # IntervalYearToMonth interval_year_to_month = 19;
         # IntervalDayToSecond interval_day_to_second = 20;
         # IntervalCompound interval_compound = 36;
         elif kind == "fixed_char":
-            literal = stalg.Expression.Literal(fixed_char=value, nullable=type.fixed_char.nullability == stp.Type.NULLABILITY_NULLABLE)
+            literal = stalg.Expression.Literal(
+                fixed_char=value,
+                nullable=type.fixed_char.nullability == stp.Type.NULLABILITY_NULLABLE,
+            )
         elif kind == "varchar":
             literal = stalg.Expression.Literal(
-                var_char=stalg.Expression.Literal.VarChar(value=value, length=type.varchar.length), 
-                nullable=type.varchar.nullability == stp.Type.NULLABILITY_NULLABLE
+                var_char=stalg.Expression.Literal.VarChar(
+                    value=value, length=type.varchar.length
+                ),
+                nullable=type.varchar.nullability == stp.Type.NULLABILITY_NULLABLE,
             )
         elif kind == "fixed_binary":
-            literal = stalg.Expression.Literal(fixed_binary=value, nullable=type.fixed_binary.nullability == stp.Type.NULLABILITY_NULLABLE)
+            literal = stalg.Expression.Literal(
+                fixed_binary=value,
+                nullable=type.fixed_binary.nullability == stp.Type.NULLABILITY_NULLABLE,
+            )
         # TODO
         # Decimal decimal = 24;
         # PrecisionTime precision_time = 37; // Time in precision units past midnight.
@@ -86,16 +143,15 @@ def literal(value: Any, type: stp.Type, alias: Union[Iterable[str], str] = None)
         return stee.ExtendedExpression(
             referred_expr=[
                 stee.ExpressionReference(
-                    expression=stalg.Expression(
-                        literal=literal
-                    ),
-                    output_names=_alias_or_inferred(alias, 'Literal', [str(value)])
+                    expression=stalg.Expression(literal=literal),
+                    output_names=_alias_or_inferred(alias, "Literal", [str(value)]),
                 )
             ],
             base_schema=base_schema,
         )
 
     return resolve
+
 
 def column(field: Union[str, int], alias: Union[Iterable[str], str] = None):
     """Builds a resolver for ExtendedExpression containing a FieldReference expression
@@ -146,10 +202,15 @@ def column(field: Union[str, int], alias: Union[Iterable[str], str] = None):
 
     return resolve
 
+
 def scalar_function(
-    uri: str, function: str, expressions: Iterable[ExtendedExpressionOrUnbound], alias: Union[Iterable[str], str] = None
+    uri: str,
+    function: str,
+    expressions: Iterable[ExtendedExpressionOrUnbound],
+    alias: Union[Iterable[str], str] = None,
 ):
     """Builds a resolver for ExtendedExpression containing a ScalarFunction expression"""
+
     def resolve(
         base_schema: stp.NamedStruct, registry: ExtensionRegistry
     ) -> stee.ExtendedExpression:
@@ -207,7 +268,11 @@ def scalar_function(
                             output_type=func[1],
                         )
                     ),
-                    output_names=_alias_or_inferred(alias, function, [e.referred_expr[0].output_names[0] for e in bound_expressions]),
+                    output_names=_alias_or_inferred(
+                        alias,
+                        function,
+                        [e.referred_expr[0].output_names[0] for e in bound_expressions],
+                    ),
                 )
             ],
             base_schema=base_schema,
@@ -217,10 +282,15 @@ def scalar_function(
 
     return resolve
 
+
 def aggregate_function(
-    uri: str, function: str, expressions: Iterable[ExtendedExpressionOrUnbound], alias: Union[Iterable[str], str] = None
+    uri: str,
+    function: str,
+    expressions: Iterable[ExtendedExpressionOrUnbound],
+    alias: Union[Iterable[str], str] = None,
 ):
     """Builds a resolver for ExtendedExpression containing a AggregateFunction measure"""
+
     def resolve(
         base_schema: stp.NamedStruct, registry: ExtensionRegistry
     ) -> stee.ExtendedExpression:
@@ -274,7 +344,11 @@ def aggregate_function(
                         ],
                         output_type=func[1],
                     ),
-                    output_names=_alias_or_inferred(alias, 'IfThen', [e.referred_expr[0].output_names[0] for e in bound_expressions]),
+                    output_names=_alias_or_inferred(
+                        alias,
+                        "IfThen",
+                        [e.referred_expr[0].output_names[0] for e in bound_expressions],
+                    ),
                 )
             ],
             base_schema=base_schema,
@@ -291,9 +365,10 @@ def window_function(
     function: str,
     expressions: Iterable[ExtendedExpressionOrUnbound],
     partitions: Iterable[ExtendedExpressionOrUnbound] = [],
-    alias: Union[Iterable[str], str] = None
+    alias: Union[Iterable[str], str] = None,
 ):
     """Builds a resolver for ExtendedExpression containing a WindowFunction expression"""
+
     def resolve(
         base_schema: stp.NamedStruct, registry: ExtensionRegistry
     ) -> stee.ExtendedExpression:
@@ -301,7 +376,9 @@ def window_function(
             resolve_expression(e, base_schema, registry) for e in expressions
         ]
 
-        bound_partitions = [resolve_expression(e, base_schema, registry) for e in partitions]
+        bound_partitions = [
+            resolve_expression(e, base_schema, registry) for e in partitions
+        ]
 
         expression_schemas = [
             infer_extended_expression_schema(b) for b in bound_expressions
@@ -360,7 +437,11 @@ def window_function(
                             ],
                         )
                     ),
-                    output_names=_alias_or_inferred(alias, function, [e.referred_expr[0].output_names[0] for e in bound_expressions]),
+                    output_names=_alias_or_inferred(
+                        alias,
+                        function,
+                        [e.referred_expr[0].output_names[0] for e in bound_expressions],
+                    ),
                 )
             ],
             base_schema=base_schema,
@@ -371,13 +452,21 @@ def window_function(
     return resolve
 
 
-def if_then(ifs: Iterable[tuple[ExtendedExpressionOrUnbound, ExtendedExpressionOrUnbound]], _else: ExtendedExpressionOrUnbound, alias: Union[Iterable[str], str] = None):
+def if_then(
+    ifs: Iterable[tuple[ExtendedExpressionOrUnbound, ExtendedExpressionOrUnbound]],
+    _else: ExtendedExpressionOrUnbound,
+    alias: Union[Iterable[str], str] = None,
+):
     """Builds a resolver for ExtendedExpression containing an IfThen expression"""
+
     def resolve(
         base_schema: stp.NamedStruct, registry: ExtensionRegistry
     ) -> stee.ExtendedExpression:
         bound_ifs = [
-            (resolve_expression(if_clause[0], base_schema, registry), resolve_expression(if_clause[1], base_schema, registry))
+            (
+                resolve_expression(if_clause[0], base_schema, registry),
+                resolve_expression(if_clause[1], base_schema, registry),
+            )
             for if_clause in ifs
         ]
 
@@ -386,33 +475,51 @@ def if_then(ifs: Iterable[tuple[ExtendedExpressionOrUnbound, ExtendedExpressionO
         extension_uris = merge_extension_uris(
             *[b[0].extension_uris for b in bound_ifs],
             *[b[1].extension_uris for b in bound_ifs],
-            bound_else.extension_uris
+            bound_else.extension_uris,
         )
 
         extensions = merge_extension_declarations(
             *[b[0].extensions for b in bound_ifs],
             *[b[1].extensions for b in bound_ifs],
-            bound_else.extensions
+            bound_else.extensions,
         )
 
         return stee.ExtendedExpression(
             referred_expr=[
                 stee.ExpressionReference(
                     expression=stalg.Expression(
-                        if_then=stalg.Expression.IfThen(**{
-                            'ifs': [
-                                stalg.Expression.IfThen.IfClause(**{
-                                    'if': if_clause[0].referred_expr[0].expression,
-                                    'then': if_clause[1].referred_expr[0].expression,
-                                })    
-                                for if_clause in bound_ifs
-                            ],
-                            'else': bound_else.referred_expr[0].expression
-                        })
+                        if_then=stalg.Expression.IfThen(
+                            **{
+                                "ifs": [
+                                    stalg.Expression.IfThen.IfClause(
+                                        **{
+                                            "if": if_clause[0]
+                                            .referred_expr[0]
+                                            .expression,
+                                            "then": if_clause[1]
+                                            .referred_expr[0]
+                                            .expression,
+                                        }
+                                    )
+                                    for if_clause in bound_ifs
+                                ],
+                                "else": bound_else.referred_expr[0].expression,
+                            }
+                        )
                     ),
-                    output_names=_alias_or_inferred(alias, 'IfThen', [a for e in bound_ifs for a in [e[0].referred_expr[0].output_names[0], e[1].referred_expr[0].output_names[0]]]
-                                                    + [bound_else.referred_expr[0].output_names[0]]
-                                                    ),
+                    output_names=_alias_or_inferred(
+                        alias,
+                        "IfThen",
+                        [
+                            a
+                            for e in bound_ifs
+                            for a in [
+                                e[0].referred_expr[0].output_names[0],
+                                e[1].referred_expr[0].output_names[0],
+                            ]
+                        ]
+                        + [bound_else.referred_expr[0].output_names[0]],
+                    ),
                 )
             ],
             base_schema=base_schema,
@@ -422,10 +529,14 @@ def if_then(ifs: Iterable[tuple[ExtendedExpressionOrUnbound, ExtendedExpressionO
 
     return resolve
 
-def switch(match: ExtendedExpressionOrUnbound,
-           ifs: Iterable[tuple[ExtendedExpressionOrUnbound, ExtendedExpressionOrUnbound]],
-           _else: ExtendedExpressionOrUnbound):
+
+def switch(
+    match: ExtendedExpressionOrUnbound,
+    ifs: Iterable[tuple[ExtendedExpressionOrUnbound, ExtendedExpressionOrUnbound]],
+    _else: ExtendedExpressionOrUnbound,
+):
     """Builds a resolver for ExtendedExpression containing a switch expression"""
+
     def resolve(
         base_schema: stp.NamedStruct, registry: ExtensionRegistry
     ) -> stee.ExtendedExpression:
@@ -433,20 +544,22 @@ def switch(match: ExtendedExpressionOrUnbound,
         bound_ifs = [
             (
                 resolve_expression(a, base_schema, registry),
-                resolve_expression(b, base_schema, registry)
-            ) for a, b in ifs]
+                resolve_expression(b, base_schema, registry),
+            )
+            for a, b in ifs
+        ]
         bound_else = resolve_expression(_else, base_schema, registry)
 
         extension_uris = merge_extension_uris(
             bound_match.extension_uris,
             *[b.extension_uris for _, b in bound_ifs],
-            bound_else.extension_uris
+            bound_else.extension_uris,
         )
 
         extensions = merge_extension_declarations(
             bound_match.extensions,
             *[b.extensions for _, b in bound_ifs],
-            bound_else.extensions
+            bound_else.extensions,
         )
 
         return stee.ExtendedExpression(
@@ -456,29 +569,33 @@ def switch(match: ExtendedExpressionOrUnbound,
                         switch_expression=stalg.Expression.SwitchExpression(
                             match=bound_match.referred_expr[0].expression,
                             ifs=[
-                                stalg.Expression.SwitchExpression.IfValue(**{
-                                    'if': i.referred_expr[0].expression.literal,
-                                    'then': t.referred_expr[0].expression
-                                })
+                                stalg.Expression.SwitchExpression.IfValue(
+                                    **{
+                                        "if": i.referred_expr[0].expression.literal,
+                                        "then": t.referred_expr[0].expression,
+                                    }
+                                )
                                 for i, t in bound_ifs
                             ],
-                            **{
-                                'else': bound_else.referred_expr[0].expression
-                            }
+                            **{"else": bound_else.referred_expr[0].expression},
                         )
                     ),
-                    output_names=['switch'] #TODO construct name from inputs
+                    output_names=["switch"],  # TODO construct name from inputs
                 )
             ],
             base_schema=base_schema,
             extension_uris=extension_uris,
             extensions=extensions,
         )
-    
+
     return resolve
 
-def singular_or_list(value: ExtendedExpressionOrUnbound, options: Iterable[ExtendedExpressionOrUnbound]):
+
+def singular_or_list(
+    value: ExtendedExpressionOrUnbound, options: Iterable[ExtendedExpressionOrUnbound]
+):
     """Builds a resolver for ExtendedExpression containing a SingularOrList expression"""
+
     def resolve(
         base_schema: stp.NamedStruct, registry: ExtensionRegistry
     ) -> stee.ExtendedExpression:
@@ -486,13 +603,11 @@ def singular_or_list(value: ExtendedExpressionOrUnbound, options: Iterable[Exten
         bound_options = [resolve_expression(o, base_schema, registry) for o in options]
 
         extension_uris = merge_extension_uris(
-            bound_value.extension_uris,
-            *[b.extension_uris for b in bound_options]
+            bound_value.extension_uris, *[b.extension_uris for b in bound_options]
         )
 
         extensions = merge_extension_declarations(
-            bound_value.extensions,
-            *[b.extensions for b in bound_options]
+            bound_value.extensions, *[b.extensions for b in bound_options]
         )
 
         return stee.ExtendedExpression(
@@ -502,23 +617,29 @@ def singular_or_list(value: ExtendedExpressionOrUnbound, options: Iterable[Exten
                         singular_or_list=stalg.Expression.SingularOrList(
                             value=bound_value.referred_expr[0].expression,
                             options=[
-                                o.referred_expr[0].expression
-                                for o in bound_options
-                            ]
+                                o.referred_expr[0].expression for o in bound_options
+                            ],
                         )
                     ),
-                    output_names=['singular_or_list'] #TODO construct name from inputs
+                    output_names=[
+                        "singular_or_list"
+                    ],  # TODO construct name from inputs
                 )
             ],
             base_schema=base_schema,
             extension_uris=extension_uris,
             extensions=extensions,
         )
-    
+
     return resolve
 
-def multi_or_list(value: Iterable[ExtendedExpressionOrUnbound], options: Iterable[Iterable[ExtendedExpressionOrUnbound]]):
+
+def multi_or_list(
+    value: Iterable[ExtendedExpressionOrUnbound],
+    options: Iterable[Iterable[ExtendedExpressionOrUnbound]],
+):
     """Builds a resolver for ExtendedExpression containing a MultiOrList expression"""
+
     def resolve(
         base_schema: stp.NamedStruct, registry: ExtensionRegistry
     ) -> stee.ExtendedExpression:
@@ -545,24 +666,28 @@ def multi_or_list(value: Iterable[ExtendedExpressionOrUnbound], options: Iterabl
                             value=[e.referred_expr[0].expression for e in bound_value],
                             options=[
                                 stalg.Expression.MultiOrList.Record(
-                                    fields=[e.referred_expr[0].expression for e in option]
+                                    fields=[
+                                        e.referred_expr[0].expression for e in option
+                                    ]
                                 )
                                 for option in bound_options
-                            ]
+                            ],
                         )
                     ),
-                    output_names=['multi_or_list'] #TODO construct name from inputs
+                    output_names=["multi_or_list"],  # TODO construct name from inputs
                 )
             ],
             base_schema=base_schema,
             extension_uris=extension_uris,
             extensions=extensions,
         )
-    
+
     return resolve
+
 
 def cast(input: ExtendedExpressionOrUnbound, type: stp.Type):
     """Builds a resolver for ExtendedExpression containing a cast expression"""
+
     def resolve(
         base_schema: stp.NamedStruct, registry: ExtensionRegistry
     ) -> stee.ExtendedExpression:
@@ -575,15 +700,15 @@ def cast(input: ExtendedExpressionOrUnbound, type: stp.Type):
                         cast=stalg.Expression.Cast(
                             input=bound_input.referred_expr[0].expression,
                             type=type,
-                            failure_behavior=stalg.Expression.Cast.FAILURE_BEHAVIOR_RETURN_NULL
+                            failure_behavior=stalg.Expression.Cast.FAILURE_BEHAVIOR_RETURN_NULL,
                         )
                     ),
-                    output_names=['cast'] #TODO construct name from inputs
+                    output_names=["cast"],  # TODO construct name from inputs
                 )
             ],
             base_schema=base_schema,
             extension_uris=bound_input.extension_uris,
             extensions=bound_input.extensions,
         )
-    
+
     return resolve

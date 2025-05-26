@@ -6,7 +6,7 @@ from substrait.gen.proto.type_pb2 import Type
 
 
 def _evaluate(x, values: dict):
-    if type(x) == SubstraitTypeParser.BinaryExprContext:
+    if isinstance(x, SubstraitTypeParser.BinaryExprContext):
         left = _evaluate(x.left, values)
         right = _evaluate(x.right, values)
 
@@ -26,15 +26,15 @@ def _evaluate(x, values: dict):
             return left <= right
         else:
             raise Exception(f"Unknown binary op {x.op.text}")
-    elif type(x) == SubstraitTypeParser.LiteralNumberContext:
+    elif isinstance(x, SubstraitTypeParser.LiteralNumberContext):
         return int(x.Number().symbol.text)
-    elif type(x) == SubstraitTypeParser.ParameterNameContext:
+    elif isinstance(x, SubstraitTypeParser.ParameterNameContext):
         return values[x.Identifier().symbol.text]
-    elif type(x) == SubstraitTypeParser.NumericParameterNameContext:
+    elif isinstance(x, SubstraitTypeParser.NumericParameterNameContext):
         return values[x.Identifier().symbol.text]
-    elif type(x) == SubstraitTypeParser.ParenExpressionContext:
+    elif isinstance(x, SubstraitTypeParser.ParenExpressionContext):
         return _evaluate(x.expr(), values)
-    elif type(x) == SubstraitTypeParser.FunctionCallContext:
+    elif isinstance(x, SubstraitTypeParser.FunctionCallContext):
         exprs = [_evaluate(e, values) for e in x.expr()]
         func = x.Identifier().symbol.text
         if func == "min":
@@ -43,7 +43,7 @@ def _evaluate(x, values: dict):
             return max(*exprs)
         else:
             raise Exception(f"Unknown function {func}")
-    elif type(x) == SubstraitTypeParser.TypeDefContext:
+    elif isinstance(x, SubstraitTypeParser.TypeDefContext):
         scalar_type = x.scalarType()
         parametrized_type = x.parameterizedType()
         any_type = x.anyType()
@@ -89,16 +89,18 @@ def _evaluate(x, values: dict):
             else:
                 raise Exception()
         else:
-            raise Exception(f"either scalar_type, parametrized_type or any_type is required")
-    elif type(x) == SubstraitTypeParser.NumericExpressionContext:
+            raise Exception(
+                "either scalar_type, parametrized_type or any_type is required"
+            )
+    elif isinstance(x, SubstraitTypeParser.NumericExpressionContext):
         return _evaluate(x.expr(), values)
-    elif type(x) == SubstraitTypeParser.TernaryContext:
+    elif isinstance(x, SubstraitTypeParser.TernaryContext):
         ifExpr = _evaluate(x.ifExpr, values)
         thenExpr = _evaluate(x.thenExpr, values)
         elseExpr = _evaluate(x.elseExpr, values)
 
         return thenExpr if ifExpr else elseExpr
-    elif type(x) == SubstraitTypeParser.MultilineDefinitionContext:
+    elif isinstance(x, SubstraitTypeParser.MultilineDefinitionContext):
         lines = zip(x.Identifier(), x.expr())
 
         for i, e in lines:
@@ -107,9 +109,9 @@ def _evaluate(x, values: dict):
             values[identifier] = expr_eval
 
         return _evaluate(x.finalType, values)
-    elif type(x) == SubstraitTypeParser.TypeLiteralContext:
+    elif isinstance(x, SubstraitTypeParser.TypeLiteralContext):
         return _evaluate(x.typeDef(), values)
-    elif type(x) == SubstraitTypeParser.NumericLiteralContext:
+    elif isinstance(x, SubstraitTypeParser.NumericLiteralContext):
         return int(str(x.Number()))
     else:
         raise Exception(f"Unknown token type {type(x)}")

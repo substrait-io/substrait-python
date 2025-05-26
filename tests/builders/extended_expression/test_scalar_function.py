@@ -44,9 +44,10 @@ registry.register_extension_dict(yaml.safe_load(content), uri="test_uri")
 
 def test_sclar_add():
     e = scalar_function('test_uri', 'test_func', 
-                           literal(10, type=stt.Type(i8=stt.Type.I8(nullability=stt.Type.NULLABILITY_REQUIRED))), 
-                           literal(20, type=stt.Type(i8=stt.Type.I8(nullability=stt.Type.NULLABILITY_REQUIRED)))
-                           )(named_struct, registry)
+                        expressions=[
+                            literal(10, type=stt.Type(i8=stt.Type.I8(nullability=stt.Type.NULLABILITY_REQUIRED))), 
+                            literal(20, type=stt.Type(i8=stt.Type.I8(nullability=stt.Type.NULLABILITY_REQUIRED)))
+                        ])(named_struct, registry)
     
     expected = stee.ExtendedExpression(
         extension_uris=[
@@ -87,9 +88,14 @@ def test_sclar_add():
 
 def test_nested_scalar_calls():
     e = scalar_function('test_uri', 'is_positive',
-            scalar_function('test_uri', 'test_func', 
+            expressions=[
+                scalar_function('test_uri', 'test_func',
+                    expressions=[
                         literal(10, type=stt.Type(i8=stt.Type.I8(nullability=stt.Type.NULLABILITY_REQUIRED))), 
-                        literal(20, type=stt.Type(i8=stt.Type.I8(nullability=stt.Type.NULLABILITY_REQUIRED)))),
+                        literal(20, type=stt.Type(i8=stt.Type.I8(nullability=stt.Type.NULLABILITY_REQUIRED)))
+                    ]
+                )
+            ],
             alias='positive'
         )(named_struct, registry)
     

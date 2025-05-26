@@ -1,5 +1,3 @@
-import yaml
-
 import substrait.gen.proto.algebra_pb2 as stalg
 import substrait.gen.proto.type_pb2 as stt
 import substrait.gen.proto.extended_expression_pb2 as stee
@@ -21,12 +19,10 @@ named_struct = stt.NamedStruct(
 
 registry = ExtensionRegistry(load_default_extensions=False)
 
+
 def test_cast():
-    e = cast(
-        input=literal(3, i8()),
-        type=i16()
-    )(named_struct, registry)
-    
+    e = cast(input=literal(3, i8()), type=i16())(named_struct, registry)
+
     expected = stee.ExtendedExpression(
         referred_expr=[
             stee.ExpressionReference(
@@ -35,8 +31,10 @@ def test_cast():
                         type=stt.Type(
                             i16=stt.Type.I16(nullability=stt.Type.NULLABILITY_NULLABLE)
                         ),
-                        input=stalg.Expression(literal=stalg.Expression.Literal(i8=3, nullable=True)),
-                        failure_behavior=stalg.Expression.Cast.FAILURE_BEHAVIOR_RETURN_NULL
+                        input=stalg.Expression(
+                            literal=stalg.Expression.Literal(i8=3, nullable=True)
+                        ),
+                        failure_behavior=stalg.Expression.Cast.FAILURE_BEHAVIOR_RETURN_NULL,
                     )
                 ),
                 output_names=["cast"],
@@ -46,4 +44,3 @@ def test_cast():
     )
 
     assert e == expected
-

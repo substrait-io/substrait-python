@@ -301,7 +301,7 @@ def test_function_with_discrete_nullability():
     )[1] == i8(nullable=True)
 
 
-def test_function_with_discrete_nullability():
+def test_function_with_discrete_nullability_nonexisting():
     assert (
         registry.lookup_function(
             uri="test", function_name="add_discrete", signature=[i8(), i8()]

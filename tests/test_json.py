@@ -1,7 +1,6 @@
 import os
 import pathlib
 import tempfile
-import json
 
 from substrait.proto import Plan
 from substrait.json import load_json, parse_json, dump_json, write_json
@@ -69,4 +68,4 @@ def _strip_json_comments(jsonfile):
     # a comment containing the SQL that matches the json plan.
     # As Python JSON parser doesn't support comments,
     # we have to strip them to make the content readable
-    return "\n".join(l for l in jsonfile.readlines() if l[0] != "#")
+    return "\n".join(line for line in jsonfile.readlines() if line[0] != "#")

@@ -6,19 +6,20 @@ from substrait.extension_registry import ExtensionRegistry
 registry = ExtensionRegistry(load_default_extensions=True)
 
 ns = named_struct(
-    names=["id", "is_applicable"], 
-    struct=struct(
-        types=[
-            i64(nullable=False), 
-            boolean()
-        ]
-    )
+    names=["id", "is_applicable"], struct=struct(types=[i64(nullable=False), boolean()])
 )
 
-table = read_named_table('example_table', ns)
-table = filter(table, expression=column('is_applicable'))
-table = filter(table, expression=scalar_function('functions_comparison.yaml', 'lt', column('id'), literal(100, i64())))
-table = project(table, expressions=[column('id')])
+table = read_named_table("example_table", ns)
+table = filter(table, expression=column("is_applicable"))
+table = filter(
+    table,
+    expression=scalar_function(
+        "functions_comparison.yaml",
+        "lt",
+        expressions=[column("id"), literal(100, i64())],
+    ),
+)
+table = project(table, expressions=[column("id")])
 
 print(table(registry))
 

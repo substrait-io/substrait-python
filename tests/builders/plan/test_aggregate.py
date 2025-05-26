@@ -30,35 +30,29 @@ registry.register_extension_dict(yaml.safe_load(content), uri="test_uri")
 
 struct = stt.Type.Struct(types=[i64(nullable=False), boolean()])
 
-named_struct = stt.NamedStruct(
-    names=["id", "is_applicable"], struct=struct
-)
+named_struct = stt.NamedStruct(names=["id", "is_applicable"], struct=struct)
+
 
 def test_aggregate():
-    table = read_named_table('table', named_struct)
+    table = read_named_table("table", named_struct)
 
-    group_expr = column('id')
-    measure_expr = aggregate_function('test_uri', 'count', expressions=[column('is_applicable')], alias=['count'])
+    group_expr = column("id")
+    measure_expr = aggregate_function(
+        "test_uri", "count", expressions=[column("is_applicable")], alias=["count"]
+    )
 
-    actual = aggregate(table, 
-                       grouping_expressions=[group_expr],
-                       measures=[measure_expr])(registry)
-    
+    actual = aggregate(
+        table, grouping_expressions=[group_expr], measures=[measure_expr]
+    )(registry)
+
     ns = infer_plan_schema(table(None))
 
     expected = stp.Plan(
-        extension_uris=[
-            ste.SimpleExtensionURI(
-                extension_uri_anchor=1,
-                uri='test_uri'
-            )
-        ],
+        extension_uris=[ste.SimpleExtensionURI(extension_uri_anchor=1, uri="test_uri")],
         extensions=[
             ste.SimpleExtensionDeclaration(
                 extension_function=ste.SimpleExtensionDeclaration.ExtensionFunction(
-                    extension_uri_reference=1,
-                    function_anchor=1,
-                    name='count'
+                    extension_uri_reference=1, function_anchor=1, name="count"
                 )
             )
         ],
@@ -74,23 +68,26 @@ def test_aggregate():
                             groupings=[
                                 stalg.AggregateRel.Grouping(
                                     grouping_expressions=[
-                                        group_expr(ns, registry).referred_expr[0].expression
+                                        group_expr(ns, registry)
+                                        .referred_expr[0]
+                                        .expression
                                     ],
-                                    expression_references=[0]
+                                    expression_references=[0],
                                 )
                             ],
                             measures=[
                                 stalg.AggregateRel.Measure(
-                                    measure=measure_expr(ns, registry).referred_expr[0].measure
+                                    measure=measure_expr(ns, registry)
+                                    .referred_expr[0]
+                                    .measure
                                 )
-                            ]
-
+                            ],
                         )
                     ),
-                    names=['id', 'count']
+                    names=["id", "count"],
                 )
             )
-        ]
+        ],
     )
 
     assert actual == expected

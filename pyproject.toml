@@ -30,8 +30,3 @@ respect-gitignore = true
 target-version = "py39"
 # never autoformat upstream or generated code
 exclude = ["third_party/", "src/substrait/gen"]
-# do not autofix the following (will still get flagged in lint)
-lint.unfixable = [
-  "F401",  # unused imports
-  "T201",  # print statements
-]

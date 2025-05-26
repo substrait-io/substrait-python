@@ -25,10 +25,14 @@ data = pyarrow.record_batch(
     names=["ints", "strs"],
 )
 
+
 def read_adbc_named_table(name: str, conn):
     pa_schema = conn.adbc_get_table_schema(name)
-    substrait_schema = pa_substrait.serialize_schema(pa_schema).to_pysubstrait().base_schema
+    substrait_schema = (
+        pa_substrait.serialize_schema(pa_schema).to_pysubstrait().base_schema
+    )
     return read_named_table(name, substrait_schema)
+
 
 with adbc_driver_duckdb.dbapi.connect(":memory:") as conn:
     with conn.cursor() as cur:
@@ -38,7 +42,14 @@ with adbc_driver_duckdb.dbapi.connect(":memory:") as conn:
         cur.executescript("LOAD substrait;")
 
         table = read_adbc_named_table("AnswerToEverything", conn)
-        table = filter(table, expression=scalar_function('functions_comparison.yaml', 'gte', column('ints'), literal(3, i64())))
+        table = filter(
+            table,
+            expression=scalar_function(
+                "functions_comparison.yaml",
+                "gte",
+                expressions=[column("ints"), literal(3, i64())],
+            ),
+        )
 
         cur.execute(table(registry).SerializeToString())
         print(cur.fetch_arrow_table())

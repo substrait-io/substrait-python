@@ -11,14 +11,13 @@ registry = ExtensionRegistry(load_default_extensions=False)
 
 struct = stt.Type.Struct(types=[i64(nullable=False), boolean()])
 
-named_struct = stt.NamedStruct(
-    names=["id", "is_applicable"], struct=struct
-)
+named_struct = stt.NamedStruct(names=["id", "is_applicable"], struct=struct)
+
 
 def test_sort_no_direction():
-    table = read_named_table('table', named_struct)
+    table = read_named_table("table", named_struct)
 
-    col = column('id')
+    col = column("id")
 
     actual = sort(table, expressions=[col])(registry)
 
@@ -32,12 +31,14 @@ def test_sort_no_direction():
                             sorts=[
                                 stalg.SortField(
                                     direction=stalg.SortField.SORT_DIRECTION_ASC_NULLS_LAST,
-                                    expr=col(infer_plan_schema(table(None)), registry).referred_expr[0].expression
+                                    expr=col(infer_plan_schema(table(None)), registry)
+                                    .referred_expr[0]
+                                    .expression,
                                 )
-                            ]
+                            ],
                         )
                     ),
-                    names=['id', 'is_applicable']
+                    names=["id", "is_applicable"],
                 )
             )
         ]
@@ -45,12 +46,15 @@ def test_sort_no_direction():
 
     assert actual == expected
 
+
 def test_sort_direction():
-    table = read_named_table('table', named_struct)
+    table = read_named_table("table", named_struct)
 
-    col = column('id')
+    col = column("id")
 
-    actual = sort(table, expressions=[(col, stalg.SortField.SORT_DIRECTION_DESC_NULLS_FIRST)])(registry)
+    actual = sort(
+        table, expressions=[(col, stalg.SortField.SORT_DIRECTION_DESC_NULLS_FIRST)]
+    )(registry)
 
     expected = stp.Plan(
         relations=[
@@ -62,12 +66,14 @@ def test_sort_direction():
                             sorts=[
                                 stalg.SortField(
                                     direction=stalg.SortField.SORT_DIRECTION_DESC_NULLS_FIRST,
-                                    expr=col(infer_plan_schema(table(None)), registry).referred_expr[0].expression
+                                    expr=col(infer_plan_schema(table(None)), registry)
+                                    .referred_expr[0]
+                                    .expression,
                                 )
-                            ]
+                            ],
                         )
                     ),
-                    names=['id', 'is_applicable']
+                    names=["id", "is_applicable"],
                 )
             )
         ]

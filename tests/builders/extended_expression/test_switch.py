@@ -1,5 +1,3 @@
-import yaml
-
 import substrait.gen.proto.algebra_pb2 as stalg
 import substrait.gen.proto.type_pb2 as stt
 import substrait.gen.proto.extended_expression_pb2 as stee
@@ -21,35 +19,52 @@ named_struct = stt.NamedStruct(
 
 registry = ExtensionRegistry(load_default_extensions=False)
 
+
 def test_switch():
     e = switch(
         match=literal(3, i8()),
         ifs=[
             (literal(1, i8()), literal(1, i8())),
-            (literal(2, i8()), literal(4, i8()))
+            (literal(2, i8()), literal(4, i8())),
         ],
-        _else=literal(9, i8())
+        _else=literal(9, i8()),
     )(named_struct, registry)
-    
+
     expected = stee.ExtendedExpression(
         referred_expr=[
             stee.ExpressionReference(
                 expression=stalg.Expression(
                     switch_expression=stalg.Expression.SwitchExpression(
-                        match=stalg.Expression(literal=stalg.Expression.Literal(i8=3, nullable=True)),
+                        match=stalg.Expression(
+                            literal=stalg.Expression.Literal(i8=3, nullable=True)
+                        ),
                         ifs=[
-                            stalg.Expression.SwitchExpression.IfValue(**{
-                                'if': stalg.Expression.Literal(i8=1, nullable=True),
-                                'then': stalg.Expression(literal=stalg.Expression.Literal(i8=1, nullable=True))
-                            }),
-                            stalg.Expression.SwitchExpression.IfValue(**{
-                                'if': stalg.Expression.Literal(i8=2, nullable=True),
-                                'then': stalg.Expression(literal=stalg.Expression.Literal(i8=4, nullable=True))
-                            }),
+                            stalg.Expression.SwitchExpression.IfValue(
+                                **{
+                                    "if": stalg.Expression.Literal(i8=1, nullable=True),
+                                    "then": stalg.Expression(
+                                        literal=stalg.Expression.Literal(
+                                            i8=1, nullable=True
+                                        )
+                                    ),
+                                }
+                            ),
+                            stalg.Expression.SwitchExpression.IfValue(
+                                **{
+                                    "if": stalg.Expression.Literal(i8=2, nullable=True),
+                                    "then": stalg.Expression(
+                                        literal=stalg.Expression.Literal(
+                                            i8=4, nullable=True
+                                        )
+                                    ),
+                                }
+                            ),
                         ],
                         **{
-                            'else': stalg.Expression(literal=stalg.Expression.Literal(i8=9, nullable=True))
-                        }
+                            "else": stalg.Expression(
+                                literal=stalg.Expression.Literal(i8=9, nullable=True)
+                            )
+                        },
                     )
                 ),
                 output_names=["switch"],
@@ -59,4 +74,3 @@ def test_switch():
     )
 
     assert e == expected
-

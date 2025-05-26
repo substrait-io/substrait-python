@@ -6,12 +6,11 @@ from substrait.builders.plan import read_named_table
 
 struct = stt.Type.Struct(types=[i64(nullable=False), boolean()])
 
-named_struct = stt.NamedStruct(
-    names=["id", "is_applicable"], struct=struct
-)
+named_struct = stt.NamedStruct(names=["id", "is_applicable"], struct=struct)
+
 
 def test_read_rel():
-    actual = read_named_table('example_table', named_struct)(None)
+    actual = read_named_table("example_table", named_struct)(None)
 
     expected = stp.Plan(
         relations=[
@@ -20,11 +19,13 @@ def test_read_rel():
                     input=stalg.Rel(
                         read=stalg.ReadRel(
                             common=stalg.RelCommon(direct=stalg.RelCommon.Direct()),
-                            base_schema=named_struct,                        
-                            named_table=stalg.ReadRel.NamedTable(names=['example_table'])
+                            base_schema=named_struct,
+                            named_table=stalg.ReadRel.NamedTable(
+                                names=["example_table"]
+                            ),
                         )
                     ),
-                    names=['id', 'is_applicable']
+                    names=["id", "is_applicable"],
                 )
             )
         ]
@@ -32,8 +33,9 @@ def test_read_rel():
 
     assert actual == expected
 
+
 def test_read_rel_db():
-    actual = read_named_table(['example_db', 'example_table'], named_struct)(None)
+    actual = read_named_table(["example_db", "example_table"], named_struct)(None)
 
     expected = stp.Plan(
         relations=[
@@ -42,11 +44,13 @@ def test_read_rel_db():
                     input=stalg.Rel(
                         read=stalg.ReadRel(
                             common=stalg.RelCommon(direct=stalg.RelCommon.Direct()),
-                            base_schema=named_struct,                        
-                            named_table=stalg.ReadRel.NamedTable(names=['example_db', 'example_table'])
+                            base_schema=named_struct,
+                            named_table=stalg.ReadRel.NamedTable(
+                                names=["example_db", "example_table"]
+                            ),
                         )
                     ),
-                    names=['id', 'is_applicable']
+                    names=["id", "is_applicable"],
                 )
             )
         ]

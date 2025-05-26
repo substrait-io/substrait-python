@@ -1,0 +1,34 @@
+name: Run linter and formatter
+
+on:
+  pull_request:
+  push:
+    branches: [ main ]
+    tags: [ 'v*.*.*' ]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Lint and Format
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+        python: ["3.9"]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Install uv with python
+        uses: astral-sh/setup-uv@v6
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Run ruff linter
+        run: |
+          uvx ruff@0.11.11 check
+      - name: Run ruff formatter
+        run: |
+          uvx ruff@0.11.11 format

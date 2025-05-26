@@ -18,7 +18,7 @@ import pyarrow.substrait as pa_substrait
 
 try:
     duckdb.install_extension("substrait")
-except:
+except duckdb.duckdb.HTTPException:
     duckdb.install_extension("substrait", repository="community")
 duckdb.load_extension("substrait")
 
@@ -29,14 +29,27 @@ duckdb.sql("CALL dbgen(sf = 1);")
 
 registry = ExtensionRegistry(load_default_extensions=True)
 
+
 def read_duckdb_named_table(name: str, conn):
     pa_schema = conn.sql(f"SELECT * FROM {name} LIMIT 0").arrow().schema
-    substrait_schema = pa_substrait.serialize_schema(pa_schema).to_pysubstrait().base_schema
+    substrait_schema = (
+        pa_substrait.serialize_schema(pa_schema).to_pysubstrait().base_schema
+    )
     return read_named_table(name, substrait_schema)
 
+
 table = read_duckdb_named_table("customer", duckdb)
-table = filter(table, expression=scalar_function('functions_comparison.yaml', 'equal', column('c_nationkey'), literal(3, i32())))
-table = project(table, expressions=[column('c_name'), column('c_address'), column('c_nationkey')])
+table = filter(
+    table,
+    expression=scalar_function(
+        "functions_comparison.yaml",
+        "equal",
+        expressions=[column("c_nationkey"), literal(3, i32())],
+    ),
+)
+table = project(
+    table, expressions=[column("c_name"), column("c_address"), column("c_nationkey")]
+)
 
 sql = f"CALL from_substrait_json('{dump_json(table(registry))}')"
 print(duckdb.sql(sql))

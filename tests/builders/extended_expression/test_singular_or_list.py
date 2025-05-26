@@ -1,5 +1,3 @@
-import yaml
-
 import substrait.gen.proto.algebra_pb2 as stalg
 import substrait.gen.proto.type_pb2 as stt
 import substrait.gen.proto.extended_expression_pb2 as stee
@@ -21,25 +19,28 @@ named_struct = stt.NamedStruct(
 
 registry = ExtensionRegistry(load_default_extensions=False)
 
+
 def test_singular_or_list():
     e = singular_or_list(
-        value=literal(3, i8()),
-        options=[
-            literal(1, i8()),
-            literal(2, i8())
-        ]
+        value=literal(3, i8()), options=[literal(1, i8()), literal(2, i8())]
     )(named_struct, registry)
-    
+
     expected = stee.ExtendedExpression(
         referred_expr=[
             stee.ExpressionReference(
                 expression=stalg.Expression(
                     singular_or_list=stalg.Expression.SingularOrList(
-                        value=stalg.Expression(literal=stalg.Expression.Literal(i8=3, nullable=True)),
+                        value=stalg.Expression(
+                            literal=stalg.Expression.Literal(i8=3, nullable=True)
+                        ),
                         options=[
-                            stalg.Expression(literal=stalg.Expression.Literal(i8=1, nullable=True)),
-                            stalg.Expression(literal=stalg.Expression.Literal(i8=2, nullable=True))
-                        ]
+                            stalg.Expression(
+                                literal=stalg.Expression.Literal(i8=1, nullable=True)
+                            ),
+                            stalg.Expression(
+                                literal=stalg.Expression.Literal(i8=2, nullable=True)
+                            ),
+                        ],
                     )
                 ),
                 output_names=["singular_or_list"],
@@ -49,4 +50,3 @@ def test_singular_or_list():
     )
 
     assert e == expected
-

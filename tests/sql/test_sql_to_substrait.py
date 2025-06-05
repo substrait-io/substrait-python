@@ -115,7 +115,13 @@ def assert_query(query: str, engine: str, ignore_order=True):
 
 
 engines = [
-    pytest.param("duckdb", marks=pytest.mark.skipif(sys.platform.startswith("win"))),
+    pytest.param(
+        "duckdb",
+        marks=pytest.mark.skipif(
+            sys.platform.startswith("win"),
+            reason="duckdb substrait extension not found on windows",
+        ),
+    ),
     "datafusion",
 ]
 
@@ -250,7 +256,10 @@ def test_order_by(engine: str):
         pytest.param(
             "duckdb",
             marks=[
-                pytest.mark.skipif(sys.platform.startswith("win")),
+                pytest.mark.skipif(
+                    sys.platform.startswith("win"),
+                    reason="duckdb substrait extension not found on windows",
+                ),
                 pytest.mark.xfail,
             ],
         ),

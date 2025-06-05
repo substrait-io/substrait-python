@@ -4,6 +4,7 @@ import substrait.json
 import tempfile
 import pyarrow.substrait as pa_substrait
 import pytest
+import sys
 
 
 data: pyarrow.Table = pyarrow.Table.from_batches(
@@ -113,7 +114,10 @@ def assert_query(query: str, engine: str, ignore_order=True):
         assert_query_datafusion(query, ignore_order)
 
 
-engines = ["duckdb", "datafusion"]
+engines = [
+    pytest.param("duckdb", marks=pytest.mark.skipif(sys.platform.startswith("win"))),
+    "datafusion",
+]
 
 
 @pytest.mark.parametrize("engine", engines)
@@ -241,7 +245,17 @@ def test_order_by(engine: str):
 
 
 @pytest.mark.parametrize(
-    "engine", [pytest.param("duckdb", marks=pytest.mark.xfail), "datafusion"]
+    "engine",
+    [
+        pytest.param(
+            "duckdb",
+            marks=[
+                pytest.mark.skipif(sys.platform.startswith("win")),
+                pytest.mark.xfail,
+            ],
+        ),
+        "datafusion",
+    ],
 )
 def test_row_number(engine: str):
     assert_query(

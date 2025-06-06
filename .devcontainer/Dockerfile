@@ -9,4 +9,5 @@ RUN cd ~ && curl -LO https://github.com/protocolbuffers/protobuf/releases/downlo
     unzip protoc-25.1-linux-x86_64.zip -d ~/.local && \
     rm protoc-25.1-linux-x86_64.zip
 RUN curl -sSL "https://github.com/bufbuild/buf/releases/download/v1.50.0/buf-$(uname -s)-$(uname -m)" -o ~/.local/bin/buf && chmod +x ~/.local/bin/buf
+RUN curl -LsSf https://astral.sh/uv/0.7.11/install.sh | sh
 USER root

@@ -14,6 +14,7 @@ from substrait.builders.plan import (
     project,
     filter,
     sort,
+    fetch,
     set,
     join,
     aggregate,
@@ -35,9 +36,7 @@ function_mapping = {
     "Eq": ("functions_comparison.yaml", "equal"),
 }
 
-aggregate_function_mapping = {
-    "SUM": ("functions_arithmetic.yaml", "sum"),
-}
+aggregate_function_mapping = {"SUM": ("functions_arithmetic.yaml", "sum")}
 
 window_function_mapping = {
     "row_number": ("functions_arithmetic.yaml", "row_number"),
@@ -190,6 +189,29 @@ def translate(ast: dict, schema_resolver: SchemaResolver, registry: ExtensionReg
                 for e in ast["order_by"]["kind"]["Expressions"]
             ]
             relation = sort(relation, expressions)(registry)
+
+        if ast["limit_clause"]:
+            limit_expression = translate_expression(
+                ast["limit_clause"]["LimitOffset"]["limit"],
+                schema_resolver=schema_resolver,
+                registry=registry,
+                measures=None,
+                groupings=None,
+            )
+
+            if ast["limit_clause"]["LimitOffset"]["offset"]:
+                offset_expression = translate_expression(
+                    ast["limit_clause"]["LimitOffset"]["offset"]["value"],
+                    schema_resolver=schema_resolver,
+                    registry=registry,
+                    measures=None,
+                    groupings=None,
+                )
+            else:
+                offset_expression = None
+
+            relation = fetch(relation, offset_expression, limit_expression)(registry)
+
         return relation
     elif op == "Select":
         relation = translate(

@@ -266,6 +266,48 @@ def test_order_by(engine: str):
         "datafusion",
     ],
 )
+def test_select_limit(engine: str):
+    assert_query("""SELECT store_id FROM stores ORDER BY store_id LIMIT 2""", engine)
+
+
+@pytest.mark.parametrize(
+    "engine",
+    [
+        pytest.param(
+            "duckdb",
+            marks=[
+                pytest.mark.skipif(
+                    sys.platform.startswith("win"),
+                    reason="duckdb substrait extension not found on windows",
+                ),
+                pytest.mark.xfail,
+            ],
+        ),
+        "datafusion",
+    ],
+)
+def test_select_limit_offset(engine: str):
+    assert_query(
+        """SELECT store_id FROM stores ORDER BY store_id LIMIT 2 OFFSET 2""", engine
+    )
+
+
+@pytest.mark.parametrize(
+    "engine",
+    [
+        pytest.param(
+            "duckdb",
+            marks=[
+                pytest.mark.skipif(
+                    sys.platform.startswith("win"),
+                    reason="duckdb substrait extension not found on windows",
+                ),
+                pytest.mark.xfail,
+            ],
+        ),
+        "datafusion",
+    ],
+)
 def test_row_number(engine: str):
     assert_query(
         """SELECT sale_id, fk_store_id, row_number() over (partition by fk_store_id order by sale_id) as rn

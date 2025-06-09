@@ -26,8 +26,8 @@ PlanOrUnbound = Union[stp.Plan, UnboundPlan]
 
 def _merge_extensions(*objs):
     return {
-        "extension_uris": merge_extension_uris(*[b.extension_uris for b in objs]),
-        "extensions": merge_extension_declarations(*[b.extensions for b in objs]),
+        "extension_uris": merge_extension_uris(*[b.extension_uris for b in objs if b]),
+        "extensions": merge_extension_declarations(*[b.extensions for b in objs if b]),
     }
 
 
@@ -193,13 +193,15 @@ def fetch(
         bound_plan = plan if isinstance(plan, stp.Plan) else plan(registry)
         ns = infer_plan_schema(bound_plan)
 
-        bound_offset = resolve_expression(offset, ns, registry)
+        bound_offset = resolve_expression(offset, ns, registry) if offset else None
         bound_count = resolve_expression(count, ns, registry)
 
         rel = stalg.Rel(
             fetch=stalg.FetchRel(
                 input=bound_plan.relations[-1].root.input,
-                offset_expr=bound_offset.referred_expr[0].expression,
+                offset_expr=bound_offset.referred_expr[0].expression
+                if bound_offset
+                else None,
                 count_expr=bound_count.referred_expr[0].expression,
             )
         )

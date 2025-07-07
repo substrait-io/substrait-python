@@ -2142,8 +2142,8 @@ global___ComparisonJoinKey = ComparisonJoinKey
 
 @typing_extensions.final
 class HashJoinRel(google.protobuf.message.Message):
-    """The hash equijoin join operator will build a hash table out of the right input based on a set of join keys.
-    It will then probe that hash table for incoming inputs, finding matches.
+    """The hash equijoin operator will build a hash table out of one input (default `right`) based on a set of join keys.
+    It will then probe that hash table for the other input (default `left`), finding matches.
 
     Two rows are a match if the comparison function returns true for all keys
     """
@@ -2184,6 +2184,22 @@ class HashJoinRel(google.protobuf.message.Message):
     JOIN_TYPE_RIGHT_SINGLE: HashJoinRel.JoinType.ValueType
     JOIN_TYPE_LEFT_MARK: HashJoinRel.JoinType.ValueType
     JOIN_TYPE_RIGHT_MARK: HashJoinRel.JoinType.ValueType
+
+    class _BuildInput:
+        ValueType = typing.NewType('ValueType', builtins.int)
+        V: typing_extensions.TypeAlias = ValueType
+
+    class _BuildInputEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[HashJoinRel._BuildInput.ValueType], builtins.type):
+        DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+        BUILD_INPUT_UNSPECIFIED: HashJoinRel._BuildInput.ValueType
+        BUILD_INPUT_LEFT: HashJoinRel._BuildInput.ValueType
+        BUILD_INPUT_RIGHT: HashJoinRel._BuildInput.ValueType
+
+    class BuildInput(_BuildInput, metaclass=_BuildInputEnumTypeWrapper):
+        ...
+    BUILD_INPUT_UNSPECIFIED: HashJoinRel.BuildInput.ValueType
+    BUILD_INPUT_LEFT: HashJoinRel.BuildInput.ValueType
+    BUILD_INPUT_RIGHT: HashJoinRel.BuildInput.ValueType
     COMMON_FIELD_NUMBER: builtins.int
     LEFT_FIELD_NUMBER: builtins.int
     RIGHT_FIELD_NUMBER: builtins.int
@@ -2192,6 +2208,7 @@ class HashJoinRel(google.protobuf.message.Message):
     KEYS_FIELD_NUMBER: builtins.int
     POST_JOIN_FILTER_FIELD_NUMBER: builtins.int
     TYPE_FIELD_NUMBER: builtins.int
+    BUILD_INPUT_FIELD_NUMBER: builtins.int
     ADVANCED_EXTENSION_FIELD_NUMBER: builtins.int
 
     @property
@@ -2238,18 +2255,20 @@ class HashJoinRel(google.protobuf.message.Message):
     def post_join_filter(self) -> global___Expression:
         ...
     type: global___HashJoinRel.JoinType.ValueType
+    build_input: global___HashJoinRel.BuildInput.ValueType
+    'Specifies which side of input to build the hash table for this hash join. Default is `BUILD_INPUT_RIGHT`.'
 
     @property
     def advanced_extension(self) -> proto.extensions.extensions_pb2.AdvancedExtension:
         ...
 
-    def __init__(self, *, common: global___RelCommon | None=..., left: global___Rel | None=..., right: global___Rel | None=..., left_keys: collections.abc.Iterable[global___Expression.FieldReference] | None=..., right_keys: collections.abc.Iterable[global___Expression.FieldReference] | None=..., keys: collections.abc.Iterable[global___ComparisonJoinKey] | None=..., post_join_filter: global___Expression | None=..., type: global___HashJoinRel.JoinType.ValueType=..., advanced_extension: proto.extensions.extensions_pb2.AdvancedExtension | None=...) -> None:
+    def __init__(self, *, common: global___RelCommon | None=..., left: global___Rel | None=..., right: global___Rel | None=..., left_keys: collections.abc.Iterable[global___Expression.FieldReference] | None=..., right_keys: collections.abc.Iterable[global___Expression.FieldReference] | None=..., keys: collections.abc.Iterable[global___ComparisonJoinKey] | None=..., post_join_filter: global___Expression | None=..., type: global___HashJoinRel.JoinType.ValueType=..., build_input: global___HashJoinRel.BuildInput.ValueType=..., advanced_extension: proto.extensions.extensions_pb2.AdvancedExtension | None=...) -> None:
         ...
 
     def HasField(self, field_name: typing_extensions.Literal['advanced_extension', b'advanced_extension', 'common', b'common', 'left', b'left', 'post_join_filter', b'post_join_filter', 'right', b'right']) -> builtins.bool:
         ...
 
-    def ClearField(self, field_name: typing_extensions.Literal['advanced_extension', b'advanced_extension', 'common', b'common', 'keys', b'keys', 'left', b'left', 'left_keys', b'left_keys', 'post_join_filter', b'post_join_filter', 'right', b'right', 'right_keys', b'right_keys', 'type', b'type']) -> None:
+    def ClearField(self, field_name: typing_extensions.Literal['advanced_extension', b'advanced_extension', 'build_input', b'build_input', 'common', b'common', 'keys', b'keys', 'left', b'left', 'left_keys', b'left_keys', 'post_join_filter', b'post_join_filter', 'right', b'right', 'right_keys', b'right_keys', 'type', b'type']) -> None:
         ...
 global___HashJoinRel = HashJoinRel
 

@@ -105,6 +105,23 @@ def handle_parameter_cover(
         parameters[parameter_name] = covered
         return True
 
+def _check_nullability() -> bool:
+    if not check_nullability:
+        return True
+    # The ANTLR context stores a Token called ``isnull`` – it is
+    # present when the type is declared as nullable.
+    nullability = (
+        Nullability.NULLABILITY_NULLABLE
+        if getattr(parameterized_type, "isnull", None) is not None
+        else Nullability.NULLABILITY_REQUIRED
+    )
+    # The protobuf message stores its own enum – we compare the two.
+    covered_nullability = getattr(
+        getattr(covered, kind),  # e.g. covered.varchar
+        "nullability",
+        None,
+    )
+    return nullability == covered_nullability
 
 def covers(
     covered: Type,
@@ -136,31 +153,76 @@ def covers(
 
     parameterized_type = covering.parameterizedType()
     if parameterized_type:
+        kind = covered.WhichOneof("kind")
+        if isinstance(parameterized_type, SubstraitTypeParser.VarCharContext):
+            if kind != "varchar":
+                return False
+            if getattr(covered.varchar, "length", 0) > getattr(parameterized_type, "length", 0):
+                return False
+            return _check_nullability()
+
+        if isinstance(parameterized_type, SubstraitTypeParser.FixedCharContext):
+            if kind != "fixed_char":
+                return False
+            if getattr(covered.fixed_char, "length", 0) > getattr(parameterized_type, "length", 0):
+                return False
+            return _check_nullability()
+
+        if isinstance(parameterized_type, SubstraitTypeParser.FixedBinaryContext):
+            if kind != "fixed_binary":
+                return False
+            if getattr(covered.fixed_binary, "length", 0) > getattr(parameterized_type, "length", 0):
+                return False
+            return _check_nullability()
         if isinstance(parameterized_type, SubstraitTypeParser.DecimalContext):
-            if covered.WhichOneof("kind") != "decimal":
+            if kind != "decimal":
                 return False
-
-            nullability = (
-                Type.NULLABILITY_NULLABLE
-                if parameterized_type.isnull
-                else Type.NULLABILITY_REQUIRED
-            )
-
-            if (
-                check_nullability
-                and nullability
-                != covered.__getattribute__(covered.WhichOneof("kind")).nullability
-            ):
+            if not _check_nullability():
                 return False
-
+            # precision / scale are both optional – a missing value means “no limit”.
+            covered_scale   = getattr(covered.decimal,   "scale",   0)
+            param_scale     = getattr(parameterized_type, "scale",   0)
+            covered_prec    = getattr(covered.decimal,   "precision", 0)
+            param_prec      = getattr(parameterized_type, "precision", 0)
             return not (
                 violates_integer_option(
-                    covered.decimal.scale, parameterized_type.scale, parameters
+                    covered_scale, param_scale, parameters
                 )
                 or violates_integer_option(
-                    covered.decimal.precision, parameterized_type.precision, parameters
+                    covered_prec, param_prec, parameters
                 )
             )
+        if isinstance(parameterized_type, SubstraitTypeParser.PrecisionTimestampContext):
+            if kind != "precision_timestamp":
+                return False
+            if not _check_nullability():
+                return False
+            covered_prec = getattr(covered.precision_timestamp, "precision", 0)
+            param_prec   = getattr(parameterized_type, "precision", 0)
+            return covered_prec == param_prec
+
+
+        if isinstance(parameterized_type, SubstraitTypeParser.PrecisionTimestampTZContext):
+            if kind != "precision_timestamp_tz":
+                return False
+            if not _check_nullability():
+                return False
+            covered_prec = getattr(covered.precision_timestamp_tz, "precision", 0)
+            param_prec   = getattr(parameterized_type, "precision", 0)
+            return covered_prec == param_prec
+        kind_mapping = {
+            SubstraitTypeParser.ListContext:                "list",
+            SubstraitTypeParser.MapContext:                 "map",
+            SubstraitTypeParser.StructContext:              "struct",
+            SubstraitTypeParser.UserDefinedContext:        "user_defined",
+            SubstraitTypeParser.PrecisionIntervalDayContext: "interval_day",
+        }
+
+        for ctx_cls, expected_kind in kind_mapping.items():
+            if isinstance(parameterized_type, ctx_cls):
+                if kind != expected_kind:
+                    return False
+                return _check_nullability()
         else:
             raise Exception(f"Unhandled type {type(parameterized_type)}")
 

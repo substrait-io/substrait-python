@@ -65,6 +65,22 @@ def _evaluate(x, values: dict):
                 return Type(fp64=Type.FP64(nullability=nullability))
             elif isinstance(scalar_type, SubstraitTypeParser.BooleanContext):
                 return Type(bool=Type.Boolean(nullability=nullability))
+            elif isinstance(scalar_type, SubstraitTypeParser.StringContext):
+                return Type(string=Type.String(nullability=nullability))
+            elif isinstance(scalar_type, SubstraitTypeParser.TimestampContext):
+                return Type(timestamp=Type.Timestamp(nullability=nullability))
+            elif isinstance(scalar_type, SubstraitTypeParser.DateContext):
+                return Type(date=Type.Date(nullability=nullability))
+            elif isinstance(scalar_type, SubstraitTypeParser.IntervalYearContext):
+                return Type(interval_year=Type.IntervalYear(nullability=nullability))
+            elif isinstance(scalar_type, SubstraitTypeParser.UuidContext):
+                return Type(uuid=Type.UUID(nullability=nullability))
+            elif isinstance(scalar_type, SubstraitTypeParser.BinaryContext):
+                return Type(binary=Type.Binary(nullability=nullability))
+            elif isinstance(scalar_type, SubstraitTypeParser.TimeContext):
+                return Type(time=Type.Time(nullability=nullability))
+            elif isinstance(scalar_type, SubstraitTypeParser.TimestampTzContext):
+                return Type(timestamp_tz=Type.TimestampTZ(nullability=nullability))
             else:
                 raise Exception(f"Unknown scalar type {type(scalar_type)}")
         elif parametrized_type:

@@ -4,6 +4,11 @@ import yaml
 from substrait.gen.proto.type_pb2 import Type
 from substrait.extension_registry import ExtensionRegistry, covers
 from substrait.derivation_expression import _parse
+from substrait.builders.type import (
+    i8,
+    i16,
+    decimal,
+)
 
 content = """%YAML 1.2
 ---
@@ -104,10 +109,19 @@ scalar_functions:
             value: decimal<S1,S2>
         nullability: DISCRETE
         return: decimal?<P1 + 1,S2 + 1>
+  - name: "equal_test"
+    impls:
+      - args:
+          - name: x
+            value: any
+          - name: y
+            value: any
+        nullability: DISCRETE
+        return: any
 """
 
 
-registry = ExtensionRegistry()
+registry = ExtensionRegistry(load_default_extensions=True)
 
 registry.register_extension_dict(
     yaml.safe_load(content),
@@ -115,52 +129,11 @@ registry.register_extension_dict(
 )
 
 
-def i8(nullable=False):
-    return Type(
-        i8=Type.I8(
-            nullability=Type.NULLABILITY_REQUIRED
-            if not nullable
-            else Type.NULLABILITY_NULLABLE
-        )
-    )
-
-
-def i16(nullable=False):
-    return Type(
-        i16=Type.I16(
-            nullability=Type.NULLABILITY_REQUIRED
-            if not nullable
-            else Type.NULLABILITY_NULLABLE
-        )
-    )
-
-
-def bool(nullable=False):
-    return Type(
-        bool=Type.Boolean(
-            nullability=Type.NULLABILITY_REQUIRED
-            if not nullable
-            else Type.NULLABILITY_NULLABLE
-        )
-    )
-
-
-def decimal(precision, scale, nullable=False):
-    return Type(
-        decimal=Type.Decimal(
-            scale=scale,
-            precision=precision,
-            nullability=Type.NULLABILITY_REQUIRED
-            if not nullable
-            else Type.NULLABILITY_NULLABLE,
-        )
-    )
-
 
 def test_non_existing_urn():
     assert (
         registry.lookup_function(
-            urn="non_existent", function_name="add", signature=[i8(), i8()]
+            urn="non_existent", function_name="add", signature=[i8(nullable=False), i8(nullable=False)]
         )
         is None
     )
@@ -169,7 +142,8 @@ def test_non_existing_urn():
 def test_non_existing_function():
     assert (
         registry.lookup_function(
-            urn="extension:test:functions", function_name="sub", signature=[i8(), i8()]
+
+        urn="extension:test:functions", function_name="sub", signature=[i8(nullable=False), i8(nullable=False)]
         )
         is None
     )
@@ -178,7 +152,7 @@ def test_non_existing_function():
 def test_non_existing_function_signature():
     assert (
         registry.lookup_function(
-            urn="extension:test:functions", function_name="add", signature=[i8()]
+            urn="extension:test:functions", function_name="add", signature=[i8(nullable=False)]
         )
         is None
     )
@@ -186,7 +160,7 @@ def test_non_existing_function_signature():
 
 def test_exact_match():
     assert registry.lookup_function(
-        urn="extension:test:functions", function_name="add", signature=[i8(), i8()]
+        urn="extension:test:functions", function_name="add", signature=[i8(nullable=False), i8(nullable=False)]
     )[1] == Type(i8=Type.I8(nullability=Type.NULLABILITY_REQUIRED))
 
 
@@ -194,7 +168,7 @@ def test_wildcard_match():
     assert registry.lookup_function(
         urn="extension:test:functions",
         function_name="add",
-        signature=[i8(), i8(), bool()],
+        signature=[i8(nullable=False), i8(nullable=False), bool()],
     )[1] == Type(i16=Type.I16(nullability=Type.NULLABILITY_REQUIRED))
 
 
@@ -203,7 +177,7 @@ def test_wildcard_match_fails_with_constraits():
         registry.lookup_function(
             urn="extension:test:functions",
             function_name="add",
-            signature=[i8(), i16(), i16()],
+            signature=[i8(nullable=False), i16(nullable=False), i16(nullable=False)],
         )
         is None
     )
@@ -214,9 +188,9 @@ def test_wildcard_match_with_constraits():
         registry.lookup_function(
             urn="extension:test:functions",
             function_name="add",
-            signature=[i16(), i16(), i8()],
+            signature=[i16(nullable=False), i16(nullable=False), i8(nullable=False)],
         )[1]
-        == i8()
+        == i8(nullable=False)
     )
 
 
@@ -225,9 +199,9 @@ def test_variadic():
         registry.lookup_function(
             urn="extension:test:functions",
             function_name="test_fn",
-            signature=[i8(), i8(), i8()],
+            signature=[i8(nullable=False), i8(nullable=False), i8(nullable=False)],
         )[1]
-        == i8()
+        == i8(nullable=False)
     )
 
 
@@ -236,16 +210,17 @@ def test_variadic_any():
         registry.lookup_function(
             urn="extension:test:functions",
             function_name="test_fn_variadic_any",
-            signature=[i16(), i16(), i16()],
+            signature=[i16(nullable=False), i16(nullable=False), i16(nullable=False)],
         )[1]
-        == i16()
+        == i16(nullable=False)
     )
 
 
 def test_variadic_fails_min_constraint():
     assert (
         registry.lookup_function(
-            urn="extension:test:functions", function_name="test_fn", signature=[i8()]
+
+            urn="extension:test:functions", function_name="test_fn", signature=[i8(nullable=False)]
         )
         is None
     )
@@ -255,8 +230,8 @@ def test_decimal_happy_path():
     assert registry.lookup_function(
         urn="extension:test:functions",
         function_name="test_decimal",
-        signature=[decimal(10, 8), decimal(8, 6)],
-    )[1] == decimal(11, 7)
+        signature=[decimal(8, 10, nullable=False), decimal(6, 8, nullable=False)],
+    )[1] == decimal(7, 11, nullable=False)
 
 
 def test_decimal_violates_constraint():
@@ -264,7 +239,7 @@ def test_decimal_violates_constraint():
         registry.lookup_function(
             urn="extension:test:functions",
             function_name="test_decimal",
-            signature=[decimal(10, 8), decimal(12, 10)],
+            signature=[decimal(8, 10, nullable=False), decimal(10, 12, nullable=False)],
         )
         is None
     )
@@ -274,8 +249,8 @@ def test_decimal_happy_path_discrete():
     assert registry.lookup_function(
         urn="extension:test:functions",
         function_name="test_decimal_discrete",
-        signature=[decimal(10, 8, nullable=True), decimal(8, 6)],
-    )[1] == decimal(11, 7, nullable=True)
+        signature=[decimal(8, 10, nullable=True), decimal(6, 8, nullable=False)],
+    )[1] == decimal(7, 11, nullable=True)
 
 
 def test_enum_with_valid_option():
@@ -283,9 +258,9 @@ def test_enum_with_valid_option():
         registry.lookup_function(
             urn="extension:test:functions",
             function_name="test_enum",
-            signature=["FLIP", i8()],
+            signature=["FLIP", i8(nullable=False)],
         )[1]
-        == i8()
+        == i8(nullable=False)
     )
 
 
@@ -294,7 +269,7 @@ def test_enum_with_nonexistent_option():
         registry.lookup_function(
             urn="extension:test:functions",
             function_name="test_enum",
-            signature=["NONEXISTENT", i8()],
+            signature=["NONEXISTENT", i8(nullable=False)],
         )
         is None
     )
@@ -304,7 +279,7 @@ def test_function_with_nullable_args():
     assert registry.lookup_function(
         urn="extension:test:functions",
         function_name="add",
-        signature=[i8(nullable=True), i8()],
+        signature=[i8(nullable=True), i8(nullable=False)],
     )[1] == i8(nullable=True)
 
 
@@ -312,7 +287,7 @@ def test_function_with_declared_output_nullability():
     assert registry.lookup_function(
         urn="extension:test:functions",
         function_name="add_declared",
-        signature=[i8(), i8()],
+        signature=[i8(nullable=False), i8(nullable=False)],
     )[1] == i8(nullable=True)
 
 
@@ -320,7 +295,7 @@ def test_function_with_discrete_nullability():
     assert registry.lookup_function(
         urn="extension:test:functions",
         function_name="add_discrete",
-        signature=[i8(nullable=True), i8()],
+        signature=[i8(nullable=True), i8(nullable=False)],
     )[1] == i8(nullable=True)
 
 
@@ -329,7 +304,7 @@ def test_function_with_discrete_nullability_nonexisting():
         registry.lookup_function(
             urn="extension:test:functions",
             function_name="add_discrete",
-            signature=[i8(), i8()],
+            signature=[i8(nullable=False), i8(nullable=False)],
         )
         is None
     )
@@ -337,7 +312,7 @@ def test_function_with_discrete_nullability_nonexisting():
 
 def test_covers():
     params = {}
-    assert covers(i8(), _parse("i8"), params)
+    assert covers(i8(nullable=False), _parse("i8"), params)
     assert params == {}
 
 
@@ -346,18 +321,127 @@ def test_covers_nullability():
     assert covers(i8(nullable=True), _parse("i8?"), {}, check_nullability=True)
 
 
-def test_covers_decimal():
-    assert not covers(decimal(10, 8), _parse("decimal<11, A>"), {})
+def test_covers_decimal(nullable=False):
+    assert not covers(decimal(8, 10), _parse("decimal<11, A>"), {})
 
 
 def test_covers_decimal_happy_path():
     params = {}
-    assert covers(decimal(10, 8), _parse("decimal<10, A>"), params)
+    assert covers(decimal(8, 10), _parse("decimal<10, A>"), params)
     assert params == {"A": 8}
 
 
 def test_covers_any():
-    assert covers(decimal(10, 8), _parse("any"), {})
+    assert covers(decimal(8, 10), _parse("any"), {})
+
+
+def test_covers_varchar_length_ok():
+    covered = Type(
+        varchar=Type.VarChar(nullability=Type.NULLABILITY_REQUIRED, length=15)
+    )
+    param_ctx = _parse("varchar<15>")
+    assert covers(covered, param_ctx, {}, check_nullability=True)
+
+
+def test_covers_varchar_length_fail():
+    covered = Type(
+        varchar=Type.VarChar(nullability=Type.NULLABILITY_REQUIRED, length=10)
+    )
+    param_ctx = _parse("varchar<5>")
+    assert not covers(covered, param_ctx, {})
+
+
+def test_covers_varchar_nullability():
+    covered = Type(
+        varchar=Type.VarChar(nullability=Type.NULLABILITY_REQUIRED, length=10)
+    )
+    param_tx = _parse("varchar?<10>")
+    assert covers(covered, param_tx, {})
+    assert not covers(covered, param_tx, {}, True)
+    param_ctx2 = _parse("varchar<10>")
+    assert covers(covered, param_ctx2, {}, True)
+
+
+def test_covers_fixed_char_length_ok():
+    covered = Type(
+        fixed_char=Type.FixedChar(nullability=Type.NULLABILITY_REQUIRED, length=8)
+    )
+    param_ctx = _parse("fixedchar<8>")
+    assert covers(covered, param_ctx, {})
+
+
+def test_covers_fixed_char_length_fail():
+    covered = Type(
+        fixed_char=Type.FixedChar(nullability=Type.NULLABILITY_REQUIRED, length=8)
+    )
+    param_ctx = _parse("fixedchar<4>")
+    assert not covers(covered, param_ctx, {})
+
+
+def test_covers_fixed_binary_length_ok():
+    covered = Type(
+        fixed_binary=Type.FixedBinary(nullability=Type.NULLABILITY_REQUIRED, length=16)
+    )
+    param_ctx = _parse("fixedbinary<16>")
+    assert covers(covered, param_ctx, {})
+
+
+def test_covers_fixed_binary_length_fail():
+    covered = Type(
+        fixed_binary=Type.FixedBinary(nullability=Type.NULLABILITY_REQUIRED, length=16)
+    )
+    param_ctx = _parse("fixedbinary<10>")
+    assert not covers(covered, param_ctx, {})
+
+
+def test_covers_decimal_precision_scale_fail():
+    covered = decimal(8, 10, nullable=False)
+    param_ctx = _parse("decimal<6, 5>")
+    assert not covers(covered, param_ctx, {})
+
+
+def test_covers_precision_timestamp_ok():
+    covered = Type(
+        precision_timestamp=Type.PrecisionTimestamp(
+            nullability=Type.NULLABILITY_REQUIRED, precision=5
+        )
+    )
+    param_ctx = _parse("precision_timestamp<5>")
+    assert covers(covered, param_ctx, {})
+    param_ctx = _parse("precision_timestamp<L1>")
+    assert covers(covered, param_ctx, {})
+
+
+def test_covers_precision_timestamp_fail():
+    covered = Type(
+        precision_timestamp=Type.PrecisionTimestamp(
+            nullability=Type.NULLABILITY_REQUIRED, precision=3
+        )
+    )
+    param_ctx = _parse("precision_timestamp<2>")
+    assert not covers(covered, param_ctx, {})
+
+
+def test_covers_precision_timestamp_tz_ok():
+    covered = Type(
+        precision_timestamp_tz=Type.PrecisionTimestampTZ(
+            nullability=Type.NULLABILITY_REQUIRED, precision=4
+        )
+    )
+    param_ctx = _parse("precision_timestamp_tz<4>")
+    assert covers(covered, param_ctx, {})
+    param_ctx = _parse("precision_timestamp_tz<L>")
+    assert covers(covered, param_ctx, {})
+
+
+def test_covers_precision_timestamp_tz_fail():
+    covered = Type(
+        precision_timestamp_tz=Type.PrecisionTimestampTZ(
+            nullability=Type.NULLABILITY_REQUIRED, precision=4
+        )
+    )
+    param_ctx = _parse("precision_timestamp_tz<3>")
+    assert not covers(covered, param_ctx, {})
 
 
 def test_registry_uri_urn():

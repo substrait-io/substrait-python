@@ -401,19 +401,23 @@ class PlanPrinter:
 
         # Print function options if present
         if func.options:
-            stream.write(f"{indent}| options: {len(func.options)}\n")
+            stream.write(
+                f"{self._get_indent_with_arrow(depth + 1)}{self._color('options', Colors.BLUE)}: {self._color(len(func.options), Colors.YELLOW)}\n"
+            )
             for i, option in enumerate(func.options):
                 # Handle preference as a list
                 if hasattr(option, "preference") and option.preference:
                     pref_str = f"[{', '.join(str(p) for p in option.preference)}]"
                 else:
                     pref_str = "[]"
-                stream.write(f"{indent}| | {i}: {option.name}={pref_str}\n")
+                stream.write(
+                    f"{self._get_indent_with_arrow(depth + 2)}{self._color(f'{i}', Colors.CYAN)}: {option.name}={pref_str}\n"
+                )
 
         # Print output type if present
         if func.HasField("output_type"):
             stream.write(
-                f"{indent}| output_type: {self._type_to_string(func.output_type)}\n"
+                f"{self._get_indent_with_arrow(depth + 1)}{self._color('output_type', Colors.BLUE)}: {self._type_to_string(func.output_type)}\n"
             )
 
     def _stream_cast(self, cast: stalg.Expression.Cast, stream, depth: int):
@@ -421,9 +425,13 @@ class PlanPrinter:
         indent = " " * (depth * self.indent_size)
 
         stream.write(f"{indent}cast\n")
-        stream.write(f"{indent}| input:\n")
+        stream.write(
+            f"{self._get_indent_with_arrow(depth + 1)}{self._color('input', Colors.BLUE)}:\n"
+        )
         self._stream_expression(cast.input, stream, depth + 1)
-        stream.write(f"{indent}| to: {self._type_to_string(cast.type)}\n")
+        stream.write(
+            f"{self._get_indent_with_arrow(depth + 1)}{self._color('to', Colors.BLUE)}: {self._type_to_string(cast.type)}\n"
+        )
 
     def _stream_if_then(self, if_then: stalg.Expression.IfThen, stream, depth: int):
         """Print an if-then expression concisely"""
@@ -431,13 +439,19 @@ class PlanPrinter:
 
         stream.write(f"{indent}if_then\n")
         if if_then.ifs:
-            stream.write(f"{indent}| if:\n")
+            stream.write(
+                f"{self._get_indent_with_arrow(depth + 1)}{self._color('if', Colors.BLUE)}:\n"
+            )
             self._stream_expression(if_then.ifs[0].if_, stream, depth + 1)
-            stream.write(f"{indent}| then:\n")
+            stream.write(
+                f"{self._get_indent_with_arrow(depth + 1)}{self._color('then', Colors.BLUE)}:\n"
+            )
             self._stream_expression(if_then.ifs[0].then, stream, depth + 1)
 
         if if_then.HasField("else_"):
-            stream.write(f"{indent}| else:\n")
+            stream.write(
+                f"{self._get_indent_with_arrow(depth + 1)}{self._color('else', Colors.BLUE)}:\n"
+            )
             self._stream_expression(if_then.else_, stream, depth + 1)
 
     def _stream_window_function(
@@ -448,9 +462,13 @@ class PlanPrinter:
 
         stream.write(f"{indent}window_function: {func.function_reference}\n")
         if func.arguments:
-            stream.write(f"{indent}| args: {len(func.arguments)}\n")
+            stream.write(
+                f"{self._get_indent_with_arrow(depth + 1)}{self._color('args', Colors.BLUE)}: {self._color(len(func.arguments), Colors.YELLOW)}\n"
+            )
             for i, arg in enumerate(func.arguments):
-                stream.write(f"{indent}| | {i}:\n")
+                stream.write(
+                    f"{self._get_indent_with_arrow(depth + 2)}{self._color(f'{i}', Colors.CYAN)}:\n"
+                )
                 self._stream_expression(arg, stream, depth + 2)
 
     def _get_function_argument_string(self, arg) -> str:

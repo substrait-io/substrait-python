@@ -105,7 +105,7 @@ def handle_parameter_cover(
         parameters[parameter_name] = covered
         return True
 
-def _check_nullability() -> bool:
+def _check_nullability(check_nullability,parameterized_type,covered,kind) -> bool:
     if not check_nullability:
         return True
     # The ANTLR context stores a Token called ``isnull`` – it is
@@ -159,25 +159,25 @@ def covers(
                 return False
             if getattr(covered.varchar, "length", 0) > getattr(parameterized_type, "length", 0):
                 return False
-            return _check_nullability()
+            return _check_nullability(check_nullability,parameterized_type,covered,kind)
 
         if isinstance(parameterized_type, SubstraitTypeParser.FixedCharContext):
             if kind != "fixed_char":
                 return False
             if getattr(covered.fixed_char, "length", 0) > getattr(parameterized_type, "length", 0):
                 return False
-            return _check_nullability()
+            return _check_nullability(check_nullability,parameterized_type,covered,kind)
 
         if isinstance(parameterized_type, SubstraitTypeParser.FixedBinaryContext):
             if kind != "fixed_binary":
                 return False
             if getattr(covered.fixed_binary, "length", 0) > getattr(parameterized_type, "length", 0):
                 return False
-            return _check_nullability()
+            return _check_nullability(check_nullability,parameterized_type,covered,kind)
         if isinstance(parameterized_type, SubstraitTypeParser.DecimalContext):
             if kind != "decimal":
                 return False
-            if not _check_nullability():
+            if not _check_nullability(check_nullability,parameterized_type,covered,kind):
                 return False
             # precision / scale are both optional – a missing value means “no limit”.
             covered_scale   = getattr(covered.decimal,   "scale",   0)
@@ -195,7 +195,7 @@ def covers(
         if isinstance(parameterized_type, SubstraitTypeParser.PrecisionTimestampContext):
             if kind != "precision_timestamp":
                 return False
-            if not _check_nullability():
+            if not _check_nullability(check_nullability,parameterized_type,covered,kind):
                 return False
             covered_prec = getattr(covered.precision_timestamp, "precision", 0)
             param_prec   = getattr(parameterized_type, "precision", 0)
@@ -205,7 +205,7 @@ def covers(
         if isinstance(parameterized_type, SubstraitTypeParser.PrecisionTimestampTZContext):
             if kind != "precision_timestamp_tz":
                 return False
-            if not _check_nullability():
+            if not _check_nullability(check_nullability,parameterized_type,covered,kind):
                 return False
             covered_prec = getattr(covered.precision_timestamp_tz, "precision", 0)
             param_prec   = getattr(parameterized_type, "precision", 0)
@@ -222,7 +222,7 @@ def covers(
             if isinstance(parameterized_type, ctx_cls):
                 if kind != expected_kind:
                     return False
-                return _check_nullability()
+                return _check_nullability(check_nullability,parameterized_type,covered,kind)
         else:
             raise Exception(f"Unhandled type {type(parameterized_type)}")
 

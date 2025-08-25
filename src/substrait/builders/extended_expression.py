@@ -1,18 +1,19 @@
-from datetime import date
 import itertools
+from datetime import date
+from typing import Any, Callable, Iterable, Union
+
 import substrait.gen.proto.algebra_pb2 as stalg
-import substrait.gen.proto.type_pb2 as stp
 import substrait.gen.proto.extended_expression_pb2 as stee
 import substrait.gen.proto.extensions.extensions_pb2 as ste
+import substrait.gen.proto.type_pb2 as stp
 from substrait.extension_registry import ExtensionRegistry
-from substrait.utils import (
-    type_num_names,
-    merge_extension_urns,
-    merge_extension_uris,
-    merge_extension_declarations,
-)
 from substrait.type_inference import infer_extended_expression_schema
-from typing import Callable, Any, Union, Iterable
+from substrait.utils import (
+    merge_extension_declarations,
+    merge_extension_uris,
+    merge_extension_urns,
+    type_num_names,
+)
 
 UnboundExtendedExpression = Callable[
     [stp.NamedStruct, ExtensionRegistry], stee.ExtendedExpression
@@ -21,7 +22,7 @@ ExtendedExpressionOrUnbound = Union[stee.ExtendedExpression, UnboundExtendedExpr
 
 
 def _alias_or_inferred(
-    alias: Union[Iterable[str], str],
+    alias: Union[Iterable[str], str, None],
     op: str,
     args: Iterable[str],
 ):
@@ -44,7 +45,7 @@ def resolve_expression(
 
 
 def literal(
-    value: Any, type: stp.Type, alias: Union[Iterable[str], str] = None
+    value: Any, type: stp.Type, alias: Union[Iterable[str], str, None] = None
 ) -> UnboundExtendedExpression:
     """Builds a resolver for ExtendedExpression containing a literal expression"""
 
@@ -154,7 +155,7 @@ def literal(
     return resolve
 
 
-def column(field: Union[str, int], alias: Union[Iterable[str], str] = None):
+def column(field: Union[str, int], alias: Union[Iterable[str], str, None] = None):
     """Builds a resolver for ExtendedExpression containing a FieldReference expression
 
     Accepts either an index or a field name of a desired field.
@@ -208,7 +209,7 @@ def scalar_function(
     urn: str,
     function: str,
     expressions: Iterable[ExtendedExpressionOrUnbound],
-    alias: Union[Iterable[str], str] = None,
+    alias: Union[Iterable[str], str, None] = None,
 ):
     """Builds a resolver for ExtendedExpression containing a ScalarFunction expression"""
 
@@ -306,7 +307,7 @@ def aggregate_function(
     urn: str,
     function: str,
     expressions: Iterable[ExtendedExpressionOrUnbound],
-    alias: Union[Iterable[str], str] = None,
+    alias: Union[Iterable[str], str, None] = None,
 ):
     """Builds a resolver for ExtendedExpression containing a AggregateFunction measure"""
 
@@ -402,7 +403,7 @@ def window_function(
     function: str,
     expressions: Iterable[ExtendedExpressionOrUnbound],
     partitions: Iterable[ExtendedExpressionOrUnbound] = [],
-    alias: Union[Iterable[str], str] = None,
+    alias: Union[Iterable[str], str, None] = None,
 ):
     """Builds a resolver for ExtendedExpression containing a WindowFunction expression"""
 
@@ -512,7 +513,7 @@ def window_function(
 def if_then(
     ifs: Iterable[tuple[ExtendedExpressionOrUnbound, ExtendedExpressionOrUnbound]],
     _else: ExtendedExpressionOrUnbound,
-    alias: Union[Iterable[str], str] = None,
+    alias: Union[Iterable[str], str, None] = None,
 ):
     """Builds a resolver for ExtendedExpression containing an IfThen expression"""
 
@@ -551,24 +552,16 @@ def if_then(
             referred_expr=[
                 stee.ExpressionReference(
                     expression=stalg.Expression(
-                        if_then=stalg.Expression.IfThen(
-                            **{
-                                "ifs": [
-                                    stalg.Expression.IfThen.IfClause(
-                                        **{
-                                            "if": if_clause[0]
-                                            .referred_expr[0]
-                                            .expression,
-                                            "then": if_clause[1]
-                                            .referred_expr[0]
-                                            .expression,
-                                        }
-                                    )
-                                    for if_clause in bound_ifs
-                                ],
-                                "else": bound_else.referred_expr[0].expression,
-                            }
-                        )
+                        if_then=stalg.Expression.IfThen(**{
+                            "ifs": [
+                                stalg.Expression.IfThen.IfClause(**{
+                                    "if": if_clause[0].referred_expr[0].expression,
+                                    "then": if_clause[1].referred_expr[0].expression,
+                                })
+                                for if_clause in bound_ifs
+                            ],
+                            "else": bound_else.referred_expr[0].expression,
+                        })
                     ),
                     output_names=_alias_or_inferred(
                         alias,
@@ -639,12 +632,10 @@ def switch(
                         switch_expression=stalg.Expression.SwitchExpression(
                             match=bound_match.referred_expr[0].expression,
                             ifs=[
-                                stalg.Expression.SwitchExpression.IfValue(
-                                    **{
-                                        "if": i.referred_expr[0].expression.literal,
-                                        "then": t.referred_expr[0].expression,
-                                    }
-                                )
+                                stalg.Expression.SwitchExpression.IfValue(**{
+                                    "if": i.referred_expr[0].expression.literal,
+                                    "then": t.referred_expr[0].expression,
+                                })
                                 for i, t in bound_ifs
                             ],
                             **{"else": bound_else.referred_expr[0].expression},
@@ -767,7 +758,11 @@ def multi_or_list(
     return resolve
 
 
-def cast(input: ExtendedExpressionOrUnbound, type: stp.Type):
+def cast(
+    input: ExtendedExpressionOrUnbound,
+    type: stp.Type,
+    alias: Union[Iterable[str], str, None] = None,
+):
     """Builds a resolver for ExtendedExpression containing a cast expression"""
 
     def resolve(
@@ -785,7 +780,9 @@ def cast(input: ExtendedExpressionOrUnbound, type: stp.Type):
                             failure_behavior=stalg.Expression.Cast.FAILURE_BEHAVIOR_RETURN_NULL,
                         )
                     ),
-                    output_names=["cast"],  # TODO construct name from inputs
+                    output_names=_alias_or_inferred(
+                        alias, "cast", [bound_input.referred_expr[0].output_names[0]]
+                    ),
                 )
             ],
             base_schema=base_schema,

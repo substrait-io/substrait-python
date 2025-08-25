@@ -20,7 +20,7 @@ ExtendedExpressionOrUnbound = Union[stee.ExtendedExpression, UnboundExtendedExpr
 
 
 def _alias_or_inferred(
-    alias: Union[Iterable[str], str],
+    alias: Union[Iterable[str], str,None],
     op: str,
     args: Iterable[str],
 ):
@@ -43,7 +43,7 @@ def resolve_expression(
 
 
 def literal(
-    value: Any, type: stp.Type, alias: Union[Iterable[str], str] = None
+    value: Any, type: stp.Type, alias: Union[Iterable[str], str,None] = None
 ) -> UnboundExtendedExpression:
     """Builds a resolver for ExtendedExpression containing a literal expression"""
 
@@ -153,7 +153,7 @@ def literal(
     return resolve
 
 
-def column(field: Union[str, int], alias: Union[Iterable[str], str] = None):
+def column(field: Union[str, int], alias: Union[Iterable[str], str,None] = None):
     """Builds a resolver for ExtendedExpression containing a FieldReference expression
 
     Accepts either an index or a field name of a desired field.
@@ -207,7 +207,7 @@ def scalar_function(
     uri: str,
     function: str,
     expressions: Iterable[ExtendedExpressionOrUnbound],
-    alias: Union[Iterable[str], str] = None,
+    alias: Union[Iterable[str], str,None] = None,
 ):
     """Builds a resolver for ExtendedExpression containing a ScalarFunction expression"""
 
@@ -287,7 +287,7 @@ def aggregate_function(
     uri: str,
     function: str,
     expressions: Iterable[ExtendedExpressionOrUnbound],
-    alias: Union[Iterable[str], str] = None,
+    alias: Union[Iterable[str], str,None] = None,
 ):
     """Builds a resolver for ExtendedExpression containing a AggregateFunction measure"""
 
@@ -365,7 +365,7 @@ def window_function(
     function: str,
     expressions: Iterable[ExtendedExpressionOrUnbound],
     partitions: Iterable[ExtendedExpressionOrUnbound] = [],
-    alias: Union[Iterable[str], str] = None,
+    alias: Union[Iterable[str], str,None] = None,
 ):
     """Builds a resolver for ExtendedExpression containing a WindowFunction expression"""
 
@@ -455,7 +455,7 @@ def window_function(
 def if_then(
     ifs: Iterable[tuple[ExtendedExpressionOrUnbound, ExtendedExpressionOrUnbound]],
     _else: ExtendedExpressionOrUnbound,
-    alias: Union[Iterable[str], str] = None,
+    alias: Union[Iterable[str], str,None] = None,
 ):
     """Builds a resolver for ExtendedExpression containing an IfThen expression"""
 
@@ -685,7 +685,7 @@ def multi_or_list(
     return resolve
 
 
-def cast(input: ExtendedExpressionOrUnbound, type: stp.Type):
+def cast(input: ExtendedExpressionOrUnbound, type: stp.Type,alias: Union[Iterable[str], str,None] = None):
     """Builds a resolver for ExtendedExpression containing a cast expression"""
 
     def resolve(
@@ -703,7 +703,8 @@ def cast(input: ExtendedExpressionOrUnbound, type: stp.Type):
                             failure_behavior=stalg.Expression.Cast.FAILURE_BEHAVIOR_RETURN_NULL,
                         )
                     ),
-                    output_names=["cast"],  # TODO construct name from inputs
+                    output_names=_alias_or_inferred(alias, "cast", []),
+
                 )
             ],
             base_schema=base_schema,

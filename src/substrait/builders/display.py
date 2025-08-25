@@ -343,6 +343,9 @@ class PlanPrinter:
             stream.write(f"{indent}literal: date={literal.date}\n")
         elif literal.HasField("timestamp"):
             stream.write(f"{indent}literal: timestamp={literal.timestamp}\n")
+        elif literal.HasField("map"):
+            stream.write(f"{indent}literal: map\n")
+            self._stream_map_literal(literal.map, stream, depth + 1)
         else:
             stream.write(f"{indent}literal: <complex>\n")
 
@@ -376,17 +379,36 @@ class PlanPrinter:
                 f"{self._get_indent_with_arrow(depth + 1)}{self._color('args', Colors.BLUE)}({self._color(len(func.arguments), Colors.YELLOW)}):\n"
             )
             for i, arg in enumerate(func.arguments):
-                # Get the argument content as a string without newlines
-                arg_content = self._get_function_argument_string(arg)
-                stream.write(
-                    f"{self._get_indent_with_arrow(depth + 2)}{self._color(f'args', Colors.BLUE)}[{self._color(f'{i}', Colors.CYAN)}]: {arg_content}\n"
-                )
+                # Check if this is a nested scalar function
+                if (
+                    hasattr(arg, "value")
+                    and arg.HasField("value")
+                    and arg.value.HasField("scalar_function")
+                ):
+                    # Recursively expand nested scalar functions
+                    stream.write(
+                        f"{self._get_indent_with_arrow(depth + 2)}{self._color(f'args', Colors.BLUE)}[{self._color(f'{i}', Colors.CYAN)}]:\n"
+                    )
+                    self._stream_scalar_function(
+                        arg.value.scalar_function, stream, depth + 3
+                    )
+                else:
+                    # For simple arguments, show on the same line
+                    arg_content = self._get_function_argument_string(arg)
+                    stream.write(
+                        f"{self._get_indent_with_arrow(depth + 2)}{self._color(f'args', Colors.BLUE)}[{self._color(f'{i}', Colors.CYAN)}]: {arg_content}\n"
+                    )
 
         # Print function options if present
         if func.options:
             stream.write(f"{indent}| options: {len(func.options)}\n")
             for i, option in enumerate(func.options):
-                stream.write(f"{indent}| | {i}: {option.name}={option.value}\n")
+                # Handle preference as a list
+                if hasattr(option, "preference") and option.preference:
+                    pref_str = f"[{', '.join(str(p) for p in option.preference)}]"
+                else:
+                    pref_str = "[]"
+                stream.write(f"{indent}| | {i}: {option.name}={pref_str}\n")
 
         # Print output type if present
         if func.HasField("output_type"):
@@ -452,6 +474,9 @@ class PlanPrinter:
                     return f"literal: date={arg.value.literal.date}"
                 elif arg.value.literal.HasField("timestamp"):
                     return f"literal: timestamp={arg.value.literal.timestamp}"
+                elif arg.value.literal.HasField("map"):
+                    # For maps, we'll handle them specially in the main printing
+                    return "<map_literal>"
                 else:
                     return "literal: <complex>"
             elif arg.value.HasField("selection"):
@@ -468,7 +493,9 @@ class PlanPrinter:
                 else:
                     return "field: root"
             elif arg.value.HasField("scalar_function"):
-                return f"function: {arg.value.scalar_function.function_reference}"
+                # For nested scalar functions, we'll handle them specially in the main printing
+                # Return a placeholder that indicates it needs recursive expansion
+                return "<nested_scalar_function>"
             elif arg.value.HasField("enum"):
                 return f"enum: {arg.value.enum}"
             else:
@@ -502,6 +529,10 @@ class PlanPrinter:
                     stream.write(
                         f"{indent}literal: timestamp={arg.value.literal.timestamp}\n"
                     )
+                elif arg.value.literal.HasField("map"):
+                    # Handle map literals with proper indentation
+                    stream.write(f"{indent}literal: map\n")
+                    self._stream_map_literal(arg.value.literal.map, stream, depth + 1)
                 else:
                     stream.write(f"{indent}literal: <complex>\n")
             elif arg.value.HasField("selection"):
@@ -525,6 +556,83 @@ class PlanPrinter:
                 stream.write(f"{indent}<unknown_function_argument_value>\n")
         else:
             stream.write(f"{indent}<function_argument>\n")
+
+    def _stream_map_literal(
+        self, map_literal: stalg.Expression.Literal.Map, stream, depth: int
+    ):
+        """Print a map literal with proper indentation"""
+        indent = " " * (depth * self.indent_size)
+
+        if map_literal.key_values:
+            stream.write(
+                f"{indent}-> {self._color('key_values', Colors.BLUE)}({self._color(len(map_literal.key_values), Colors.YELLOW)}):\n"
+            )
+            for i, kv in enumerate(map_literal.key_values):
+                stream.write(
+                    f"{indent}  -> {self._color('key_values', Colors.BLUE)}[{self._color(f'{i}', Colors.CYAN)}]:\n"
+                )
+                stream.write(
+                    f"{indent}    -> {self._color('key', Colors.BLUE)}: {self._color(kv.key.string, Colors.GREEN)}\n"
+                )
+                stream.write(f"{indent}    -> {self._color('value', Colors.BLUE)}:\n")
+                self._stream_literal_value(kv.value, stream, depth + 2)
+        else:
+            stream.write(f"{indent}-> {self._color('empty map', Colors.YELLOW)}\n")
+
+    def _stream_literal_value(
+        self, literal: stalg.Expression.Literal, stream, depth: int
+    ):
+        """Print a literal value with proper indentation"""
+        indent = " " * (depth * self.indent_size)
+
+        if literal.HasField("boolean"):
+            stream.write(
+                f"{indent}{self._color('boolean', Colors.BLUE)}: {self._color(literal.boolean, Colors.GREEN)}\n"
+            )
+        elif literal.HasField("i32"):
+            stream.write(
+                f"{indent}{self._color('i32', Colors.BLUE)}: {self._color(literal.i32, Colors.GREEN)}\n"
+            )
+        elif literal.HasField("i64"):
+            stream.write(
+                f"{indent}{self._color('i64', Colors.BLUE)}: {self._color(literal.i64, Colors.GREEN)}\n"
+            )
+        elif literal.HasField("fp32"):
+            stream.write(
+                f"{indent}{self._color('fp32', Colors.BLUE)}: {self._color(literal.fp32, Colors.GREEN)}\n"
+            )
+        elif literal.HasField("fp64"):
+            stream.write(
+                f"{indent}{self._color('fp64', Colors.BLUE)}: {self._color(literal.fp64, Colors.GREEN)}\n"
+            )
+        elif literal.HasField("string"):
+            stream.write(
+                f"{indent}{self._color('string', Colors.BLUE)}: {self._color(f'"{literal.string}"', Colors.GREEN)}\n"
+            )
+        elif literal.HasField("date"):
+            stream.write(
+                f"{indent}{self._color('date', Colors.BLUE)}: {self._color(literal.date, Colors.GREEN)}\n"
+            )
+        elif literal.HasField("timestamp"):
+            stream.write(
+                f"{indent}{self._color('timestamp', Colors.BLUE)}: {self._color(literal.timestamp, Colors.GREEN)}\n"
+            )
+        elif literal.HasField("map"):
+            # Recursively handle nested maps
+            stream.write(f"{indent}{self._color('map', Colors.BLUE)}:\n")
+            self._stream_map_literal(literal.map, stream, depth + 1)
+        elif literal.HasField("list"):
+            # Handle list literals
+            stream.write(
+                f"{indent}{self._color('list', Colors.BLUE)}({self._color(len(literal.list.values), Colors.YELLOW)}):\n"
+            )
+            for i, item in enumerate(literal.list.values):
+                stream.write(f"{indent}  -> {self._color(f'{i}', Colors.CYAN)}:\n")
+                self._stream_literal_value(item, stream, depth + 2)
+        else:
+            stream.write(
+                f"{indent}{self._color('<unknown_literal_type>', Colors.RED)}\n"
+            )
 
     def _type_to_string(self, type_info: stt.Type) -> str:
         """Convert a type to a concise string representation"""
@@ -566,4 +674,4 @@ def pretty_print_expression(
 ) -> None:
     """Convenience function to print a Substrait expression concisely"""
     printer = PlanPrinter(indent_size, show_metadata, use_colors)
-    printer.stringify_expression(expression)
+    printer.print_expression(expression)

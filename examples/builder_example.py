@@ -2,6 +2,7 @@ from substrait.builders.plan import read_named_table, project, filter
 from substrait.builders.extended_expression import column, scalar_function, literal
 from substrait.builders.type import i64, boolean, struct, named_struct
 from substrait.extension_registry import ExtensionRegistry
+from substrait.builders.display import pretty_print_plan
 
 registry = ExtensionRegistry(load_default_extensions=True)
 
@@ -22,6 +23,7 @@ table = filter(
 table = project(table, expressions=[column("id")])
 
 print(table(registry))
+pretty_print_plan(table(registry), use_colors=True)
 
 """
 extension_uris {

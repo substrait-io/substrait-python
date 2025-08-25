@@ -393,11 +393,11 @@ class PlanPrinter:
                         arg.value.scalar_function, stream, depth + 3
                     )
                 else:
-                    # For simple arguments, show on the same line
-                    arg_content = self._get_function_argument_string(arg)
+                    # Always show the full recursive output for all argument types
                     stream.write(
-                        f"{self._get_indent_with_arrow(depth + 2)}{self._color(f'args', Colors.BLUE)}[{self._color(f'{i}', Colors.CYAN)}]: {arg_content}\n"
+                        f"{self._get_indent_with_arrow(depth + 2)}{self._color(f'args', Colors.BLUE)}[{self._color(f'{i}', Colors.CYAN)}]:\n"
                     )
+                    self._stream_function_argument(arg, stream, depth + 3)
 
         # Print function options if present
         if func.options:

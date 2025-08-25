@@ -129,7 +129,6 @@ class PlanPrinter:
 
     def _stream_relation(self, rel: stp.PlanRel, stream, depth: int):
         """Print a plan relation concisely"""
-        indent = " " * (depth * self.indent_size)
 
         if rel.HasField("root"):
             self._stream_rel_root(rel.root, stream, depth)
@@ -220,7 +219,7 @@ class PlanPrinter:
             )
             for i, expr in enumerate(project.expressions):
                 stream.write(
-                    f"{self._get_indent_with_arrow(depth + 2)}{self._color(f'expr', Colors.BLUE)}[{self._color(f'{i}', Colors.CYAN)}]:\n"
+                    f"{self._get_indent_with_arrow(depth + 2)}{self._color('expr', Colors.BLUE)}[{self._color(f'{i}', Colors.CYAN)}]:\n"
                 )
                 self._stream_expression(expr, stream, depth + 2)
 
@@ -387,7 +386,7 @@ class PlanPrinter:
                 ):
                     # Recursively expand nested scalar functions
                     stream.write(
-                        f"{self._get_indent_with_arrow(depth + 2)}{self._color(f'args', Colors.BLUE)}[{self._color(f'{i}', Colors.CYAN)}]:\n"
+                        f"{self._get_indent_with_arrow(depth + 2)}{self._color('args', Colors.BLUE)}[{self._color(f'{i}', Colors.CYAN)}]:\n"
                     )
                     self._stream_scalar_function(
                         arg.value.scalar_function, stream, depth + 3
@@ -395,7 +394,7 @@ class PlanPrinter:
                 else:
                     # Always show the full recursive output for all argument types
                     stream.write(
-                        f"{self._get_indent_with_arrow(depth + 2)}{self._color(f'args', Colors.BLUE)}[{self._color(f'{i}', Colors.CYAN)}]:\n"
+                        f"{self._get_indent_with_arrow(depth + 2)}{self._color('args', Colors.BLUE)}[{self._color(f'{i}', Colors.CYAN)}]:\n"
                     )
                     self._stream_function_argument(arg, stream, depth + 3)
 

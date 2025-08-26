@@ -12,7 +12,7 @@ from substrait.builders.extended_expression import (
 )
 from substrait.builders.type import i64, boolean, struct, named_struct, fp64, string
 from substrait.extension_registry import ExtensionRegistry
-from substrait.builders.display import pretty_print_plan, pretty_print_expression
+from substrait.utils.display import pretty_print_plan, pretty_print_expression
 import substrait.gen.proto.algebra_pb2 as stalg
 
 registry = ExtensionRegistry(load_default_extensions=True)

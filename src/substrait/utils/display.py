@@ -8,7 +8,6 @@ in a readable format using indentation, -> characters, and colors.
 import substrait.gen.proto.algebra_pb2 as stalg
 import substrait.gen.proto.plan_pb2 as stp
 import substrait.gen.proto.type_pb2 as stt
-import substrait.gen.proto.extended_expression_pb2 as stee
 
 
 # ANSI color codes

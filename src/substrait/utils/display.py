@@ -347,8 +347,6 @@ class PlanPrinter:
             )
             # Try to unpack and display the detail if it's an Expression
             try:
-                from google.protobuf import any_pb2
-
                 detail = extension.detail
                 if detail.type_url and detail.value:
                     # Try to unpack as Expression
@@ -388,8 +386,6 @@ class PlanPrinter:
             )
             # Try to unpack and display the detail if it's an Expression
             try:
-                from google.protobuf import any_pb2
-
                 detail = extension.detail
                 if detail.type_url and detail.value:
                     # Try to unpack as Expression

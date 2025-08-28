@@ -183,6 +183,29 @@ class PlanPrinter:
             stream.write(
                 f"{indent}{self._color('read:', Colors.GREEN)} {self._color(table_names[0] if len(table_names) == 1 else table_names, Colors.YELLOW)}\n"
             )
+        elif read.HasField("virtual_table"):
+            stream.write(
+                f"{indent}{self._color('read:', Colors.GREEN)} {self._color('virtual_table', Colors.YELLOW)}\n"
+            )
+            if read.virtual_table.values:
+                stream.write(
+                    f"{self._get_indent_with_arrow(depth + 1)}{self._color('values:', Colors.BLUE)} {self._color(len(read.virtual_table.values), Colors.YELLOW)}\n"
+                )
+                # Show the actual values, not just count
+                for i, value in enumerate(read.virtual_table.values):
+                    # Handle struct values properly
+                    if hasattr(value, "fields"):
+                        stream.write(
+                            f"{self._get_indent_with_arrow(depth + 2)}value[{i}]: "
+                        )
+                        self._stream_struct_literal(
+                            value, stream, depth + 2, inline=True
+                        )
+                    else:
+                        stream.write(
+                            f"{self._get_indent_with_arrow(depth + 2)}value[{i}]: "
+                        )
+                        self._stream_literal_value(value, stream, depth + 2)
 
         if read.HasField("base_schema"):
             # Capture schema names for field resolution
@@ -729,6 +752,53 @@ class PlanPrinter:
             stream.write(
                 f"{indent}{self._color('<unknown_literal_type>', Colors.RED)}\n"
             )
+
+    def _stream_struct_literal(
+        self, struct_literal, stream, depth: int, inline: bool = False
+    ):
+        """Print a struct literal value with proper indentation"""
+        if inline:
+            # When inline, don't add extra indentation since we're already on the same line
+            indent = ""
+        else:
+            indent = " " * (depth * self.indent_size)
+
+        if hasattr(struct_literal, "fields") and struct_literal.fields:
+            stream.write(f"{indent}{self._color('struct', Colors.BLUE)}\n")
+            for i, field in enumerate(struct_literal.fields):
+                # Show field index
+                stream.write(f"{self._get_indent_with_arrow(depth + 1)}field[{i}]:\n")
+                # Show the actual field value with proper indentation
+                if hasattr(field, "i64"):
+                    stream.write(
+                        f"{self._get_indent_with_arrow(depth + 2)}{self._color('i64', Colors.BLUE)}: {self._color(field.i64, Colors.GREEN)}\n"
+                    )
+                elif hasattr(field, "fp64"):
+                    stream.write(
+                        f"{self._get_indent_with_arrow(depth + 2)}{self._color('fp64', Colors.BLUE)}: {self._color(field.fp64, Colors.GREEN)}\n"
+                    )
+                elif hasattr(field, "fp32"):
+                    stream.write(
+                        f"{self._get_indent_with_arrow(depth + 2)}{self._color('fp32', Colors.BLUE)}: {self._color(field.fp32, Colors.GREEN)}\n"
+                    )
+                elif hasattr(field, "i32"):
+                    stream.write(
+                        f"{self._get_indent_with_arrow(depth + 2)}{self._color('i32', Colors.BLUE)}: {self._color(field.i32, Colors.GREEN)}\n"
+                    )
+                elif hasattr(field, "string"):
+                    stream.write(
+                        f"{self._get_indent_with_arrow(depth + 2)}{self._color('string', Colors.BLUE)}: {self._color(f'"{field.string}"', Colors.GREEN)}\n"
+                    )
+                elif hasattr(field, "boolean"):
+                    stream.write(
+                        f"{self._get_indent_with_arrow(depth + 2)}{self._color('boolean', Colors.BLUE)}: {self._color(field.boolean, Colors.GREEN)}\n"
+                    )
+                else:
+                    stream.write(
+                        f"{self._get_indent_with_arrow(depth + 2)}{self._color('<unknown_field_type>', Colors.RED)}\n"
+                    )
+        else:
+            stream.write(f"{indent}{self._color('empty_struct', Colors.YELLOW)}\n")
 
     def _type_to_string(self, type_info: stt.Type) -> str:
         """Convert a type to a concise string representation"""

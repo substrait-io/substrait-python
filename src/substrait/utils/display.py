@@ -168,6 +168,10 @@ class PlanPrinter:
             self._stream_cross_rel(rel.cross, stream, depth)
         elif rel.HasField("fetch"):
             self._stream_fetch_rel(rel.fetch, stream, depth)
+        elif rel.HasField("extension_single"):
+            self._stream_extension_single_rel(rel.extension_single, stream, depth)
+        elif rel.HasField("extension_multi"):
+            self._stream_extension_multi_rel(rel.extension_multi, stream, depth)
         else:
             stream.write(f"{indent}<unknown_relation>\n")
 
@@ -302,6 +306,82 @@ class PlanPrinter:
             f"{self._get_indent_with_arrow(depth + 1)}{self._color('input:', Colors.BLUE)}\n"
         )
         self._stream_rel(fetch.input, stream, depth + 1)
+
+    def _stream_extension_single_rel(
+        self, extension: stalg.ExtensionSingleRel, stream, depth: int
+    ):
+        """Print an extension single relation concisely"""
+        indent = " " * (depth * self.indent_size)
+
+        stream.write(f"{indent}{self._color('extension_single', Colors.MAGENTA)}\n")
+        stream.write(
+            f"{self._get_indent_with_arrow(depth + 1)}{self._color('input:', Colors.BLUE)}\n"
+        )
+        self._stream_rel(extension.input, stream, depth + 1)
+
+        if extension.HasField("detail"):
+            stream.write(
+                f"{self._get_indent_with_arrow(depth + 1)}{self._color('detail:', Colors.BLUE)}\n"
+            )
+            # Try to unpack and display the detail if it's an Expression
+            try:
+                from google.protobuf import any_pb2
+
+                detail = extension.detail
+                if detail.type_url and detail.value:
+                    # Try to unpack as Expression
+                    expression = stalg.Expression()
+                    detail.Unpack(expression)
+                    self._stream_expression(expression, stream, depth + 2)
+                else:
+                    stream.write(
+                        f"{self._get_indent_with_arrow(depth + 2)}<binary_detail>\n"
+                    )
+            except Exception:
+                stream.write(
+                    f"{self._get_indent_with_arrow(depth + 2)}<unpackable_detail>\n"
+                )
+
+    def _stream_extension_multi_rel(
+        self, extension: stalg.ExtensionMultiRel, stream, depth: int
+    ):
+        """Print an extension multi relation concisely"""
+        indent = " " * (depth * self.indent_size)
+
+        stream.write(f"{indent}{self._color('extension_multi', Colors.MAGENTA)}\n")
+
+        if extension.inputs:
+            stream.write(
+                f"{self._get_indent_with_arrow(depth + 1)}{self._color('inputs', Colors.BLUE)}({self._color(len(extension.inputs), Colors.YELLOW)}):\n"
+            )
+            for i, input_rel in enumerate(extension.inputs):
+                stream.write(
+                    f"{self._get_indent_with_arrow(depth + 2)}{self._color('input', Colors.BLUE)}[{self._color(f'{i}', Colors.CYAN)}]:\n"
+                )
+                self._stream_rel(input_rel, stream, depth + 3)
+
+        if extension.HasField("detail"):
+            stream.write(
+                f"{self._get_indent_with_arrow(depth + 1)}{self._color('detail:', Colors.BLUE)}\n"
+            )
+            # Try to unpack and display the detail if it's an Expression
+            try:
+                from google.protobuf import any_pb2
+
+                detail = extension.detail
+                if detail.type_url and detail.value:
+                    # Try to unpack as Expression
+                    expression = stalg.Expression()
+                    detail.Unpack(expression)
+                    self._stream_expression(expression, stream, depth + 2)
+                else:
+                    stream.write(
+                        f"{self._get_indent_with_arrow(depth + 2)}<binary_detail>\n"
+                    )
+            except Exception:
+                stream.write(
+                    f"{self._get_indent_with_arrow(depth + 2)}<unpackable_detail>\n"
+                )
 
     def _stream_expression(self, expression: stalg.Expression, stream, depth: int):
         """Print an expression concisely"""

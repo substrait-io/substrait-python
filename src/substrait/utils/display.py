@@ -765,27 +765,27 @@ class PlanPrinter:
                 # Show field index
                 stream.write(f"{self._get_indent_with_arrow(depth + 1)}field[{i}]:\n")
                 # Show the actual field value with proper indentation
-                if hasattr(field, "i64"):
+                if field.HasField("i64"):
                     stream.write(
                         f"{self._get_indent_with_arrow(depth + 2)}{self._color('i64', Colors.BLUE)}: {self._color(field.i64, Colors.GREEN)}\n"
                     )
-                elif hasattr(field, "fp64"):
+                elif field.HasField("fp64"):
                     stream.write(
                         f"{self._get_indent_with_arrow(depth + 2)}{self._color('fp64', Colors.BLUE)}: {self._color(field.fp64, Colors.GREEN)}\n"
                     )
-                elif hasattr(field, "fp32"):
+                elif field.HasField("fp32"):
                     stream.write(
                         f"{self._get_indent_with_arrow(depth + 2)}{self._color('fp32', Colors.BLUE)}: {self._color(field.fp32, Colors.GREEN)}\n"
                     )
-                elif hasattr(field, "i32"):
+                elif field.HasField("i32"):
                     stream.write(
                         f"{self._get_indent_with_arrow(depth + 2)}{self._color('i32', Colors.BLUE)}: {self._color(field.i32, Colors.GREEN)}\n"
                     )
-                elif hasattr(field, "string"):
+                elif field.HasField("string"):
                     stream.write(
                         f"{self._get_indent_with_arrow(depth + 2)}{self._color('string', Colors.BLUE)}: {self._color(f'"{field.string}"', Colors.GREEN)}\n"
                     )
-                elif hasattr(field, "boolean"):
+                elif field.HasField("boolean"):
                     stream.write(
                         f"{self._get_indent_with_arrow(depth + 2)}{self._color('boolean', Colors.BLUE)}: {self._color(field.boolean, Colors.GREEN)}\n"
                     )

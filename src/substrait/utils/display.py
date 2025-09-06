@@ -566,7 +566,7 @@ class PlanPrinter:
                 stream.write(
                     f"{self._get_indent_with_arrow(depth + 2)}{self._color(f'{i}', Colors.CYAN)}:\n"
                 )
-                self._stream_expression(arg, stream, depth + 2)
+                self._stream_function_argument(arg, stream, depth + 2)
 
     def _get_function_argument_string(self, arg) -> str:
         """Get function argument content as a string without newlines"""

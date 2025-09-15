@@ -1,3 +1,7 @@
+"""
+Utility and debugging functions for Substrait.
+"""
+
 import substrait.gen.proto.type_pb2 as stp
 import substrait.gen.proto.extensions.extensions_pb2 as ste
 from typing import Iterable

@@ -240,7 +240,7 @@ def scalar_function(
                 extension_function=ste.SimpleExtensionDeclaration.ExtensionFunction(
                     extension_uri_reference=registry.lookup_uri(uri),
                     function_anchor=func[0].anchor,
-                    name=function,
+                    name=str(func[0]),
                 )
             )
         ]

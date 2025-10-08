@@ -55,7 +55,7 @@ def test_row_number():
         extensions=[
             ste.SimpleExtensionDeclaration(
                 extension_function=ste.SimpleExtensionDeclaration.ExtensionFunction(
-                    extension_uri_reference=1, function_anchor=1, name="row_number"
+                    extension_uri_reference=1, function_anchor=1, name="row_number:"
                 )
             )
         ],

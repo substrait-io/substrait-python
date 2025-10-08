@@ -59,7 +59,7 @@ def test_aggregate_count():
         extensions=[
             ste.SimpleExtensionDeclaration(
                 extension_function=ste.SimpleExtensionDeclaration.ExtensionFunction(
-                    extension_uri_reference=1, function_anchor=1, name="count"
+                    extension_uri_reference=1, function_anchor=1, name="count:any"
                 )
             )
         ],

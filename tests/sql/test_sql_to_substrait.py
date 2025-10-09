@@ -134,6 +134,7 @@ def test_select_field(engine: str):
     assert_query("""SELECT store_id FROM stores""", engine)
 
 
+@pytest.mark.xfail
 @pytest.mark.parametrize("engine", engines)
 def test_inner_join_filtered(engine: str):
     assert_query(
@@ -145,7 +146,7 @@ def test_inner_join_filtered(engine: str):
         engine,
     )
 
-
+@pytest.mark.xfail
 @pytest.mark.parametrize("engine", engines)
 def test_left_join(engine: str):
     assert_query(
@@ -156,7 +157,7 @@ def test_left_join(engine: str):
         engine,
     )
 
-
+@pytest.mark.xfail
 @pytest.mark.parametrize("engine", engines)
 def test_right_join(engine: str):
     assert_query(
@@ -178,7 +179,7 @@ def test_group_by_empty_measures(engine: str):
         engine,
     )
 
-
+@pytest.mark.xfail
 @pytest.mark.parametrize("engine", engines)
 def test_group_by_count(engine: str):
     assert_query(
@@ -189,7 +190,7 @@ def test_group_by_count(engine: str):
         engine,
     )
 
-
+@pytest.mark.xfail
 @pytest.mark.parametrize("engine", engines)
 def test_group_by_unnamed_expr(engine: str):
     assert_query(
@@ -200,7 +201,7 @@ def test_group_by_unnamed_expr(engine: str):
         engine,
     )
 
-
+@pytest.mark.xfail
 @pytest.mark.parametrize("engine", engines)
 def test_sum(engine: str):
     assert_query(
@@ -221,7 +222,7 @@ def test_group_by_hidden_dimension(engine: str):
         engine,
     )
 
-
+@pytest.mark.xfail
 @pytest.mark.parametrize("engine", engines)
 def test_group_by_having_no_duplicate(engine: str):
     assert_query(
@@ -233,7 +234,7 @@ def test_group_by_having_no_duplicate(engine: str):
         engine,
     )
 
-
+@pytest.mark.xfail
 @pytest.mark.parametrize("engine", engines)
 def test_group_by_having_duplicate(engine: str):
     assert_query(

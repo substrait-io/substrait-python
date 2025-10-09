@@ -6,6 +6,7 @@ from substrait.derivation_expression import _parse
 
 content = """%YAML 1.2
 ---
+urn: test
 scalar_functions:
   - name: "test_fn"
     description: ""
@@ -107,7 +108,7 @@ scalar_functions:
 
 registry = ExtensionRegistry()
 
-registry.register_extension_dict(yaml.safe_load(content), urn="test")
+registry.register_extension_dict(yaml.safe_load(content))
 
 
 def i8(nullable=False):

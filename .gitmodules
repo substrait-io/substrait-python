@@ -1,6 +1,3 @@
 [submodule "third_party/substrait"]
 	path = third_party/substrait
 	url = https://github.com/substrait-io/substrait
-[submodule "third_party/substrait-cpp"]
-	path = third_party/substrait-cpp
-	url = https://github.com/substrait-io/substrait-cpp

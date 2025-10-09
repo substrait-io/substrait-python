@@ -21,6 +21,7 @@ named_struct = stt.NamedStruct(
 
 content = """%YAML 1.2
 ---
+urn: test_urn
 window_functions:
   - name: "row_number"
     description: "the number of the current row within its partition, starting at 1"
@@ -42,7 +43,7 @@ window_functions:
 
 
 registry = ExtensionRegistry(load_default_extensions=False)
-registry.register_extension_dict(yaml.safe_load(content), urn="test_urn")
+registry.register_extension_dict(yaml.safe_load(content))
 
 
 def test_row_number():

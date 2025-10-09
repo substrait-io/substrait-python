@@ -256,22 +256,21 @@ class ExtensionRegistry:
             for fpath in importlib_files("substrait.extensions").glob(  # type: ignore
                 "functions*.yaml"
             ):
-                urn = f"{DEFAULT_URN_PREFIX}/{fpath.name}"
-                self._urn_aliases[fpath.name] = urn
-                self.register_extension_yaml(fpath, urn)
+                self.register_extension_yaml(fpath)
 
     def register_extension_yaml(
         self,
         fname: Union[str, Path],
-        urn: str,
     ) -> None:
         fname = Path(fname)
         with open(fname) as f:  # type: ignore
             extension_definitions = yaml.safe_load(f)
 
-        self.register_extension_dict(extension_definitions, urn)
+        self.register_extension_dict(extension_definitions)
 
-    def register_extension_dict(self, definitions: dict, urn: str) -> None:
+    def register_extension_dict(self, definitions: dict) -> None:
+        urn = definitions.get("urn")
+        print(f"THIS IS MY URN {urn}")
         self._urn_mapping[urn] = next(self._urn_id_generator)
 
         simple_extensions = build_simple_extensions(definitions)

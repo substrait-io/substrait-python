@@ -22,6 +22,7 @@ named_struct = stt.NamedStruct(
 
 content = """%YAML 1.2
 ---
+urn: test_urn
 aggregate_functions:
   - name: "count"
     description: Count a set of values
@@ -37,7 +38,7 @@ aggregate_functions:
 
 
 registry = ExtensionRegistry(load_default_extensions=False)
-registry.register_extension_dict(yaml.safe_load(content), urn="test_urn")
+registry.register_extension_dict(yaml.safe_load(content))
 
 
 def test_aggregate_count():

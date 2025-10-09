@@ -40,13 +40,13 @@ def basic_example():
     pretty_print_plan(table(registry), use_colors=True)
 
     """
-  extension_uris {
-    extension_uri_anchor: 13
-    uri: "functions_comparison.yaml"
+  extension_urns {
+    extension_urn_anchor: 13
+    urn: "functions_comparison.yaml"
   }
   extensions {
     extension_function {
-      extension_uri_reference: 13
+      extension_urn_reference: 13
       function_anchor: 495
       name: "lt"
     }

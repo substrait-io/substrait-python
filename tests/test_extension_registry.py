@@ -107,7 +107,7 @@ scalar_functions:
 
 registry = ExtensionRegistry()
 
-registry.register_extension_dict(yaml.safe_load(content), uri="test")
+registry.register_extension_dict(yaml.safe_load(content), urn="test")
 
 
 def i8(nullable=False):
@@ -152,10 +152,10 @@ def decimal(precision, scale, nullable=False):
     )
 
 
-def test_non_existing_uri():
+def test_non_existing_urn():
     assert (
         registry.lookup_function(
-            uri="non_existent", function_name="add", signature=[i8(), i8()]
+            urn="non_existent", function_name="add", signature=[i8(), i8()]
         )
         is None
     )
@@ -164,7 +164,7 @@ def test_non_existing_uri():
 def test_non_existing_function():
     assert (
         registry.lookup_function(
-            uri="test", function_name="sub", signature=[i8(), i8()]
+            urn="test", function_name="sub", signature=[i8(), i8()]
         )
         is None
     )
@@ -172,27 +172,27 @@ def test_non_existing_function():
 
 def test_non_existing_function_signature():
     assert (
-        registry.lookup_function(uri="test", function_name="add", signature=[i8()])
+        registry.lookup_function(urn="test", function_name="add", signature=[i8()])
         is None
     )
 
 
 def test_exact_match():
     assert registry.lookup_function(
-        uri="test", function_name="add", signature=[i8(), i8()]
+        urn="test", function_name="add", signature=[i8(), i8()]
     )[1] == Type(i8=Type.I8(nullability=Type.NULLABILITY_REQUIRED))
 
 
 def test_wildcard_match():
     assert registry.lookup_function(
-        uri="test", function_name="add", signature=[i8(), i8(), bool()]
+        urn="test", function_name="add", signature=[i8(), i8(), bool()]
     )[1] == Type(i16=Type.I16(nullability=Type.NULLABILITY_REQUIRED))
 
 
 def test_wildcard_match_fails_with_constraits():
     assert (
         registry.lookup_function(
-            uri="test", function_name="add", signature=[i8(), i16(), i16()]
+            urn="test", function_name="add", signature=[i8(), i16(), i16()]
         )
         is None
     )
@@ -201,7 +201,7 @@ def test_wildcard_match_fails_with_constraits():
 def test_wildcard_match_with_constraits():
     assert (
         registry.lookup_function(
-            uri="test", function_name="add", signature=[i16(), i16(), i8()]
+            urn="test", function_name="add", signature=[i16(), i16(), i8()]
         )[1]
         == i8()
     )
@@ -210,7 +210,7 @@ def test_wildcard_match_with_constraits():
 def test_variadic():
     assert (
         registry.lookup_function(
-            uri="test", function_name="test_fn", signature=[i8(), i8(), i8()]
+            urn="test", function_name="test_fn", signature=[i8(), i8(), i8()]
         )[1]
         == i8()
     )
@@ -219,7 +219,7 @@ def test_variadic():
 def test_variadic_any():
     assert (
         registry.lookup_function(
-            uri="test",
+            urn="test",
             function_name="test_fn_variadic_any",
             signature=[i16(), i16(), i16()],
         )[1]
@@ -229,14 +229,14 @@ def test_variadic_any():
 
 def test_variadic_fails_min_constraint():
     assert (
-        registry.lookup_function(uri="test", function_name="test_fn", signature=[i8()])
+        registry.lookup_function(urn="test", function_name="test_fn", signature=[i8()])
         is None
     )
 
 
 def test_decimal_happy_path():
     assert registry.lookup_function(
-        uri="test",
+        urn="test",
         function_name="test_decimal",
         signature=[decimal(10, 8), decimal(8, 6)],
     )[1] == decimal(11, 7)
@@ -245,7 +245,7 @@ def test_decimal_happy_path():
 def test_decimal_violates_constraint():
     assert (
         registry.lookup_function(
-            uri="test",
+            urn="test",
             function_name="test_decimal",
             signature=[decimal(10, 8), decimal(12, 10)],
         )
@@ -255,7 +255,7 @@ def test_decimal_violates_constraint():
 
 def test_decimal_happy_path_discrete():
     assert registry.lookup_function(
-        uri="test",
+        urn="test",
         function_name="test_decimal_discrete",
         signature=[decimal(10, 8, nullable=True), decimal(8, 6)],
     )[1] == decimal(11, 7, nullable=True)
@@ -264,7 +264,7 @@ def test_decimal_happy_path_discrete():
 def test_enum_with_valid_option():
     assert (
         registry.lookup_function(
-            uri="test",
+            urn="test",
             function_name="test_enum",
             signature=["FLIP", i8()],
         )[1]
@@ -275,7 +275,7 @@ def test_enum_with_valid_option():
 def test_enum_with_nonexistent_option():
     assert (
         registry.lookup_function(
-            uri="test",
+            urn="test",
             function_name="test_enum",
             signature=["NONEXISTENT", i8()],
         )
@@ -285,26 +285,26 @@ def test_enum_with_nonexistent_option():
 
 def test_function_with_nullable_args():
     assert registry.lookup_function(
-        uri="test", function_name="add", signature=[i8(nullable=True), i8()]
+        urn="test", function_name="add", signature=[i8(nullable=True), i8()]
     )[1] == i8(nullable=True)
 
 
 def test_function_with_declared_output_nullability():
     assert registry.lookup_function(
-        uri="test", function_name="add_declared", signature=[i8(), i8()]
+        urn="test", function_name="add_declared", signature=[i8(), i8()]
     )[1] == i8(nullable=True)
 
 
 def test_function_with_discrete_nullability():
     assert registry.lookup_function(
-        uri="test", function_name="add_discrete", signature=[i8(nullable=True), i8()]
+        urn="test", function_name="add_discrete", signature=[i8(nullable=True), i8()]
     )[1] == i8(nullable=True)
 
 
 def test_function_with_discrete_nullability_nonexisting():
     assert (
         registry.lookup_function(
-            uri="test", function_name="add_discrete", signature=[i8(), i8()]
+            urn="test", function_name="add_discrete", signature=[i8(), i8()]
         )
         is None
     )

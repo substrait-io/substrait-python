@@ -20,19 +20,19 @@ def type_num_names(typ: stp.Type):
         return 1
 
 
-def merge_extension_uris(*extension_uris: Iterable[ste.SimpleExtensionURI]):
-    """Merges multiple sets of SimpleExtensionURI objects into a single set.
+def merge_extension_urns(*extension_urns: Iterable[ste.SimpleExtensionURN]):
+    """Merges multiple sets of SimpleExtensionURN objects into a single set.
     The order of extensions is kept intact, while duplicates are discarded.
     Assumes that there are no collisions (different extensions having identical anchors).
     """
-    seen_uris = set()
+    seen_urns = set()
     ret = []
 
-    for uris in extension_uris:
-        for uri in uris:
-            if uri.uri not in seen_uris:
-                seen_uris.add(uri.uri)
-                ret.append(uri)
+    for urns in extension_urns:
+        for urn in urns:
+            if urn.urn not in seen_urns:
+                seen_urns.add(urn.urn)
+                ret.append(urn)
 
     return ret
 
@@ -52,7 +52,7 @@ def merge_extension_declarations(
         for declaration in declarations:
             if declaration.WhichOneof("mapping_type") == "extension_function":
                 ident = (
-                    declaration.extension_function.extension_uri_reference,
+                    declaration.extension_function.extension_urn_reference,
                     declaration.extension_function.name,
                 )
                 if ident not in seen_extension_functions:

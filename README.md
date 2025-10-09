@@ -136,12 +136,13 @@ relations {
 ```
 
 ## Load a Substrait Plan from JSON
-A substrait plan can be loaded from its JSON representation
-using the ``substrait.json.load_json`` and ``substrait.json.parse_json``
+A substrait plan can be loaded [from the JSON representation
+of the protobuf message](https://protobuf.dev/programming-guides/json/) using the [`protobuf` python library](https://pypi.org/project/protobuf/):
 functions:
 
 ```
->>> import substrait.json
+>>> from substrait.proto import Plan
+>>> from google.protobuf import json_format
 >>> jsontext = """{
 ...   "relations":[
 ...     {
@@ -182,7 +183,7 @@ functions:
 ...     }
 ...   ]
 ... }"""
->>> substrait.json.parse_json(jsontext)
+>>> json_format.Parse(text=jsontext, mesage=Plan())
 relations {
   root {
     input {

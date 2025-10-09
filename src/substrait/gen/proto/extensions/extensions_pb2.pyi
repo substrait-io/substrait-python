@@ -13,6 +13,7 @@ DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
 @typing.final
 class SimpleExtensionURI(google.protobuf.message.Message):
+    """This message is deprecated, use SimpleExtensionURN moving forwards"""
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
     EXTENSION_URI_ANCHOR_FIELD_NUMBER: builtins.int
     URI_FIELD_NUMBER: builtins.int
@@ -29,8 +30,25 @@ class SimpleExtensionURI(google.protobuf.message.Message):
 global___SimpleExtensionURI = SimpleExtensionURI
 
 @typing.final
+class SimpleExtensionURN(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+    EXTENSION_URN_ANCHOR_FIELD_NUMBER: builtins.int
+    URN_FIELD_NUMBER: builtins.int
+    extension_urn_anchor: builtins.int
+    'A surrogate key used in the context of a single plan used to reference the\n    URN associated with an extension.\n    '
+    urn: builtins.str
+    'The extension URN that uniquely identifies this extension. This must follow the\n    format extension:<OWNER>:<ID> and serves as the "namespace" of this extension.\n    '
+
+    def __init__(self, *, extension_urn_anchor: builtins.int=..., urn: builtins.str=...) -> None:
+        ...
+
+    def ClearField(self, field_name: typing.Literal['extension_urn_anchor', b'extension_urn_anchor', 'urn', b'urn']) -> None:
+        ...
+global___SimpleExtensionURN = SimpleExtensionURN
+
+@typing.final
 class SimpleExtensionDeclaration(google.protobuf.message.Message):
-    """Describes a mapping between a specific extension entity and the uri where
+    """Describes a mapping between a specific extension entity and the uri/urn where
     that extension can be found.
     """
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -40,57 +58,66 @@ class SimpleExtensionDeclaration(google.protobuf.message.Message):
         """Describes a Type"""
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
         EXTENSION_URI_REFERENCE_FIELD_NUMBER: builtins.int
+        EXTENSION_URN_REFERENCE_FIELD_NUMBER: builtins.int
         TYPE_ANCHOR_FIELD_NUMBER: builtins.int
         NAME_FIELD_NUMBER: builtins.int
         extension_uri_reference: builtins.int
-        'references the extension_uri_anchor defined for a specific extension URI.'
+        'references the extension_uri_anchor defined for a specific extension URI.\n        this is now deprecated and extension_urn_reference should be used instead.\n        '
+        extension_urn_reference: builtins.int
+        'references the extension_urn_anchor defined for a specific extension URN.\n        If both extension_urn_reference and extension_uri_reference are present,\n        extension_urn_reference takes precedence.\n        '
         type_anchor: builtins.int
         'A surrogate key used in the context of a single plan to reference a\n        specific extension type\n        '
         name: builtins.str
         'the name of the type in the defined extension YAML.'
 
-        def __init__(self, *, extension_uri_reference: builtins.int=..., type_anchor: builtins.int=..., name: builtins.str=...) -> None:
+        def __init__(self, *, extension_uri_reference: builtins.int=..., extension_urn_reference: builtins.int=..., type_anchor: builtins.int=..., name: builtins.str=...) -> None:
             ...
 
-        def ClearField(self, field_name: typing.Literal['extension_uri_reference', b'extension_uri_reference', 'name', b'name', 'type_anchor', b'type_anchor']) -> None:
+        def ClearField(self, field_name: typing.Literal['extension_uri_reference', b'extension_uri_reference', 'extension_urn_reference', b'extension_urn_reference', 'name', b'name', 'type_anchor', b'type_anchor']) -> None:
             ...
 
     @typing.final
     class ExtensionTypeVariation(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
         EXTENSION_URI_REFERENCE_FIELD_NUMBER: builtins.int
+        EXTENSION_URN_REFERENCE_FIELD_NUMBER: builtins.int
         TYPE_VARIATION_ANCHOR_FIELD_NUMBER: builtins.int
         NAME_FIELD_NUMBER: builtins.int
         extension_uri_reference: builtins.int
-        'references the extension_uri_anchor defined for a specific extension URI.'
+        'references the extension_uri_anchor defined for a specific extension URI.\n        this is now deprecated and extension_urn_reference should be used instead.\n        '
+        extension_urn_reference: builtins.int
+        'references the extension_urn_anchor defined for a specific extension URN.\n        If both extension_urn_reference and extension_uri_reference are present,\n        extension_urn_reference takes precedence.\n        '
         type_variation_anchor: builtins.int
         'A surrogate key used in the context of a single plan to reference a\n        specific type variation\n        '
         name: builtins.str
         'the name of the type in the defined extension YAML.'
 
-        def __init__(self, *, extension_uri_reference: builtins.int=..., type_variation_anchor: builtins.int=..., name: builtins.str=...) -> None:
+        def __init__(self, *, extension_uri_reference: builtins.int=..., extension_urn_reference: builtins.int=..., type_variation_anchor: builtins.int=..., name: builtins.str=...) -> None:
             ...
 
-        def ClearField(self, field_name: typing.Literal['extension_uri_reference', b'extension_uri_reference', 'name', b'name', 'type_variation_anchor', b'type_variation_anchor']) -> None:
+        def ClearField(self, field_name: typing.Literal['extension_uri_reference', b'extension_uri_reference', 'extension_urn_reference', b'extension_urn_reference', 'name', b'name', 'type_variation_anchor', b'type_variation_anchor']) -> None:
             ...
 
     @typing.final
     class ExtensionFunction(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
         EXTENSION_URI_REFERENCE_FIELD_NUMBER: builtins.int
+        EXTENSION_URN_REFERENCE_FIELD_NUMBER: builtins.int
         FUNCTION_ANCHOR_FIELD_NUMBER: builtins.int
         NAME_FIELD_NUMBER: builtins.int
         extension_uri_reference: builtins.int
-        'references the extension_uri_anchor defined for a specific extension URI.'
+        'references the extension_uri_anchor defined for a specific extension URI.\n        this is now deprecated and extension_urn_reference should be used instead.\n        '
+        extension_urn_reference: builtins.int
+        'references the extension_urn_anchor defined for a specific extension URN.\n        If both extension_urn_reference and extension_uri_reference are present,\n        extension_urn_reference takes precedence.\n        '
         function_anchor: builtins.int
         'A surrogate key used in the context of a single plan to reference a\n        specific function\n        '
         name: builtins.str
         'A function signature compound name'
 
-        def __init__(self, *, extension_uri_reference: builtins.int=..., function_anchor: builtins.int=..., name: builtins.str=...) -> None:
+        def __init__(self, *, extension_uri_reference: builtins.int=..., extension_urn_reference: builtins.int=..., function_anchor: builtins.int=..., name: builtins.str=...) -> None:
             ...
 
-        def ClearField(self, field_name: typing.Literal['extension_uri_reference', b'extension_uri_reference', 'function_anchor', b'function_anchor', 'name', b'name']) -> None:
+        def ClearField(self, field_name: typing.Literal['extension_uri_reference', b'extension_uri_reference', 'extension_urn_reference', b'extension_urn_reference', 'function_anchor', b'function_anchor', 'name', b'name']) -> None:
             ...
     EXTENSION_TYPE_FIELD_NUMBER: builtins.int
     EXTENSION_TYPE_VARIATION_FIELD_NUMBER: builtins.int

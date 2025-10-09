@@ -11,7 +11,7 @@ from substrait.gen.json import simple_extensions as se
 from substrait.simple_extension_utils import build_simple_extensions
 
 
-DEFAULT_URI_PREFIX = "https://github.com/substrait-io/substrait/blob/main/extensions"
+DEFAULT_URN_PREFIX = "https://github.com/substrait-io/substrait/blob/main/extensions"
 
 
 # mapping from argument types to shortened signature names: https://substrait.io/extensions/#function-signature-compound-names
@@ -167,12 +167,12 @@ def covers(
 
 class FunctionEntry:
     def __init__(
-        self, uri: str, name: str, impl: Union[se.Impl, se.Impl1, se.Impl2], anchor: int
+        self, urn: str, name: str, impl: Union[se.Impl, se.Impl1, se.Impl2], anchor: int
     ) -> None:
         self.name = name
         self.impl = impl
         self.normalized_inputs: list = []
-        self.uri: str = uri
+        self.urn: str = urn
         self.anchor = anchor
         self.arguments = []
         self.nullability = (
@@ -244,35 +244,35 @@ class FunctionEntry:
 
 class ExtensionRegistry:
     def __init__(self, load_default_extensions=True) -> None:
-        self._uri_mapping: dict = defaultdict(dict)
-        self._uri_id_generator = itertools.count(1)
+        self._urn_mapping: dict = defaultdict(dict)
+        self._urn_id_generator = itertools.count(1)
 
         self._function_mapping: dict = defaultdict(dict)
         self._id_generator = itertools.count(1)
 
-        self._uri_aliases = {}
+        self._urn_aliases = {}
 
         if load_default_extensions:
             for fpath in importlib_files("substrait.extensions").glob(  # type: ignore
                 "functions*.yaml"
             ):
-                uri = f"{DEFAULT_URI_PREFIX}/{fpath.name}"
-                self._uri_aliases[fpath.name] = uri
-                self.register_extension_yaml(fpath, uri)
+                urn = f"{DEFAULT_URN_PREFIX}/{fpath.name}"
+                self._urn_aliases[fpath.name] = urn
+                self.register_extension_yaml(fpath, urn)
 
     def register_extension_yaml(
         self,
         fname: Union[str, Path],
-        uri: str,
+        urn: str,
     ) -> None:
         fname = Path(fname)
         with open(fname) as f:  # type: ignore
             extension_definitions = yaml.safe_load(f)
 
-        self.register_extension_dict(extension_definitions, uri)
+        self.register_extension_dict(extension_definitions, urn)
 
-    def register_extension_dict(self, definitions: dict, uri: str) -> None:
-        self._uri_mapping[uri] = next(self._uri_id_generator)
+    def register_extension_dict(self, definitions: dict, urn: str) -> None:
+        self._urn_mapping[urn] = next(self._urn_id_generator)
 
         simple_extensions = build_simple_extensions(definitions)
 
@@ -286,28 +286,28 @@ class ExtensionRegistry:
             for function in functions:
                 for impl in function.impls:
                     func = FunctionEntry(
-                        uri, function.name, impl, next(self._id_generator)
+                        urn, function.name, impl, next(self._id_generator)
                     )
                     if (
-                        func.uri in self._function_mapping
-                        and function.name in self._function_mapping[func.uri]
+                        func.urn in self._function_mapping
+                        and function.name in self._function_mapping[func.urn]
                     ):
-                        self._function_mapping[func.uri][function.name].append(func)
+                        self._function_mapping[func.urn][function.name].append(func)
                     else:
-                        self._function_mapping[func.uri][function.name] = [func]
+                        self._function_mapping[func.urn][function.name] = [func]
 
     # TODO add an optional return type check
     def lookup_function(
-        self, uri: str, function_name: str, signature: tuple
+        self, urn: str, function_name: str, signature: tuple
     ) -> Optional[tuple[FunctionEntry, Type]]:
-        uri = self._uri_aliases.get(uri, uri)
+        urn = self._urn_aliases.get(urn, urn)
 
         if (
-            uri not in self._function_mapping
-            or function_name not in self._function_mapping[uri]
+            urn not in self._function_mapping
+            or function_name not in self._function_mapping[urn]
         ):
             return None
-        functions = self._function_mapping[uri][function_name]
+        functions = self._function_mapping[urn][function_name]
         for f in functions:
             assert isinstance(f, FunctionEntry)
             rtn = f.satisfies_signature(signature)
@@ -316,6 +316,6 @@ class ExtensionRegistry:
 
         return None
 
-    def lookup_uri(self, uri: str) -> Optional[int]:
-        uri = self._uri_aliases.get(uri, uri)
-        return self._uri_mapping.get(uri, None)
+    def lookup_urn(self, urn: str) -> Optional[int]:
+        urn = self._urn_aliases.get(urn, urn)
+        return self._urn_mapping.get(urn, None)

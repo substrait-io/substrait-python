@@ -182,7 +182,6 @@ def covers(
                 return False
             if not _check_nullability(check_nullability,parameterized_type,covered,kind):
                 return False
-            return True
             # precision / scale are both optional – a missing value means “no limit”.
             covered_scale   = getattr(covered.decimal,   "scale",   0)
             param_scale     = getattr(parameterized_type, "scale",   0)

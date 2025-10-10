@@ -111,9 +111,9 @@ def _check_nullability(check_nullability,parameterized_type,covered,kind) -> boo
     # The ANTLR context stores a Token called ``isnull`` – it is
     # present when the type is declared as nullable.
     nullability = (
-        Nullability.NULLABILITY_NULLABLE
+        Type.Nullability.NULLABILITY_NULLABLE
         if getattr(parameterized_type, "isnull", None) is not None
-        else Nullability.NULLABILITY_REQUIRED
+        else Type.Nullability.NULLABILITY_REQUIRED
     )
     # The protobuf message stores its own enum – we compare the two.
     covered_nullability = getattr(

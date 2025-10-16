@@ -3,8 +3,12 @@ import substrait.gen.proto.plan_pb2 as stp
 import substrait.gen.proto.algebra_pb2 as stalg
 from substrait.builders.type import boolean, i64
 from substrait.builders.plan import read_named_table
+import pytest
 
-struct = stt.Type.Struct(types=[i64(nullable=False), boolean()])
+struct = stt.Type.Struct(
+    types=[i64(nullable=False), boolean()],
+    nullability=stt.Type.Nullability.NULLABILITY_REQUIRED,
+)
 
 named_struct = stt.NamedStruct(names=["id", "is_applicable"], struct=struct)
 
@@ -57,3 +61,18 @@ def test_read_rel_db():
     )
 
     assert actual == expected
+
+
+def test_read_rel_schema_nullable():
+
+    struct = stt.Type.Struct(
+        types=[i64(nullable=False), boolean()],
+        nullability=stt.Type.Nullability.NULLABILITY_NULLABLE,
+    )
+
+    named_struct = stt.NamedStruct(names=["id", "is_applicable"], struct=struct)
+    with pytest.raises(Exception,match=r"NamedStruct must not contain a nullable struct"):
+        read_named_table("example_table", named_struct)(None)
+
+
+

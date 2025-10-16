@@ -34,6 +34,12 @@ def _merge_extensions(*objs):
 def read_named_table(
     names: Union[str, Iterable[str]], named_struct: stt.NamedStruct
 ) -> UnboundPlan:
+    
+    if named_struct.struct.nullability is stt.Type.NULLABILITY_NULLABLE:
+        raise Exception("NamedStruct must not contain a nullable struct")
+    elif named_struct.struct.nullability is stt.Type.NULLABILITY_UNSPECIFIED:
+        named_struct.struct.nullability = stt.Type.NULLABILITY_REQUIRED
+
     def resolve(registry: ExtensionRegistry) -> stp.Plan:
         _names = [names] if isinstance(names, str) else names
 

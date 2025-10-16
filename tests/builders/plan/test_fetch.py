@@ -8,7 +8,7 @@ from substrait.extension_registry import ExtensionRegistry
 
 registry = ExtensionRegistry(load_default_extensions=False)
 
-struct = stt.Type.Struct(types=[i64(nullable=False), boolean()])
+struct = stt.Type.Struct(types=[i64(nullable=False), boolean()],nullability=stt.Type.NULLABILITY_REQUIRED)
 
 named_struct = stt.NamedStruct(names=["id", "is_applicable"], struct=struct)
 

@@ -28,7 +28,7 @@ aggregate_functions:
 registry = ExtensionRegistry(load_default_extensions=False)
 registry.register_extension_dict(yaml.safe_load(content), uri="test_uri")
 
-struct = stt.Type.Struct(types=[i64(nullable=False), boolean()])
+struct = stt.Type.Struct(types=[i64(nullable=False), boolean()],nullability=stt.Type.NULLABILITY_REQUIRED)
 
 named_struct = stt.NamedStruct(names=["id", "is_applicable"], struct=struct)
 

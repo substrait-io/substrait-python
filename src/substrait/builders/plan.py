@@ -5,9 +5,10 @@ All builders return UnboundPlan objects that can be materialized to a Plan using
 See `examples/builder_example.py` for usage.
 """
 
-from typing import Iterable, Union, Callable
+from typing import Iterable, Optional, Union, Callable
 
 import substrait.gen.proto.algebra_pb2 as stalg
+from substrait.gen.proto.extensions.extensions_pb2 import AdvancedExtension
 import substrait.gen.proto.plan_pb2 as stp
 import substrait.gen.proto.type_pb2 as stt
 import substrait.gen.proto.extended_expression_pb2 as stee
@@ -32,7 +33,9 @@ def _merge_extensions(*objs):
 
 
 def read_named_table(
-    names: Union[str, Iterable[str]], named_struct: stt.NamedStruct
+    names: Union[str, Iterable[str]],
+    named_struct: stt.NamedStruct,
+    extension: Optional[AdvancedExtension] = None,
 ) -> UnboundPlan:
     if named_struct.struct.nullability is stt.Type.NULLABILITY_NULLABLE:
         raise Exception("NamedStruct must not contain a nullable struct")
@@ -47,6 +50,7 @@ def read_named_table(
                 common=stalg.RelCommon(direct=stalg.RelCommon.Direct()),
                 base_schema=named_struct,
                 named_table=stalg.ReadRel.NamedTable(names=_names),
+                advanced_extension=extension,
             )
         )
 
@@ -60,7 +64,9 @@ def read_named_table(
 
 
 def project(
-    plan: PlanOrUnbound, expressions: Iterable[ExtendedExpressionOrUnbound]
+    plan: PlanOrUnbound,
+    expressions: Iterable[ExtendedExpressionOrUnbound],
+    extension: Optional[AdvancedExtension] = None,
 ) -> UnboundPlan:
     def resolve(registry: ExtensionRegistry) -> stp.Plan:
         _plan = plan if isinstance(plan, stp.Plan) else plan(registry)
@@ -86,6 +92,7 @@ def project(
                 expressions=[
                     e.expression for ee in bound_expressions for e in ee.referred_expr
                 ],
+                advanced_extension=extension,
             )
         )
 
@@ -97,7 +104,11 @@ def project(
     return resolve
 
 
-def filter(plan: PlanOrUnbound, expression: ExtendedExpressionOrUnbound) -> UnboundPlan:
+def filter(
+    plan: PlanOrUnbound,
+    expression: ExtendedExpressionOrUnbound,
+    extension: Optional[AdvancedExtension] = None,
+) -> UnboundPlan:
     def resolve(registry: ExtensionRegistry) -> stp.Plan:
         bound_plan = plan if isinstance(plan, stp.Plan) else plan(registry)
         ns = infer_plan_schema(bound_plan)
@@ -109,6 +120,7 @@ def filter(plan: PlanOrUnbound, expression: ExtendedExpressionOrUnbound) -> Unbo
             filter=stalg.FilterRel(
                 input=bound_plan.relations[-1].root.input,
                 condition=bound_expression.referred_expr[0].expression,
+                advanced_extension=extension,
             )
         )
 
@@ -130,6 +142,7 @@ def sort(
             tuple[ExtendedExpressionOrUnbound, stalg.SortField.SortDirection.ValueType],
         ]
     ],
+    extension: Optional[AdvancedExtension] = None,
 ) -> UnboundPlan:
     def resolve(registry: ExtensionRegistry) -> stp.Plan:
         bound_plan = plan if isinstance(plan, stp.Plan) else plan(registry)
@@ -155,7 +168,8 @@ def sort(
                     )
                     for e in bound_expressions
                 ],
-            )
+                advanced_extension=extension,
+            ),
         )
 
         return stp.Plan(
@@ -193,6 +207,7 @@ def fetch(
     plan: PlanOrUnbound,
     offset: ExtendedExpressionOrUnbound,
     count: ExtendedExpressionOrUnbound,
+    extension: Optional[AdvancedExtension] = None,
 ) -> UnboundPlan:
     def resolve(registry: ExtensionRegistry) -> stp.Plan:
         bound_plan = plan if isinstance(plan, stp.Plan) else plan(registry)
@@ -208,6 +223,7 @@ def fetch(
                 if bound_offset
                 else None,
                 count_expr=bound_count.referred_expr[0].expression,
+                advanced_extension=extension,
             )
         )
 
@@ -230,6 +246,7 @@ def join(
     right: PlanOrUnbound,
     expression: ExtendedExpressionOrUnbound,
     type: stalg.JoinRel.JoinType,
+    extension: Optional[AdvancedExtension] = None,
 ) -> UnboundPlan:
     def resolve(registry: ExtensionRegistry) -> stp.Plan:
         bound_left = left if isinstance(left, stp.Plan) else left(registry)
@@ -254,6 +271,7 @@ def join(
                 right=bound_right.relations[-1].root.input,
                 expression=bound_expression.referred_expr[0].expression,
                 type=type,
+                advanced_extension=extension,
             )
         )
 
@@ -268,6 +286,7 @@ def join(
 def cross(
     left: PlanOrUnbound,
     right: PlanOrUnbound,
+    extension: Optional[AdvancedExtension] = None,
 ) -> UnboundPlan:
     def resolve(registry: ExtensionRegistry) -> stp.Plan:
         bound_left = left if isinstance(left, stp.Plan) else left(registry)
@@ -287,6 +306,7 @@ def cross(
             cross=stalg.CrossRel(
                 left=bound_left.relations[-1].root.input,
                 right=bound_right.relations[-1].root.input,
+                advanced_extension=extension,
             )
         )
 
@@ -303,6 +323,7 @@ def aggregate(
     input: PlanOrUnbound,
     grouping_expressions: Iterable[ExtendedExpressionOrUnbound],
     measures: Iterable[ExtendedExpressionOrUnbound],
+    extension: Optional[AdvancedExtension] = None,
 ) -> UnboundPlan:
     def resolve(registry: ExtensionRegistry) -> stp.Plan:
         bound_input = input if isinstance(input, stp.Plan) else input(registry)
@@ -332,6 +353,7 @@ def aggregate(
                     stalg.AggregateRel.Measure(measure=m.referred_expr[0].measure)
                     for m in bound_measures
                 ],
+                advanced_extension=extension,
             )
         )
 

@@ -64,15 +64,13 @@ def test_read_rel_db():
 
 
 def test_read_rel_schema_nullable():
-
     struct = stt.Type.Struct(
         types=[i64(nullable=False), boolean()],
         nullability=stt.Type.Nullability.NULLABILITY_NULLABLE,
     )
 
     named_struct = stt.NamedStruct(names=["id", "is_applicable"], struct=struct)
-    with pytest.raises(Exception,match=r"NamedStruct must not contain a nullable struct"):
+    with pytest.raises(
+        Exception, match=r"NamedStruct must not contain a nullable struct"
+    ):
         read_named_table("example_table", named_struct)(None)
-
-
-

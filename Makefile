@@ -14,5 +14,8 @@ codegen-extensions:
 lint:
 	uvx ruff@0.11.11 check
 
+lint_fix:
+	uvx ruff@0.11.11 check --fix
+
 format:
 	uvx ruff@0.11.11 format

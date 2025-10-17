@@ -1,10 +1,5 @@
 import substrait.gen.proto.type_pb2 as stt
-import substrait.gen.proto.plan_pb2 as stp
-import substrait.gen.proto.algebra_pb2 as stalg
 from substrait.builders.type import boolean, i64
-from substrait.builders.plan import read_named_table, sort
-from substrait.builders.extended_expression import column
-from substrait.type_inference import infer_plan_schema
 from substrait.builders.type import named_struct
 import pytest
 

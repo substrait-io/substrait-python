@@ -42,8 +42,7 @@ table = read_duckdb_named_table("customer", duckdb)
 table = filter(
     table,
     expression=scalar_function(
-        "functions_comparison.yaml",
-        "equal",
+        "functions_comparison.yaml:equal",
         expressions=[column("c_nationkey"), literal(3, i32())],
     ),
 )

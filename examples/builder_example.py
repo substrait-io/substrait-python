@@ -29,8 +29,7 @@ def basic_example():
     table = filter(
         table,
         expression=scalar_function(
-            "functions_comparison.yaml",
-            "lt",
+            "functions_comparison.yaml:lt",
             expressions=[column("id"), literal(100, i64())],
         ),
     )
@@ -168,8 +167,7 @@ def advanced_example():
     table = filter(
         table,
         expression=scalar_function(
-            "functions_comparison.yaml",
-            "lt",
+            "functions_comparison.yaml:lt",
             expressions=[column("id"), literal(100, i64())],
         ),
     )
@@ -200,8 +198,7 @@ def advanced_example():
     adult_users = filter(
         users,
         expression=scalar_function(
-            "functions_comparison.yaml",
-            "gt",
+            "functions_comparison.yaml:gt",
             expressions=[column("age"), literal(25, i64())],
         ),
     )
@@ -216,8 +213,7 @@ def advanced_example():
             column("salary"),
             # Add a calculated field (this would show function options if available)
             scalar_function(
-                "functions_arithmetic.yaml",
-                "multiply",
+                "functions_arithmetic.yaml:multiply",
                 expressions=[column("salary"), literal(1.1, fp64())],
                 alias="salary_with_bonus",
             ),
@@ -248,8 +244,7 @@ def advanced_example():
     high_value_orders = filter(
         orders,
         expression=scalar_function(
-            "functions_comparison.yaml",
-            "gt",
+            "functions_comparison.yaml:gt",
             expressions=[column("amount"), literal(50.0, fp64())],
         ),
     )
@@ -280,17 +275,14 @@ def expression_only_example():
     print("=== Expression-Only Example ===")
     # Show complex expression structure
     complex_expr = scalar_function(
-        "functions_arithmetic.yaml",
-        "multiply",
+        "functions_arithmetic.yaml:multiply",
         expressions=[
             scalar_function(
-                "functions_arithmetic.yaml",
-                "add",
+                "functions_arithmetic.yaml:add",
                 expressions=[
                     column("base_salary"),
                     scalar_function(
-                        "functions_arithmetic.yaml",
-                        "multiply",
+                        "functions_arithmetic.yaml:multiply",
                         expressions=[
                             column("base_salary"),
                             literal(0.15, fp64()),  # 15% bonus
@@ -299,8 +291,7 @@ def expression_only_example():
                 ],
             ),
             scalar_function(
-                "functions_arithmetic.yaml",
-                "subtract",
+                "functions_arithmetic.yaml:subtract",
                 expressions=[
                     literal(1.0, fp64()),
                     literal(0.25, fp64()),  # 25% tax rate

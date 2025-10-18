@@ -45,8 +45,7 @@ with adbc_driver_duckdb.dbapi.connect(":memory:") as conn:
         table = filter(
             table,
             expression=scalar_function(
-                "functions_comparison.yaml",
-                "gte",
+                "functions_comparison.yaml:gte",
                 expressions=[column("ints"), literal(3, i64())],
             ),
         )

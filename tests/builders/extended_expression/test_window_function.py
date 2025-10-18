@@ -46,7 +46,7 @@ registry.register_extension_dict(yaml.safe_load(content), uri="test_uri")
 
 
 def test_row_number():
-    e = window_function("test_uri", "row_number", expressions=[], alias="rn")(
+    e = window_function("test_uri:row_number", expressions=[], alias="rn")(
         named_struct, registry
     )
 

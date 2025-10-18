@@ -41,8 +41,7 @@ registry.register_extension_dict(yaml.safe_load(content), uri="test_uri")
 
 def test_aggregate_count():
     e = aggregate_function(
-        "test_uri",
-        "count",
+        "test_uri:count",
         expressions=[
             literal(
                 10,

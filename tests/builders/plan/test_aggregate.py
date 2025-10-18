@@ -38,7 +38,7 @@ def test_aggregate():
 
     group_expr = column("id")
     measure_expr = aggregate_function(
-        "test_uri", "count", expressions=[column("is_applicable")], alias=["count"]
+        "test_uri:count", expressions=[column("is_applicable")], alias=["count"]
     )
 
     actual = aggregate(

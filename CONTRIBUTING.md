@@ -6,11 +6,10 @@ git clone --recursive https://github.com/<your-fork>/substrait-python.git
 cd substrait-python
 ```
 
-## Conda env
-Create a conda environment with developer dependencies.
+## Development environment
+Activate environmen with uv.
 ```
-conda env create -f environment.yml
-conda activate substrait-python-env
+uv sync --extra test
 ```
 
 ## Update the substrait submodule locally
@@ -21,43 +20,45 @@ git submodule update --init --recursive
 ```
 
 
-# Upgrade the substrait protocol definition
+# Code generation
 
-## a) Use the upgrade script
+## Protobuf stubs
 
 Run the upgrade script to upgrade the submodule and regenerate the protobuf stubs.
 
 ```
-./update_proto.sh <version>
+uv sync --extra gen_proto
+uv run ./update_proto.sh <version>
 ```
 
-## b) Manual upgrade
+## Antlr grammar
 
-### Upgrade the Substrait submodule
+Substrait uses antlr grammar to derive output types of extension functions. Make sure java is installed and ANTLR_JAR environment variable is set. Take a look at .devcontainer/Dockerfile for example setup.
 
 ```
-cd third_party/substrait
-git checkout <version>
-cd -
-git commit . -m "Use submodule <version>"
+make antlr
 ```
 
-### Generate protocol buffers
-Generate the protobuf files manually. Requires protobuf `v3.20.1`.
+## Extensions stubs
+
+Substrait uses jsonschema to describe data model for extension files.
+
 ```
-./gen_proto.sh
+make codegen-extensions
 ```
 
+# Lint & Format
 
-# Build
-## Python package
-Editable installation.
+Run the following make commands to lint and format with ruff.
+
 ```
-pip install -e .
+make lint
+make format
 ```
 
 # Test
 Run tests in the project's root dir.
 ```
-pytest
+uv sync --extra test
+uv run pytest
 ```

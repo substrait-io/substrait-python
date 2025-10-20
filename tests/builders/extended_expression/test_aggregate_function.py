@@ -12,7 +12,8 @@ struct = stt.Type.Struct(
         stt.Type(i64=stt.Type.I64(nullability=stt.Type.NULLABILITY_REQUIRED)),
         stt.Type(string=stt.Type.String(nullability=stt.Type.NULLABILITY_NULLABLE)),
         stt.Type(fp32=stt.Type.FP32(nullability=stt.Type.NULLABILITY_NULLABLE)),
-    ]
+    ],
+    nullability=stt.Type.Nullability.NULLABILITY_REQUIRED,
 )
 
 named_struct = stt.NamedStruct(

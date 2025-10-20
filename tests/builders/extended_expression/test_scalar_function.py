@@ -68,7 +68,7 @@ def test_sclar_add():
         extensions=[
             ste.SimpleExtensionDeclaration(
                 extension_function=ste.SimpleExtensionDeclaration.ExtensionFunction(
-                    extension_uri_reference=1, function_anchor=1, name="test_func:i8"   
+                    extension_uri_reference=1, function_anchor=1, name="test_func:i8"
                 )
             )
         ],

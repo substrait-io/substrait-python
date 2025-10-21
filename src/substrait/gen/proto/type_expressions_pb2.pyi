@@ -17,83 +17,85 @@ else:
     import typing_extensions
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
-@typing_extensions.final
+@typing.final
 class DerivationExpression(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    @typing_extensions.final
+    @typing.final
     class ExpressionFixedChar(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
         LENGTH_FIELD_NUMBER: builtins.int
         VARIATION_POINTER_FIELD_NUMBER: builtins.int
         NULLABILITY_FIELD_NUMBER: builtins.int
+        variation_pointer: builtins.int
+        nullability: proto.type_pb2.Type.Nullability.ValueType
 
         @property
         def length(self) -> global___DerivationExpression:
             ...
-        variation_pointer: builtins.int
-        nullability: proto.type_pb2.Type.Nullability.ValueType
 
         def __init__(self, *, length: global___DerivationExpression | None=..., variation_pointer: builtins.int=..., nullability: proto.type_pb2.Type.Nullability.ValueType=...) -> None:
             ...
 
-        def HasField(self, field_name: typing_extensions.Literal['length', b'length']) -> builtins.bool:
+        def HasField(self, field_name: typing.Literal['length', b'length']) -> builtins.bool:
             ...
 
-        def ClearField(self, field_name: typing_extensions.Literal['length', b'length', 'nullability', b'nullability', 'variation_pointer', b'variation_pointer']) -> None:
+        def ClearField(self, field_name: typing.Literal['length', b'length', 'nullability', b'nullability', 'variation_pointer', b'variation_pointer']) -> None:
             ...
 
-    @typing_extensions.final
+    @typing.final
     class ExpressionVarChar(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
         LENGTH_FIELD_NUMBER: builtins.int
         VARIATION_POINTER_FIELD_NUMBER: builtins.int
         NULLABILITY_FIELD_NUMBER: builtins.int
+        variation_pointer: builtins.int
+        nullability: proto.type_pb2.Type.Nullability.ValueType
 
         @property
         def length(self) -> global___DerivationExpression:
             ...
-        variation_pointer: builtins.int
-        nullability: proto.type_pb2.Type.Nullability.ValueType
 
         def __init__(self, *, length: global___DerivationExpression | None=..., variation_pointer: builtins.int=..., nullability: proto.type_pb2.Type.Nullability.ValueType=...) -> None:
             ...
 
-        def HasField(self, field_name: typing_extensions.Literal['length', b'length']) -> builtins.bool:
+        def HasField(self, field_name: typing.Literal['length', b'length']) -> builtins.bool:
             ...
 
-        def ClearField(self, field_name: typing_extensions.Literal['length', b'length', 'nullability', b'nullability', 'variation_pointer', b'variation_pointer']) -> None:
+        def ClearField(self, field_name: typing.Literal['length', b'length', 'nullability', b'nullability', 'variation_pointer', b'variation_pointer']) -> None:
             ...
 
-    @typing_extensions.final
+    @typing.final
     class ExpressionFixedBinary(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
         LENGTH_FIELD_NUMBER: builtins.int
         VARIATION_POINTER_FIELD_NUMBER: builtins.int
         NULLABILITY_FIELD_NUMBER: builtins.int
+        variation_pointer: builtins.int
+        nullability: proto.type_pb2.Type.Nullability.ValueType
 
         @property
         def length(self) -> global___DerivationExpression:
             ...
-        variation_pointer: builtins.int
-        nullability: proto.type_pb2.Type.Nullability.ValueType
 
         def __init__(self, *, length: global___DerivationExpression | None=..., variation_pointer: builtins.int=..., nullability: proto.type_pb2.Type.Nullability.ValueType=...) -> None:
             ...
 
-        def HasField(self, field_name: typing_extensions.Literal['length', b'length']) -> builtins.bool:
+        def HasField(self, field_name: typing.Literal['length', b'length']) -> builtins.bool:
             ...
 
-        def ClearField(self, field_name: typing_extensions.Literal['length', b'length', 'nullability', b'nullability', 'variation_pointer', b'variation_pointer']) -> None:
+        def ClearField(self, field_name: typing.Literal['length', b'length', 'nullability', b'nullability', 'variation_pointer', b'variation_pointer']) -> None:
             ...
 
-    @typing_extensions.final
+    @typing.final
     class ExpressionDecimal(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
         SCALE_FIELD_NUMBER: builtins.int
         PRECISION_FIELD_NUMBER: builtins.int
         VARIATION_POINTER_FIELD_NUMBER: builtins.int
         NULLABILITY_FIELD_NUMBER: builtins.int
+        variation_pointer: builtins.int
+        nullability: proto.type_pb2.Type.Nullability.ValueType
 
         @property
         def scale(self) -> global___DerivationExpression:
@@ -102,148 +104,146 @@ class DerivationExpression(google.protobuf.message.Message):
         @property
         def precision(self) -> global___DerivationExpression:
             ...
-        variation_pointer: builtins.int
-        nullability: proto.type_pb2.Type.Nullability.ValueType
 
         def __init__(self, *, scale: global___DerivationExpression | None=..., precision: global___DerivationExpression | None=..., variation_pointer: builtins.int=..., nullability: proto.type_pb2.Type.Nullability.ValueType=...) -> None:
             ...
 
-        def HasField(self, field_name: typing_extensions.Literal['precision', b'precision', 'scale', b'scale']) -> builtins.bool:
+        def HasField(self, field_name: typing.Literal['precision', b'precision', 'scale', b'scale']) -> builtins.bool:
             ...
 
-        def ClearField(self, field_name: typing_extensions.Literal['nullability', b'nullability', 'precision', b'precision', 'scale', b'scale', 'variation_pointer', b'variation_pointer']) -> None:
+        def ClearField(self, field_name: typing.Literal['nullability', b'nullability', 'precision', b'precision', 'scale', b'scale', 'variation_pointer', b'variation_pointer']) -> None:
             ...
 
-    @typing_extensions.final
+    @typing.final
     class ExpressionPrecisionTime(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
         PRECISION_FIELD_NUMBER: builtins.int
         VARIATION_POINTER_FIELD_NUMBER: builtins.int
         NULLABILITY_FIELD_NUMBER: builtins.int
+        variation_pointer: builtins.int
+        nullability: proto.type_pb2.Type.Nullability.ValueType
 
         @property
         def precision(self) -> global___DerivationExpression:
             ...
-        variation_pointer: builtins.int
-        nullability: proto.type_pb2.Type.Nullability.ValueType
 
         def __init__(self, *, precision: global___DerivationExpression | None=..., variation_pointer: builtins.int=..., nullability: proto.type_pb2.Type.Nullability.ValueType=...) -> None:
             ...
 
-        def HasField(self, field_name: typing_extensions.Literal['precision', b'precision']) -> builtins.bool:
+        def HasField(self, field_name: typing.Literal['precision', b'precision']) -> builtins.bool:
             ...
 
-        def ClearField(self, field_name: typing_extensions.Literal['nullability', b'nullability', 'precision', b'precision', 'variation_pointer', b'variation_pointer']) -> None:
+        def ClearField(self, field_name: typing.Literal['nullability', b'nullability', 'precision', b'precision', 'variation_pointer', b'variation_pointer']) -> None:
             ...
 
-    @typing_extensions.final
+    @typing.final
     class ExpressionPrecisionTimestamp(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
         PRECISION_FIELD_NUMBER: builtins.int
         VARIATION_POINTER_FIELD_NUMBER: builtins.int
         NULLABILITY_FIELD_NUMBER: builtins.int
+        variation_pointer: builtins.int
+        nullability: proto.type_pb2.Type.Nullability.ValueType
 
         @property
         def precision(self) -> global___DerivationExpression:
             ...
-        variation_pointer: builtins.int
-        nullability: proto.type_pb2.Type.Nullability.ValueType
 
         def __init__(self, *, precision: global___DerivationExpression | None=..., variation_pointer: builtins.int=..., nullability: proto.type_pb2.Type.Nullability.ValueType=...) -> None:
             ...
 
-        def HasField(self, field_name: typing_extensions.Literal['precision', b'precision']) -> builtins.bool:
+        def HasField(self, field_name: typing.Literal['precision', b'precision']) -> builtins.bool:
             ...
 
-        def ClearField(self, field_name: typing_extensions.Literal['nullability', b'nullability', 'precision', b'precision', 'variation_pointer', b'variation_pointer']) -> None:
+        def ClearField(self, field_name: typing.Literal['nullability', b'nullability', 'precision', b'precision', 'variation_pointer', b'variation_pointer']) -> None:
             ...
 
-    @typing_extensions.final
+    @typing.final
     class ExpressionIntervalDay(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
         PRECISION_FIELD_NUMBER: builtins.int
         VARIATION_POINTER_FIELD_NUMBER: builtins.int
         NULLABILITY_FIELD_NUMBER: builtins.int
+        variation_pointer: builtins.int
+        nullability: proto.type_pb2.Type.Nullability.ValueType
 
         @property
         def precision(self) -> global___DerivationExpression:
             ...
-        variation_pointer: builtins.int
-        nullability: proto.type_pb2.Type.Nullability.ValueType
 
         def __init__(self, *, precision: global___DerivationExpression | None=..., variation_pointer: builtins.int=..., nullability: proto.type_pb2.Type.Nullability.ValueType=...) -> None:
             ...
 
-        def HasField(self, field_name: typing_extensions.Literal['precision', b'precision']) -> builtins.bool:
+        def HasField(self, field_name: typing.Literal['precision', b'precision']) -> builtins.bool:
             ...
 
-        def ClearField(self, field_name: typing_extensions.Literal['nullability', b'nullability', 'precision', b'precision', 'variation_pointer', b'variation_pointer']) -> None:
+        def ClearField(self, field_name: typing.Literal['nullability', b'nullability', 'precision', b'precision', 'variation_pointer', b'variation_pointer']) -> None:
             ...
 
-    @typing_extensions.final
+    @typing.final
     class ExpressionIntervalCompound(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
         PRECISION_FIELD_NUMBER: builtins.int
         VARIATION_POINTER_FIELD_NUMBER: builtins.int
         NULLABILITY_FIELD_NUMBER: builtins.int
+        variation_pointer: builtins.int
+        nullability: proto.type_pb2.Type.Nullability.ValueType
 
         @property
         def precision(self) -> global___DerivationExpression:
             ...
-        variation_pointer: builtins.int
-        nullability: proto.type_pb2.Type.Nullability.ValueType
 
         def __init__(self, *, precision: global___DerivationExpression | None=..., variation_pointer: builtins.int=..., nullability: proto.type_pb2.Type.Nullability.ValueType=...) -> None:
             ...
 
-        def HasField(self, field_name: typing_extensions.Literal['precision', b'precision']) -> builtins.bool:
+        def HasField(self, field_name: typing.Literal['precision', b'precision']) -> builtins.bool:
             ...
 
-        def ClearField(self, field_name: typing_extensions.Literal['nullability', b'nullability', 'precision', b'precision', 'variation_pointer', b'variation_pointer']) -> None:
+        def ClearField(self, field_name: typing.Literal['nullability', b'nullability', 'precision', b'precision', 'variation_pointer', b'variation_pointer']) -> None:
             ...
 
-    @typing_extensions.final
+    @typing.final
     class ExpressionPrecisionTimestampTZ(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
         PRECISION_FIELD_NUMBER: builtins.int
         VARIATION_POINTER_FIELD_NUMBER: builtins.int
         NULLABILITY_FIELD_NUMBER: builtins.int
+        variation_pointer: builtins.int
+        nullability: proto.type_pb2.Type.Nullability.ValueType
 
         @property
         def precision(self) -> global___DerivationExpression:
             ...
-        variation_pointer: builtins.int
-        nullability: proto.type_pb2.Type.Nullability.ValueType
 
         def __init__(self, *, precision: global___DerivationExpression | None=..., variation_pointer: builtins.int=..., nullability: proto.type_pb2.Type.Nullability.ValueType=...) -> None:
             ...
 
-        def HasField(self, field_name: typing_extensions.Literal['precision', b'precision']) -> builtins.bool:
+        def HasField(self, field_name: typing.Literal['precision', b'precision']) -> builtins.bool:
             ...
 
-        def ClearField(self, field_name: typing_extensions.Literal['nullability', b'nullability', 'precision', b'precision', 'variation_pointer', b'variation_pointer']) -> None:
+        def ClearField(self, field_name: typing.Literal['nullability', b'nullability', 'precision', b'precision', 'variation_pointer', b'variation_pointer']) -> None:
             ...
 
-    @typing_extensions.final
+    @typing.final
     class ExpressionStruct(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
         TYPES_FIELD_NUMBER: builtins.int
         VARIATION_POINTER_FIELD_NUMBER: builtins.int
         NULLABILITY_FIELD_NUMBER: builtins.int
+        variation_pointer: builtins.int
+        nullability: proto.type_pb2.Type.Nullability.ValueType
 
         @property
         def types(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___DerivationExpression]:
             ...
-        variation_pointer: builtins.int
-        nullability: proto.type_pb2.Type.Nullability.ValueType
 
         def __init__(self, *, types: collections.abc.Iterable[global___DerivationExpression] | None=..., variation_pointer: builtins.int=..., nullability: proto.type_pb2.Type.Nullability.ValueType=...) -> None:
             ...
 
-        def ClearField(self, field_name: typing_extensions.Literal['nullability', b'nullability', 'types', b'types', 'variation_pointer', b'variation_pointer']) -> None:
+        def ClearField(self, field_name: typing.Literal['nullability', b'nullability', 'types', b'types', 'variation_pointer', b'variation_pointer']) -> None:
             ...
 
-    @typing_extensions.final
+    @typing.final
     class ExpressionNamedStruct(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
         NAMES_FIELD_NUMBER: builtins.int
@@ -260,41 +260,43 @@ class DerivationExpression(google.protobuf.message.Message):
         def __init__(self, *, names: collections.abc.Iterable[builtins.str] | None=..., struct: global___DerivationExpression.ExpressionStruct | None=...) -> None:
             ...
 
-        def HasField(self, field_name: typing_extensions.Literal['struct', b'struct']) -> builtins.bool:
+        def HasField(self, field_name: typing.Literal['struct', b'struct']) -> builtins.bool:
             ...
 
-        def ClearField(self, field_name: typing_extensions.Literal['names', b'names', 'struct', b'struct']) -> None:
+        def ClearField(self, field_name: typing.Literal['names', b'names', 'struct', b'struct']) -> None:
             ...
 
-    @typing_extensions.final
+    @typing.final
     class ExpressionList(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
         TYPE_FIELD_NUMBER: builtins.int
         VARIATION_POINTER_FIELD_NUMBER: builtins.int
         NULLABILITY_FIELD_NUMBER: builtins.int
+        variation_pointer: builtins.int
+        nullability: proto.type_pb2.Type.Nullability.ValueType
 
         @property
         def type(self) -> global___DerivationExpression:
             ...
-        variation_pointer: builtins.int
-        nullability: proto.type_pb2.Type.Nullability.ValueType
 
         def __init__(self, *, type: global___DerivationExpression | None=..., variation_pointer: builtins.int=..., nullability: proto.type_pb2.Type.Nullability.ValueType=...) -> None:
             ...
 
-        def HasField(self, field_name: typing_extensions.Literal['type', b'type']) -> builtins.bool:
+        def HasField(self, field_name: typing.Literal['type', b'type']) -> builtins.bool:
             ...
 
-        def ClearField(self, field_name: typing_extensions.Literal['nullability', b'nullability', 'type', b'type', 'variation_pointer', b'variation_pointer']) -> None:
+        def ClearField(self, field_name: typing.Literal['nullability', b'nullability', 'type', b'type', 'variation_pointer', b'variation_pointer']) -> None:
             ...
 
-    @typing_extensions.final
+    @typing.final
     class ExpressionMap(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
         KEY_FIELD_NUMBER: builtins.int
         VALUE_FIELD_NUMBER: builtins.int
         VARIATION_POINTER_FIELD_NUMBER: builtins.int
         NULLABILITY_FIELD_NUMBER: builtins.int
+        variation_pointer: builtins.int
+        nullability: proto.type_pb2.Type.Nullability.ValueType
 
         @property
         def key(self) -> global___DerivationExpression:
@@ -303,19 +305,17 @@ class DerivationExpression(google.protobuf.message.Message):
         @property
         def value(self) -> global___DerivationExpression:
             ...
-        variation_pointer: builtins.int
-        nullability: proto.type_pb2.Type.Nullability.ValueType
 
         def __init__(self, *, key: global___DerivationExpression | None=..., value: global___DerivationExpression | None=..., variation_pointer: builtins.int=..., nullability: proto.type_pb2.Type.Nullability.ValueType=...) -> None:
             ...
 
-        def HasField(self, field_name: typing_extensions.Literal['key', b'key', 'value', b'value']) -> builtins.bool:
+        def HasField(self, field_name: typing.Literal['key', b'key', 'value', b'value']) -> builtins.bool:
             ...
 
-        def ClearField(self, field_name: typing_extensions.Literal['key', b'key', 'nullability', b'nullability', 'value', b'value', 'variation_pointer', b'variation_pointer']) -> None:
+        def ClearField(self, field_name: typing.Literal['key', b'key', 'nullability', b'nullability', 'value', b'value', 'variation_pointer', b'variation_pointer']) -> None:
             ...
 
-    @typing_extensions.final
+    @typing.final
     class ExpressionUserDefined(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
         TYPE_POINTER_FIELD_NUMBER: builtins.int
@@ -328,10 +328,10 @@ class DerivationExpression(google.protobuf.message.Message):
         def __init__(self, *, type_pointer: builtins.int=..., variation_pointer: builtins.int=..., nullability: proto.type_pb2.Type.Nullability.ValueType=...) -> None:
             ...
 
-        def ClearField(self, field_name: typing_extensions.Literal['nullability', b'nullability', 'type_pointer', b'type_pointer', 'variation_pointer', b'variation_pointer']) -> None:
+        def ClearField(self, field_name: typing.Literal['nullability', b'nullability', 'type_pointer', b'type_pointer', 'variation_pointer', b'variation_pointer']) -> None:
             ...
 
-    @typing_extensions.final
+    @typing.final
     class IfElse(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
         IF_CONDITION_FIELD_NUMBER: builtins.int
@@ -353,13 +353,13 @@ class DerivationExpression(google.protobuf.message.Message):
         def __init__(self, *, if_condition: global___DerivationExpression | None=..., if_return: global___DerivationExpression | None=..., else_return: global___DerivationExpression | None=...) -> None:
             ...
 
-        def HasField(self, field_name: typing_extensions.Literal['else_return', b'else_return', 'if_condition', b'if_condition', 'if_return', b'if_return']) -> builtins.bool:
+        def HasField(self, field_name: typing.Literal['else_return', b'else_return', 'if_condition', b'if_condition', 'if_return', b'if_return']) -> builtins.bool:
             ...
 
-        def ClearField(self, field_name: typing_extensions.Literal['else_return', b'else_return', 'if_condition', b'if_condition', 'if_return', b'if_return']) -> None:
+        def ClearField(self, field_name: typing.Literal['else_return', b'else_return', 'if_condition', b'if_condition', 'if_return', b'if_return']) -> None:
             ...
 
-    @typing_extensions.final
+    @typing.final
     class UnaryOp(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -387,13 +387,13 @@ class DerivationExpression(google.protobuf.message.Message):
         def __init__(self, *, op_type: global___DerivationExpression.UnaryOp.UnaryOpType.ValueType=..., arg: global___DerivationExpression | None=...) -> None:
             ...
 
-        def HasField(self, field_name: typing_extensions.Literal['arg', b'arg']) -> builtins.bool:
+        def HasField(self, field_name: typing.Literal['arg', b'arg']) -> builtins.bool:
             ...
 
-        def ClearField(self, field_name: typing_extensions.Literal['arg', b'arg', 'op_type', b'op_type']) -> None:
+        def ClearField(self, field_name: typing.Literal['arg', b'arg', 'op_type', b'op_type']) -> None:
             ...
 
-    @typing_extensions.final
+    @typing.final
     class BinaryOp(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -448,17 +448,17 @@ class DerivationExpression(google.protobuf.message.Message):
         def __init__(self, *, op_type: global___DerivationExpression.BinaryOp.BinaryOpType.ValueType=..., arg1: global___DerivationExpression | None=..., arg2: global___DerivationExpression | None=...) -> None:
             ...
 
-        def HasField(self, field_name: typing_extensions.Literal['arg1', b'arg1', 'arg2', b'arg2']) -> builtins.bool:
+        def HasField(self, field_name: typing.Literal['arg1', b'arg1', 'arg2', b'arg2']) -> builtins.bool:
             ...
 
-        def ClearField(self, field_name: typing_extensions.Literal['arg1', b'arg1', 'arg2', b'arg2', 'op_type', b'op_type']) -> None:
+        def ClearField(self, field_name: typing.Literal['arg1', b'arg1', 'arg2', b'arg2', 'op_type', b'op_type']) -> None:
             ...
 
-    @typing_extensions.final
+    @typing.final
     class ReturnProgram(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-        @typing_extensions.final
+        @typing.final
         class Assignment(google.protobuf.message.Message):
             DESCRIPTOR: google.protobuf.descriptor.Descriptor
             NAME_FIELD_NUMBER: builtins.int
@@ -472,10 +472,10 @@ class DerivationExpression(google.protobuf.message.Message):
             def __init__(self, *, name: builtins.str=..., expression: global___DerivationExpression | None=...) -> None:
                 ...
 
-            def HasField(self, field_name: typing_extensions.Literal['expression', b'expression']) -> builtins.bool:
+            def HasField(self, field_name: typing.Literal['expression', b'expression']) -> builtins.bool:
                 ...
 
-            def ClearField(self, field_name: typing_extensions.Literal['expression', b'expression', 'name', b'name']) -> None:
+            def ClearField(self, field_name: typing.Literal['expression', b'expression', 'name', b'name']) -> None:
                 ...
         ASSIGNMENTS_FIELD_NUMBER: builtins.int
         FINAL_EXPRESSION_FIELD_NUMBER: builtins.int
@@ -491,10 +491,10 @@ class DerivationExpression(google.protobuf.message.Message):
         def __init__(self, *, assignments: collections.abc.Iterable[global___DerivationExpression.ReturnProgram.Assignment] | None=..., final_expression: global___DerivationExpression | None=...) -> None:
             ...
 
-        def HasField(self, field_name: typing_extensions.Literal['final_expression', b'final_expression']) -> builtins.bool:
+        def HasField(self, field_name: typing.Literal['final_expression', b'final_expression']) -> builtins.bool:
             ...
 
-        def ClearField(self, field_name: typing_extensions.Literal['assignments', b'assignments', 'final_expression', b'final_expression']) -> None:
+        def ClearField(self, field_name: typing.Literal['assignments', b'assignments', 'final_expression', b'final_expression']) -> None:
             ...
     BOOL_FIELD_NUMBER: builtins.int
     I8_FIELD_NUMBER: builtins.int
@@ -532,6 +532,11 @@ class DerivationExpression(google.protobuf.message.Message):
     BINARY_OP_FIELD_NUMBER: builtins.int
     IF_ELSE_FIELD_NUMBER: builtins.int
     RETURN_PROGRAM_FIELD_NUMBER: builtins.int
+    user_defined_pointer: builtins.int
+    'Deprecated in favor of user_defined, which allows nullability and\n    variations to be specified. If user_defined_pointer is encountered,\n    treat it as being non-nullable and having the default variation.\n    '
+    type_parameter_name: builtins.str
+    integer_parameter_name: builtins.str
+    integer_literal: builtins.int
 
     @property
     def bool(self) -> proto.type_pb2.Type.Boolean:
@@ -644,11 +649,6 @@ class DerivationExpression(google.protobuf.message.Message):
     @property
     def user_defined(self) -> global___DerivationExpression.ExpressionUserDefined:
         ...
-    user_defined_pointer: builtins.int
-    'Deprecated in favor of user_defined, which allows nullability and\n    variations to be specified. If user_defined_pointer is encountered,\n    treat it as being non-nullable and having the default variation.\n    '
-    type_parameter_name: builtins.str
-    integer_parameter_name: builtins.str
-    integer_literal: builtins.int
 
     @property
     def unary_op(self) -> global___DerivationExpression.UnaryOp:
@@ -669,12 +669,12 @@ class DerivationExpression(google.protobuf.message.Message):
     def __init__(self, *, bool: proto.type_pb2.Type.Boolean | None=..., i8: proto.type_pb2.Type.I8 | None=..., i16: proto.type_pb2.Type.I16 | None=..., i32: proto.type_pb2.Type.I32 | None=..., i64: proto.type_pb2.Type.I64 | None=..., fp32: proto.type_pb2.Type.FP32 | None=..., fp64: proto.type_pb2.Type.FP64 | None=..., string: proto.type_pb2.Type.String | None=..., binary: proto.type_pb2.Type.Binary | None=..., timestamp: proto.type_pb2.Type.Timestamp | None=..., date: proto.type_pb2.Type.Date | None=..., time: proto.type_pb2.Type.Time | None=..., interval_year: proto.type_pb2.Type.IntervalYear | None=..., timestamp_tz: proto.type_pb2.Type.TimestampTZ | None=..., uuid: proto.type_pb2.Type.UUID | None=..., interval_day: global___DerivationExpression.ExpressionIntervalDay | None=..., interval_compound: global___DerivationExpression.ExpressionIntervalCompound | None=..., fixed_char: global___DerivationExpression.ExpressionFixedChar | None=..., varchar: global___DerivationExpression.ExpressionVarChar | None=..., fixed_binary: global___DerivationExpression.ExpressionFixedBinary | None=..., decimal: global___DerivationExpression.ExpressionDecimal | None=..., precision_time: global___DerivationExpression.ExpressionPrecisionTime | None=..., precision_timestamp: global___DerivationExpression.ExpressionPrecisionTimestamp | None=..., precision_timestamp_tz: global___DerivationExpression.ExpressionPrecisionTimestampTZ | None=..., struct: global___DerivationExpression.ExpressionStruct | None=..., list: global___DerivationExpression.ExpressionList | None=..., map: global___DerivationExpression.ExpressionMap | None=..., user_defined: global___DerivationExpression.ExpressionUserDefined | None=..., user_defined_pointer: builtins.int=..., type_parameter_name: builtins.str=..., integer_parameter_name: builtins.str=..., integer_literal: builtins.int=..., unary_op: global___DerivationExpression.UnaryOp | None=..., binary_op: global___DerivationExpression.BinaryOp | None=..., if_else: global___DerivationExpression.IfElse | None=..., return_program: global___DerivationExpression.ReturnProgram | None=...) -> None:
         ...
 
-    def HasField(self, field_name: typing_extensions.Literal['binary', b'binary', 'binary_op', b'binary_op', 'bool', b'bool', 'date', b'date', 'decimal', b'decimal', 'fixed_binary', b'fixed_binary', 'fixed_char', b'fixed_char', 'fp32', b'fp32', 'fp64', b'fp64', 'i16', b'i16', 'i32', b'i32', 'i64', b'i64', 'i8', b'i8', 'if_else', b'if_else', 'integer_literal', b'integer_literal', 'integer_parameter_name', b'integer_parameter_name', 'interval_compound', b'interval_compound', 'interval_day', b'interval_day', 'interval_year', b'interval_year', 'kind', b'kind', 'list', b'list', 'map', b'map', 'precision_time', b'precision_time', 'precision_timestamp', b'precision_timestamp', 'precision_timestamp_tz', b'precision_timestamp_tz', 'return_program', b'return_program', 'string', b'string', 'struct', b'struct', 'time', b'time', 'timestamp', b'timestamp', 'timestamp_tz', b'timestamp_tz', 'type_parameter_name', b'type_parameter_name', 'unary_op', b'unary_op', 'user_defined', b'user_defined', 'user_defined_pointer', b'user_defined_pointer', 'uuid', b'uuid', 'varchar', b'varchar']) -> builtins.bool:
+    def HasField(self, field_name: typing.Literal['binary', b'binary', 'binary_op', b'binary_op', 'bool', b'bool', 'date', b'date', 'decimal', b'decimal', 'fixed_binary', b'fixed_binary', 'fixed_char', b'fixed_char', 'fp32', b'fp32', 'fp64', b'fp64', 'i16', b'i16', 'i32', b'i32', 'i64', b'i64', 'i8', b'i8', 'if_else', b'if_else', 'integer_literal', b'integer_literal', 'integer_parameter_name', b'integer_parameter_name', 'interval_compound', b'interval_compound', 'interval_day', b'interval_day', 'interval_year', b'interval_year', 'kind', b'kind', 'list', b'list', 'map', b'map', 'precision_time', b'precision_time', 'precision_timestamp', b'precision_timestamp', 'precision_timestamp_tz', b'precision_timestamp_tz', 'return_program', b'return_program', 'string', b'string', 'struct', b'struct', 'time', b'time', 'timestamp', b'timestamp', 'timestamp_tz', b'timestamp_tz', 'type_parameter_name', b'type_parameter_name', 'unary_op', b'unary_op', 'user_defined', b'user_defined', 'user_defined_pointer', b'user_defined_pointer', 'uuid', b'uuid', 'varchar', b'varchar']) -> builtins.bool:
         ...
 
-    def ClearField(self, field_name: typing_extensions.Literal['binary', b'binary', 'binary_op', b'binary_op', 'bool', b'bool', 'date', b'date', 'decimal', b'decimal', 'fixed_binary', b'fixed_binary', 'fixed_char', b'fixed_char', 'fp32', b'fp32', 'fp64', b'fp64', 'i16', b'i16', 'i32', b'i32', 'i64', b'i64', 'i8', b'i8', 'if_else', b'if_else', 'integer_literal', b'integer_literal', 'integer_parameter_name', b'integer_parameter_name', 'interval_compound', b'interval_compound', 'interval_day', b'interval_day', 'interval_year', b'interval_year', 'kind', b'kind', 'list', b'list', 'map', b'map', 'precision_time', b'precision_time', 'precision_timestamp', b'precision_timestamp', 'precision_timestamp_tz', b'precision_timestamp_tz', 'return_program', b'return_program', 'string', b'string', 'struct', b'struct', 'time', b'time', 'timestamp', b'timestamp', 'timestamp_tz', b'timestamp_tz', 'type_parameter_name', b'type_parameter_name', 'unary_op', b'unary_op', 'user_defined', b'user_defined', 'user_defined_pointer', b'user_defined_pointer', 'uuid', b'uuid', 'varchar', b'varchar']) -> None:
+    def ClearField(self, field_name: typing.Literal['binary', b'binary', 'binary_op', b'binary_op', 'bool', b'bool', 'date', b'date', 'decimal', b'decimal', 'fixed_binary', b'fixed_binary', 'fixed_char', b'fixed_char', 'fp32', b'fp32', 'fp64', b'fp64', 'i16', b'i16', 'i32', b'i32', 'i64', b'i64', 'i8', b'i8', 'if_else', b'if_else', 'integer_literal', b'integer_literal', 'integer_parameter_name', b'integer_parameter_name', 'interval_compound', b'interval_compound', 'interval_day', b'interval_day', 'interval_year', b'interval_year', 'kind', b'kind', 'list', b'list', 'map', b'map', 'precision_time', b'precision_time', 'precision_timestamp', b'precision_timestamp', 'precision_timestamp_tz', b'precision_timestamp_tz', 'return_program', b'return_program', 'string', b'string', 'struct', b'struct', 'time', b'time', 'timestamp', b'timestamp', 'timestamp_tz', b'timestamp_tz', 'type_parameter_name', b'type_parameter_name', 'unary_op', b'unary_op', 'user_defined', b'user_defined', 'user_defined_pointer', b'user_defined_pointer', 'uuid', b'uuid', 'varchar', b'varchar']) -> None:
         ...
 
-    def WhichOneof(self, oneof_group: typing_extensions.Literal['kind', b'kind']) -> typing_extensions.Literal['bool', 'i8', 'i16', 'i32', 'i64', 'fp32', 'fp64', 'string', 'binary', 'timestamp', 'date', 'time', 'interval_year', 'timestamp_tz', 'uuid', 'interval_day', 'interval_compound', 'fixed_char', 'varchar', 'fixed_binary', 'decimal', 'precision_time', 'precision_timestamp', 'precision_timestamp_tz', 'struct', 'list', 'map', 'user_defined', 'user_defined_pointer', 'type_parameter_name', 'integer_parameter_name', 'integer_literal', 'unary_op', 'binary_op', 'if_else', 'return_program'] | None:
+    def WhichOneof(self, oneof_group: typing.Literal['kind', b'kind']) -> typing.Literal['bool', 'i8', 'i16', 'i32', 'i64', 'fp32', 'fp64', 'string', 'binary', 'timestamp', 'date', 'time', 'interval_year', 'timestamp_tz', 'uuid', 'interval_day', 'interval_compound', 'fixed_char', 'varchar', 'fixed_binary', 'decimal', 'precision_time', 'precision_timestamp', 'precision_timestamp_tz', 'struct', 'list', 'map', 'user_defined', 'user_defined_pointer', 'type_parameter_name', 'integer_parameter_name', 'integer_literal', 'unary_op', 'binary_op', 'if_else', 'return_program'] | None:
         ...
 global___DerivationExpression = DerivationExpression

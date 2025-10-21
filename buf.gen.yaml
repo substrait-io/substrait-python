@@ -2,5 +2,5 @@ version: v2
 plugins:
   - protoc_builtin: python
     out: src/substrait/gen
-  - remote: buf.build/community/nipunn1313-mypy:v3.5.0
+  - remote: buf.build/community/nipunn1313-mypy:v3.6.0
     out: src/substrait/gen

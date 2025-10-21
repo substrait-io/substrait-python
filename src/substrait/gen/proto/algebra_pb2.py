@@ -1,8 +1,10 @@
 """Generated protocol buffer code."""
 from google.protobuf import descriptor as _descriptor
 from google.protobuf import descriptor_pool as _descriptor_pool
+from google.protobuf import runtime_version as _runtime_version
 from google.protobuf import symbol_database as _symbol_database
 from google.protobuf.internal import builder as _builder
+_runtime_version.ValidateProtobufRuntimeVersion(_runtime_version.Domain.PUBLIC, 5, 29, 5, '', 'proto/algebra.proto')
 _sym_db = _symbol_database.Default()
 from google.protobuf import any_pb2 as google_dot_protobuf_dot_any__pb2
 from ..proto.extensions import extensions_pb2 as proto_dot_extensions_dot_extensions__pb2
@@ -11,42 +13,42 @@ DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x13proto/algebra.
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'proto.algebra_pb2', _globals)
-if _descriptor._USE_C_DESCRIPTORS == False:
-    _globals['DESCRIPTOR']._options = None
+if not _descriptor._USE_C_DESCRIPTORS:
+    _globals['DESCRIPTOR']._loaded_options = None
     _globals['DESCRIPTOR']._serialized_options = b'\n\x0eio.proto.protoP\x01\xaa\x02\x0eProto.Protobuf'
-    _globals['_READREL_VIRTUALTABLE'].fields_by_name['values']._options = None
+    _globals['_READREL_VIRTUALTABLE'].fields_by_name['values']._loaded_options = None
     _globals['_READREL_VIRTUALTABLE'].fields_by_name['values']._serialized_options = b'\x18\x01'
-    _globals['_FETCHREL'].fields_by_name['offset']._options = None
+    _globals['_FETCHREL'].fields_by_name['offset']._loaded_options = None
     _globals['_FETCHREL'].fields_by_name['offset']._serialized_options = b'\x18\x01'
-    _globals['_FETCHREL'].fields_by_name['count']._options = None
+    _globals['_FETCHREL'].fields_by_name['count']._loaded_options = None
     _globals['_FETCHREL'].fields_by_name['count']._serialized_options = b'\x18\x01'
-    _globals['_AGGREGATEREL_GROUPING'].fields_by_name['grouping_expressions']._options = None
+    _globals['_AGGREGATEREL_GROUPING'].fields_by_name['grouping_expressions']._loaded_options = None
     _globals['_AGGREGATEREL_GROUPING'].fields_by_name['grouping_expressions']._serialized_options = b'\x18\x01'
-    _globals['_HASHJOINREL'].fields_by_name['left_keys']._options = None
+    _globals['_HASHJOINREL'].fields_by_name['left_keys']._loaded_options = None
     _globals['_HASHJOINREL'].fields_by_name['left_keys']._serialized_options = b'\x18\x01'
-    _globals['_HASHJOINREL'].fields_by_name['right_keys']._options = None
+    _globals['_HASHJOINREL'].fields_by_name['right_keys']._loaded_options = None
     _globals['_HASHJOINREL'].fields_by_name['right_keys']._serialized_options = b'\x18\x01'
-    _globals['_MERGEJOINREL'].fields_by_name['left_keys']._options = None
+    _globals['_MERGEJOINREL'].fields_by_name['left_keys']._loaded_options = None
     _globals['_MERGEJOINREL'].fields_by_name['left_keys']._serialized_options = b'\x18\x01'
-    _globals['_MERGEJOINREL'].fields_by_name['right_keys']._options = None
+    _globals['_MERGEJOINREL'].fields_by_name['right_keys']._loaded_options = None
     _globals['_MERGEJOINREL'].fields_by_name['right_keys']._serialized_options = b'\x18\x01'
-    _globals['_EXPRESSION_ENUM_EMPTY']._options = None
+    _globals['_EXPRESSION_ENUM_EMPTY']._loaded_options = None
     _globals['_EXPRESSION_ENUM_EMPTY']._serialized_options = b'\x18\x01'
-    _globals['_EXPRESSION_ENUM']._options = None
+    _globals['_EXPRESSION_ENUM']._loaded_options = None
     _globals['_EXPRESSION_ENUM']._serialized_options = b'\x18\x01'
-    _globals['_EXPRESSION_LITERAL_INTERVALDAYTOSECOND'].fields_by_name['microseconds']._options = None
+    _globals['_EXPRESSION_LITERAL_INTERVALDAYTOSECOND'].fields_by_name['microseconds']._loaded_options = None
     _globals['_EXPRESSION_LITERAL_INTERVALDAYTOSECOND'].fields_by_name['microseconds']._serialized_options = b'\x18\x01'
-    _globals['_EXPRESSION_LITERAL'].fields_by_name['timestamp']._options = None
+    _globals['_EXPRESSION_LITERAL'].fields_by_name['timestamp']._loaded_options = None
     _globals['_EXPRESSION_LITERAL'].fields_by_name['timestamp']._serialized_options = b'\x18\x01'
-    _globals['_EXPRESSION_LITERAL'].fields_by_name['timestamp_tz']._options = None
+    _globals['_EXPRESSION_LITERAL'].fields_by_name['timestamp_tz']._loaded_options = None
     _globals['_EXPRESSION_LITERAL'].fields_by_name['timestamp_tz']._serialized_options = b'\x18\x01'
-    _globals['_EXPRESSION_SCALARFUNCTION'].fields_by_name['args']._options = None
+    _globals['_EXPRESSION_SCALARFUNCTION'].fields_by_name['args']._loaded_options = None
     _globals['_EXPRESSION_SCALARFUNCTION'].fields_by_name['args']._serialized_options = b'\x18\x01'
-    _globals['_EXPRESSION_WINDOWFUNCTION'].fields_by_name['args']._options = None
+    _globals['_EXPRESSION_WINDOWFUNCTION'].fields_by_name['args']._loaded_options = None
     _globals['_EXPRESSION_WINDOWFUNCTION'].fields_by_name['args']._serialized_options = b'\x18\x01'
-    _globals['_EXPRESSION'].fields_by_name['enum']._options = None
+    _globals['_EXPRESSION'].fields_by_name['enum']._loaded_options = None
     _globals['_EXPRESSION'].fields_by_name['enum']._serialized_options = b'\x18\x01'
-    _globals['_AGGREGATEFUNCTION'].fields_by_name['args']._options = None
+    _globals['_AGGREGATEFUNCTION'].fields_by_name['args']._loaded_options = None
     _globals['_AGGREGATEFUNCTION'].fields_by_name['args']._serialized_options = b'\x18\x01'
     _globals['_AGGREGATIONPHASE']._serialized_start = 29278
     _globals['_AGGREGATIONPHASE']._serialized_end = 29517

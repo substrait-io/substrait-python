@@ -5,7 +5,7 @@ authors = [{name = "Substrait contributors", email = "substrait@googlegroups.com
 license = {text = "Apache-2.0"}
 readme = "README.md"
 requires-python = ">=3.9"
-dependencies = ["protobuf >= 3.20"]
+dependencies = ["protobuf >=3.19.1,<6"]
 dynamic = ["version"]
 
 [tool.setuptools_scm]
@@ -13,7 +13,7 @@ write_to = "src/substrait/_version.py"
 
 [project.optional-dependencies]
 extensions = ["antlr4-python3-runtime", "pyyaml"]
-gen_proto = ["protobuf == 3.20.1", "protoletariat >= 2.0.0"]
+gen_proto = ["protobuf >=3.19.1,<6", "protoletariat >= 3.0.0"]
 sql = ["sqloxide", "deepdiff"]
 test = ["pytest >= 7.0.0", "antlr4-python3-runtime", "pyyaml", "sqloxide", "deepdiff", "duckdb<=1.2.2", "datafusion"]
 

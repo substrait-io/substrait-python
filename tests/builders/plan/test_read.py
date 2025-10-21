@@ -5,7 +5,7 @@ from substrait.builders.type import boolean, i64
 from substrait.builders.plan import read_named_table
 import pytest
 from substrait.gen.proto.extensions.extensions_pb2 import AdvancedExtension
-from google.protobuf import any
+from google.protobuf import any_pb2
 from google.protobuf.wrappers_pb2 import StringValue
 
 struct = stt.Type.Struct(
@@ -80,7 +80,10 @@ def test_read_rel_schema_nullable():
 
 
 def test_read_rel_ae():
-    extension = AdvancedExtension(optimization=[any.pack(StringValue(value="Opt1"))])
+    any = any_pb2.Any()
+    any.Pack(StringValue(value="Opt1"))
+
+    extension = AdvancedExtension(optimization=[any])
 
     actual = read_named_table(["example_db", "example_table"], named_struct, extension)(
         None

@@ -7,7 +7,7 @@ cd substrait-python
 ```
 
 ## Development environment
-Activate environmen with uv.
+Activate environment with uv.
 ```
 uv sync --extra test
 ```
@@ -41,7 +41,7 @@ make antlr
 
 ## Extensions stubs
 
-Substrait uses jsonschema to describe data model for extension files.
+Substrait uses jsonschema to describe the data model for extension files.
 
 ```
 make codegen-extensions

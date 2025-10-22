@@ -722,7 +722,7 @@ class PlanPrinter:
             )
         elif literal.HasField("string"):
             stream.write(
-                f"{indent}{self._color('string', Colors.BLUE)}: {self._color(f'"{literal.string}"', Colors.GREEN)}\n"
+                f"{indent}{self._color('string', Colors.BLUE)}: {self._color(literal.string, Colors.GREEN)}\n"
             )
         elif literal.HasField("date"):
             stream.write(
@@ -783,7 +783,7 @@ class PlanPrinter:
                     )
                 elif field.HasField("string"):
                     stream.write(
-                        f"{self._get_indent_with_arrow(depth + 2)}{self._color('string', Colors.BLUE)}: {self._color(f'"{field.string}"', Colors.GREEN)}\n"
+                        f"{self._get_indent_with_arrow(depth + 2)}{self._color('string', Colors.BLUE)}: {self._color(field.string, Colors.GREEN)}\n"
                     )
                 elif field.HasField("boolean"):
                     stream.write(

@@ -204,12 +204,12 @@ def column(field: Union[str, int], alias: Union[Iterable[str], str] = None):
 
 
 def scalar_function(
-    uri: str,
-    function: str,
+    function: Union[Iterable[str], str],
     expressions: Iterable[ExtendedExpressionOrUnbound],
     alias: Union[Iterable[str], str] = None,
 ):
     """Builds a resolver for ExtendedExpression containing a ScalarFunction expression"""
+    functions = [function] if isinstance(function, str) else function
 
     def resolve(
         base_schema: stp.NamedStruct, registry: ExtensionRegistry
@@ -224,23 +224,30 @@ def scalar_function(
 
         signature = [typ for es in expression_schemas for typ in es.types]
 
-        func = registry.lookup_function(uri, function, signature)
+        for f in functions:
+            uri, name = f.split(":")
+            func = registry.lookup_function(uri, name, signature)
+            if func:
+                break
 
         if not func:
             raise Exception(f"Unknown function {function} for {signature}")
 
+        resolved_func, return_type = func
+
         func_extension_uris = [
             ste.SimpleExtensionURI(
-                extension_uri_anchor=registry.lookup_uri(uri), uri=uri
+                extension_uri_anchor=registry.lookup_uri(resolved_func.uri),
+                uri=resolved_func.uri,
             )
         ]
 
         func_extensions = [
             ste.SimpleExtensionDeclaration(
                 extension_function=ste.SimpleExtensionDeclaration.ExtensionFunction(
-                    extension_uri_reference=registry.lookup_uri(uri),
-                    function_anchor=func[0].anchor,
-                    name=str(func[0]),
+                    extension_uri_reference=registry.lookup_uri(resolved_func.uri),
+                    function_anchor=resolved_func.anchor,
+                    name=str(resolved_func),
                 )
             )
         ]
@@ -258,14 +265,14 @@ def scalar_function(
                 stee.ExpressionReference(
                     expression=stalg.Expression(
                         scalar_function=stalg.Expression.ScalarFunction(
-                            function_reference=func[0].anchor,
+                            function_reference=resolved_func.anchor,
                             arguments=[
                                 stalg.FunctionArgument(
                                     value=e.referred_expr[0].expression
                                 )
                                 for e in bound_expressions
                             ],
-                            output_type=func[1],
+                            output_type=return_type,
                         )
                     ),
                     output_names=_alias_or_inferred(
@@ -284,12 +291,12 @@ def scalar_function(
 
 
 def aggregate_function(
-    uri: str,
-    function: str,
+    function: Union[Iterable[str], str],
     expressions: Iterable[ExtendedExpressionOrUnbound],
     alias: Union[Iterable[str], str] = None,
 ):
     """Builds a resolver for ExtendedExpression containing a AggregateFunction measure"""
+    functions = [function] if isinstance(function, str) else function
 
     def resolve(
         base_schema: stp.NamedStruct, registry: ExtensionRegistry
@@ -304,23 +311,30 @@ def aggregate_function(
 
         signature = [typ for es in expression_schemas for typ in es.types]
 
-        func = registry.lookup_function(uri, function, signature)
+        for f in functions:
+            uri, name = f.split(":")
+            func = registry.lookup_function(uri, name, signature)
+            if func:
+                break
 
         if not func:
             raise Exception(f"Unknown function {function} for {signature}")
 
+        resolved_func, return_type = func
+
         func_extension_uris = [
             ste.SimpleExtensionURI(
-                extension_uri_anchor=registry.lookup_uri(uri), uri=uri
+                extension_uri_anchor=registry.lookup_uri(resolved_func.uri),
+                uri=resolved_func.uri,
             )
         ]
 
         func_extensions = [
             ste.SimpleExtensionDeclaration(
                 extension_function=ste.SimpleExtensionDeclaration.ExtensionFunction(
-                    extension_uri_reference=registry.lookup_uri(uri),
-                    function_anchor=func[0].anchor,
-                    name=str(func[0]),
+                    extension_uri_reference=registry.lookup_uri(resolved_func.uri),
+                    function_anchor=resolved_func.anchor,
+                    name=str(resolved_func),
                 )
             )
         ]
@@ -342,7 +356,7 @@ def aggregate_function(
                             stalg.FunctionArgument(value=e.referred_expr[0].expression)
                             for e in bound_expressions
                         ],
-                        output_type=func[1],
+                        output_type=return_type,
                     ),
                     output_names=_alias_or_inferred(
                         alias,
@@ -361,13 +375,13 @@ def aggregate_function(
 
 # TODO bounds, sorts
 def window_function(
-    uri: str,
-    function: str,
+    function: Union[Iterable[str], str],
     expressions: Iterable[ExtendedExpressionOrUnbound],
     partitions: Iterable[ExtendedExpressionOrUnbound] = [],
     alias: Union[Iterable[str], str] = None,
 ):
     """Builds a resolver for ExtendedExpression containing a WindowFunction expression"""
+    functions = [function] if isinstance(function, str) else function
 
     def resolve(
         base_schema: stp.NamedStruct, registry: ExtensionRegistry
@@ -386,23 +400,30 @@ def window_function(
 
         signature = [typ for es in expression_schemas for typ in es.types]
 
-        func = registry.lookup_function(uri, function, signature)
+        for f in functions:
+            uri, name = f.split(":")
+            func = registry.lookup_function(uri, name, signature)
+            if func:
+                break
 
         if not func:
             raise Exception(f"Unknown function {function} for {signature}")
 
+        resolved_func, return_type = func
+
         func_extension_uris = [
             ste.SimpleExtensionURI(
-                extension_uri_anchor=registry.lookup_uri(uri), uri=uri
+                extension_uri_anchor=registry.lookup_uri(resolved_func.uri),
+                uri=resolved_func.uri,
             )
         ]
 
         func_extensions = [
             ste.SimpleExtensionDeclaration(
                 extension_function=ste.SimpleExtensionDeclaration.ExtensionFunction(
-                    extension_uri_reference=registry.lookup_uri(uri),
-                    function_anchor=func[0].anchor,
-                    name=str(func[0]),
+                    extension_uri_reference=registry.lookup_uri(resolved_func.uri),
+                    function_anchor=resolved_func.anchor,
+                    name=str(resolved_func),
                 )
             )
         ]
@@ -431,7 +452,7 @@ def window_function(
                                 )
                                 for e in bound_expressions
                             ],
-                            output_type=func[1],
+                            output_type=return_type,
                             partitions=[
                                 e.referred_expr[0].expression for e in bound_partitions
                             ],

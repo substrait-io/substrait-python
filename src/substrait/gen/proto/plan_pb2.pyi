@@ -8,14 +8,10 @@ import google.protobuf.descriptor
 import google.protobuf.internal.containers
 import google.protobuf.message
 from .. import proto
-import sys
-if sys.version_info >= (3, 8):
-    import typing as typing_extensions
-else:
-    import typing_extensions
+import typing
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
-@typing_extensions.final
+@typing.final
 class PlanRel(google.protobuf.message.Message):
     """Either a relation or root relation"""
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -33,17 +29,17 @@ class PlanRel(google.protobuf.message.Message):
     def __init__(self, *, rel: proto.algebra_pb2.Rel | None=..., root: proto.algebra_pb2.RelRoot | None=...) -> None:
         ...
 
-    def HasField(self, field_name: typing_extensions.Literal['rel', b'rel', 'rel_type', b'rel_type', 'root', b'root']) -> builtins.bool:
+    def HasField(self, field_name: typing.Literal['rel', b'rel', 'rel_type', b'rel_type', 'root', b'root']) -> builtins.bool:
         ...
 
-    def ClearField(self, field_name: typing_extensions.Literal['rel', b'rel', 'rel_type', b'rel_type', 'root', b'root']) -> None:
+    def ClearField(self, field_name: typing.Literal['rel', b'rel', 'rel_type', b'rel_type', 'root', b'root']) -> None:
         ...
 
-    def WhichOneof(self, oneof_group: typing_extensions.Literal['rel_type', b'rel_type']) -> typing_extensions.Literal['rel', 'root'] | None:
+    def WhichOneof(self, oneof_group: typing.Literal['rel_type', b'rel_type']) -> typing.Literal['rel', 'root'] | None:
         ...
 global___PlanRel = PlanRel
 
-@typing_extensions.final
+@typing.final
 class Plan(google.protobuf.message.Message):
     """Describe a set of operations to complete.
     For compactness sake, identifiers are normalized at the plan level.
@@ -97,14 +93,14 @@ class Plan(google.protobuf.message.Message):
     def __init__(self, *, version: global___Version | None=..., extension_uris: collections.abc.Iterable[proto.extensions.extensions_pb2.SimpleExtensionURI] | None=..., extensions: collections.abc.Iterable[proto.extensions.extensions_pb2.SimpleExtensionDeclaration] | None=..., relations: collections.abc.Iterable[global___PlanRel] | None=..., advanced_extensions: proto.extensions.extensions_pb2.AdvancedExtension | None=..., expected_type_urls: collections.abc.Iterable[builtins.str] | None=..., parameter_bindings: collections.abc.Iterable[global___DynamicParameterBinding] | None=...) -> None:
         ...
 
-    def HasField(self, field_name: typing_extensions.Literal['advanced_extensions', b'advanced_extensions', 'version', b'version']) -> builtins.bool:
+    def HasField(self, field_name: typing.Literal['advanced_extensions', b'advanced_extensions', 'version', b'version']) -> builtins.bool:
         ...
 
-    def ClearField(self, field_name: typing_extensions.Literal['advanced_extensions', b'advanced_extensions', 'expected_type_urls', b'expected_type_urls', 'extension_uris', b'extension_uris', 'extensions', b'extensions', 'parameter_bindings', b'parameter_bindings', 'relations', b'relations', 'version', b'version']) -> None:
+    def ClearField(self, field_name: typing.Literal['advanced_extensions', b'advanced_extensions', 'expected_type_urls', b'expected_type_urls', 'extension_uris', b'extension_uris', 'extensions', b'extensions', 'parameter_bindings', b'parameter_bindings', 'relations', b'relations', 'version', b'version']) -> None:
         ...
 global___Plan = Plan
 
-@typing_extensions.final
+@typing.final
 class PlanVersion(google.protobuf.message.Message):
     """This message type can be used to deserialize only the version of a Substrait
     Plan message. This prevents deserialization errors when there were breaking
@@ -122,14 +118,14 @@ class PlanVersion(google.protobuf.message.Message):
     def __init__(self, *, version: global___Version | None=...) -> None:
         ...
 
-    def HasField(self, field_name: typing_extensions.Literal['version', b'version']) -> builtins.bool:
+    def HasField(self, field_name: typing.Literal['version', b'version']) -> builtins.bool:
         ...
 
-    def ClearField(self, field_name: typing_extensions.Literal['version', b'version']) -> None:
+    def ClearField(self, field_name: typing.Literal['version', b'version']) -> None:
         ...
 global___PlanVersion = PlanVersion
 
-@typing_extensions.final
+@typing.final
 class Version(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
     MAJOR_NUMBER_FIELD_NUMBER: builtins.int
@@ -149,11 +145,11 @@ class Version(google.protobuf.message.Message):
     def __init__(self, *, major_number: builtins.int=..., minor_number: builtins.int=..., patch_number: builtins.int=..., git_hash: builtins.str=..., producer: builtins.str=...) -> None:
         ...
 
-    def ClearField(self, field_name: typing_extensions.Literal['git_hash', b'git_hash', 'major_number', b'major_number', 'minor_number', b'minor_number', 'patch_number', b'patch_number', 'producer', b'producer']) -> None:
+    def ClearField(self, field_name: typing.Literal['git_hash', b'git_hash', 'major_number', b'major_number', 'minor_number', b'minor_number', 'patch_number', b'patch_number', 'producer', b'producer']) -> None:
         ...
 global___Version = Version
 
-@typing_extensions.final
+@typing.final
 class DynamicParameterBinding(google.protobuf.message.Message):
     """Represents a binding for a dynamic parameter."""
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -172,9 +168,9 @@ class DynamicParameterBinding(google.protobuf.message.Message):
     def __init__(self, *, parameter_anchor: builtins.int=..., value: proto.algebra_pb2.Expression.Literal | None=...) -> None:
         ...
 
-    def HasField(self, field_name: typing_extensions.Literal['value', b'value']) -> builtins.bool:
+    def HasField(self, field_name: typing.Literal['value', b'value']) -> builtins.bool:
         ...
 
-    def ClearField(self, field_name: typing_extensions.Literal['parameter_anchor', b'parameter_anchor', 'value', b'value']) -> None:
+    def ClearField(self, field_name: typing.Literal['parameter_anchor', b'parameter_anchor', 'value', b'value']) -> None:
         ...
 global___DynamicParameterBinding = DynamicParameterBinding

@@ -8,14 +8,10 @@ import google.protobuf.any_pb2
 import google.protobuf.descriptor
 import google.protobuf.internal.containers
 import google.protobuf.message
-import sys
-if sys.version_info >= (3, 8):
-    import typing as typing_extensions
-else:
-    import typing_extensions
+import typing
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
-@typing_extensions.final
+@typing.final
 class SimpleExtensionURI(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
     EXTENSION_URI_ANCHOR_FIELD_NUMBER: builtins.int
@@ -28,18 +24,18 @@ class SimpleExtensionURI(google.protobuf.message.Message):
     def __init__(self, *, extension_uri_anchor: builtins.int=..., uri: builtins.str=...) -> None:
         ...
 
-    def ClearField(self, field_name: typing_extensions.Literal['extension_uri_anchor', b'extension_uri_anchor', 'uri', b'uri']) -> None:
+    def ClearField(self, field_name: typing.Literal['extension_uri_anchor', b'extension_uri_anchor', 'uri', b'uri']) -> None:
         ...
 global___SimpleExtensionURI = SimpleExtensionURI
 
-@typing_extensions.final
+@typing.final
 class SimpleExtensionDeclaration(google.protobuf.message.Message):
     """Describes a mapping between a specific extension entity and the uri where
     that extension can be found.
     """
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    @typing_extensions.final
+    @typing.final
     class ExtensionType(google.protobuf.message.Message):
         """Describes a Type"""
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -56,10 +52,10 @@ class SimpleExtensionDeclaration(google.protobuf.message.Message):
         def __init__(self, *, extension_uri_reference: builtins.int=..., type_anchor: builtins.int=..., name: builtins.str=...) -> None:
             ...
 
-        def ClearField(self, field_name: typing_extensions.Literal['extension_uri_reference', b'extension_uri_reference', 'name', b'name', 'type_anchor', b'type_anchor']) -> None:
+        def ClearField(self, field_name: typing.Literal['extension_uri_reference', b'extension_uri_reference', 'name', b'name', 'type_anchor', b'type_anchor']) -> None:
             ...
 
-    @typing_extensions.final
+    @typing.final
     class ExtensionTypeVariation(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
         EXTENSION_URI_REFERENCE_FIELD_NUMBER: builtins.int
@@ -75,10 +71,10 @@ class SimpleExtensionDeclaration(google.protobuf.message.Message):
         def __init__(self, *, extension_uri_reference: builtins.int=..., type_variation_anchor: builtins.int=..., name: builtins.str=...) -> None:
             ...
 
-        def ClearField(self, field_name: typing_extensions.Literal['extension_uri_reference', b'extension_uri_reference', 'name', b'name', 'type_variation_anchor', b'type_variation_anchor']) -> None:
+        def ClearField(self, field_name: typing.Literal['extension_uri_reference', b'extension_uri_reference', 'name', b'name', 'type_variation_anchor', b'type_variation_anchor']) -> None:
             ...
 
-    @typing_extensions.final
+    @typing.final
     class ExtensionFunction(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
         EXTENSION_URI_REFERENCE_FIELD_NUMBER: builtins.int
@@ -94,7 +90,7 @@ class SimpleExtensionDeclaration(google.protobuf.message.Message):
         def __init__(self, *, extension_uri_reference: builtins.int=..., function_anchor: builtins.int=..., name: builtins.str=...) -> None:
             ...
 
-        def ClearField(self, field_name: typing_extensions.Literal['extension_uri_reference', b'extension_uri_reference', 'function_anchor', b'function_anchor', 'name', b'name']) -> None:
+        def ClearField(self, field_name: typing.Literal['extension_uri_reference', b'extension_uri_reference', 'function_anchor', b'function_anchor', 'name', b'name']) -> None:
             ...
     EXTENSION_TYPE_FIELD_NUMBER: builtins.int
     EXTENSION_TYPE_VARIATION_FIELD_NUMBER: builtins.int
@@ -115,17 +111,17 @@ class SimpleExtensionDeclaration(google.protobuf.message.Message):
     def __init__(self, *, extension_type: global___SimpleExtensionDeclaration.ExtensionType | None=..., extension_type_variation: global___SimpleExtensionDeclaration.ExtensionTypeVariation | None=..., extension_function: global___SimpleExtensionDeclaration.ExtensionFunction | None=...) -> None:
         ...
 
-    def HasField(self, field_name: typing_extensions.Literal['extension_function', b'extension_function', 'extension_type', b'extension_type', 'extension_type_variation', b'extension_type_variation', 'mapping_type', b'mapping_type']) -> builtins.bool:
+    def HasField(self, field_name: typing.Literal['extension_function', b'extension_function', 'extension_type', b'extension_type', 'extension_type_variation', b'extension_type_variation', 'mapping_type', b'mapping_type']) -> builtins.bool:
         ...
 
-    def ClearField(self, field_name: typing_extensions.Literal['extension_function', b'extension_function', 'extension_type', b'extension_type', 'extension_type_variation', b'extension_type_variation', 'mapping_type', b'mapping_type']) -> None:
+    def ClearField(self, field_name: typing.Literal['extension_function', b'extension_function', 'extension_type', b'extension_type', 'extension_type_variation', b'extension_type_variation', 'mapping_type', b'mapping_type']) -> None:
         ...
 
-    def WhichOneof(self, oneof_group: typing_extensions.Literal['mapping_type', b'mapping_type']) -> typing_extensions.Literal['extension_type', 'extension_type_variation', 'extension_function'] | None:
+    def WhichOneof(self, oneof_group: typing.Literal['mapping_type', b'mapping_type']) -> typing.Literal['extension_type', 'extension_type_variation', 'extension_function'] | None:
         ...
 global___SimpleExtensionDeclaration = SimpleExtensionDeclaration
 
-@typing_extensions.final
+@typing.final
 class AdvancedExtension(google.protobuf.message.Message):
     """A generic object that can be used to embed additional extension information
     into the serialized substrait plan.
@@ -147,9 +143,9 @@ class AdvancedExtension(google.protobuf.message.Message):
     def __init__(self, *, optimization: collections.abc.Iterable[google.protobuf.any_pb2.Any] | None=..., enhancement: google.protobuf.any_pb2.Any | None=...) -> None:
         ...
 
-    def HasField(self, field_name: typing_extensions.Literal['enhancement', b'enhancement']) -> builtins.bool:
+    def HasField(self, field_name: typing.Literal['enhancement', b'enhancement']) -> builtins.bool:
         ...
 
-    def ClearField(self, field_name: typing_extensions.Literal['enhancement', b'enhancement', 'optimization', b'optimization']) -> None:
+    def ClearField(self, field_name: typing.Literal['enhancement', b'enhancement', 'optimization', b'optimization']) -> None:
         ...
 global___AdvancedExtension = AdvancedExtension

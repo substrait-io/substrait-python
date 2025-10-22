@@ -8,14 +8,10 @@ import google.protobuf.descriptor
 import google.protobuf.internal.containers
 import google.protobuf.message
 from .. import proto
-import sys
-if sys.version_info >= (3, 8):
-    import typing as typing_extensions
-else:
-    import typing_extensions
+import typing
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
-@typing_extensions.final
+@typing.final
 class ExpressionReference(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
     EXPRESSION_FIELD_NUMBER: builtins.int
@@ -37,17 +33,17 @@ class ExpressionReference(google.protobuf.message.Message):
     def __init__(self, *, expression: proto.algebra_pb2.Expression | None=..., measure: proto.algebra_pb2.AggregateFunction | None=..., output_names: collections.abc.Iterable[builtins.str] | None=...) -> None:
         ...
 
-    def HasField(self, field_name: typing_extensions.Literal['expr_type', b'expr_type', 'expression', b'expression', 'measure', b'measure']) -> builtins.bool:
+    def HasField(self, field_name: typing.Literal['expr_type', b'expr_type', 'expression', b'expression', 'measure', b'measure']) -> builtins.bool:
         ...
 
-    def ClearField(self, field_name: typing_extensions.Literal['expr_type', b'expr_type', 'expression', b'expression', 'measure', b'measure', 'output_names', b'output_names']) -> None:
+    def ClearField(self, field_name: typing.Literal['expr_type', b'expr_type', 'expression', b'expression', 'measure', b'measure', 'output_names', b'output_names']) -> None:
         ...
 
-    def WhichOneof(self, oneof_group: typing_extensions.Literal['expr_type', b'expr_type']) -> typing_extensions.Literal['expression', 'measure'] | None:
+    def WhichOneof(self, oneof_group: typing.Literal['expr_type', b'expr_type']) -> typing.Literal['expression', 'measure'] | None:
         ...
 global___ExpressionReference = ExpressionReference
 
-@typing_extensions.final
+@typing.final
 class ExtendedExpression(google.protobuf.message.Message):
     """Describe a set of operations to complete.
     For compactness sake, identifiers are normalized at the plan level.
@@ -99,9 +95,9 @@ class ExtendedExpression(google.protobuf.message.Message):
     def __init__(self, *, version: proto.plan_pb2.Version | None=..., extension_uris: collections.abc.Iterable[proto.extensions.extensions_pb2.SimpleExtensionURI] | None=..., extensions: collections.abc.Iterable[proto.extensions.extensions_pb2.SimpleExtensionDeclaration] | None=..., referred_expr: collections.abc.Iterable[global___ExpressionReference] | None=..., base_schema: proto.type_pb2.NamedStruct | None=..., advanced_extensions: proto.extensions.extensions_pb2.AdvancedExtension | None=..., expected_type_urls: collections.abc.Iterable[builtins.str] | None=...) -> None:
         ...
 
-    def HasField(self, field_name: typing_extensions.Literal['advanced_extensions', b'advanced_extensions', 'base_schema', b'base_schema', 'version', b'version']) -> builtins.bool:
+    def HasField(self, field_name: typing.Literal['advanced_extensions', b'advanced_extensions', 'base_schema', b'base_schema', 'version', b'version']) -> builtins.bool:
         ...
 
-    def ClearField(self, field_name: typing_extensions.Literal['advanced_extensions', b'advanced_extensions', 'base_schema', b'base_schema', 'expected_type_urls', b'expected_type_urls', 'extension_uris', b'extension_uris', 'extensions', b'extensions', 'referred_expr', b'referred_expr', 'version', b'version']) -> None:
+    def ClearField(self, field_name: typing.Literal['advanced_extensions', b'advanced_extensions', 'base_schema', b'base_schema', 'expected_type_urls', b'expected_type_urls', 'extension_uris', b'extension_uris', 'extensions', b'extensions', 'referred_expr', b'referred_expr', 'version', b'version']) -> None:
         ...
 global___ExtendedExpression = ExtendedExpression

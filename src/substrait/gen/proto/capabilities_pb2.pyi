@@ -7,19 +7,15 @@ import collections.abc
 import google.protobuf.descriptor
 import google.protobuf.internal.containers
 import google.protobuf.message
-import sys
-if sys.version_info >= (3, 8):
-    import typing as typing_extensions
-else:
-    import typing_extensions
+import typing
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
-@typing_extensions.final
+@typing.final
 class Capabilities(google.protobuf.message.Message):
     """Defines a set of Capabilities that a system (producer or consumer) supports."""
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    @typing_extensions.final
+    @typing.final
     class SimpleExtension(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
         URI_FIELD_NUMBER: builtins.int
@@ -43,7 +39,7 @@ class Capabilities(google.protobuf.message.Message):
         def __init__(self, *, uri: builtins.str=..., function_keys: collections.abc.Iterable[builtins.str] | None=..., type_keys: collections.abc.Iterable[builtins.str] | None=..., type_variation_keys: collections.abc.Iterable[builtins.str] | None=...) -> None:
             ...
 
-        def ClearField(self, field_name: typing_extensions.Literal['function_keys', b'function_keys', 'type_keys', b'type_keys', 'type_variation_keys', b'type_variation_keys', 'uri', b'uri']) -> None:
+        def ClearField(self, field_name: typing.Literal['function_keys', b'function_keys', 'type_keys', b'type_keys', 'type_variation_keys', b'type_variation_keys', 'uri', b'uri']) -> None:
             ...
     SUBSTRAIT_VERSIONS_FIELD_NUMBER: builtins.int
     ADVANCED_EXTENSION_TYPE_URLS_FIELD_NUMBER: builtins.int
@@ -66,6 +62,6 @@ class Capabilities(google.protobuf.message.Message):
     def __init__(self, *, substrait_versions: collections.abc.Iterable[builtins.str] | None=..., advanced_extension_type_urls: collections.abc.Iterable[builtins.str] | None=..., simple_extensions: collections.abc.Iterable[global___Capabilities.SimpleExtension] | None=...) -> None:
         ...
 
-    def ClearField(self, field_name: typing_extensions.Literal['advanced_extension_type_urls', b'advanced_extension_type_urls', 'simple_extensions', b'simple_extensions', 'substrait_versions', b'substrait_versions']) -> None:
+    def ClearField(self, field_name: typing.Literal['advanced_extension_type_urls', b'advanced_extension_type_urls', 'simple_extensions', b'simple_extensions', 'substrait_versions', b'substrait_versions']) -> None:
         ...
 global___Capabilities = Capabilities

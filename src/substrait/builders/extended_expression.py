@@ -8,6 +8,7 @@ from substrait.extension_registry import ExtensionRegistry
 from substrait.utils import (
     type_num_names,
     merge_extension_urns,
+    merge_extension_uris,
     merge_extension_declarations,
 )
 from substrait.type_inference import infer_extended_expression_schema
@@ -229,24 +230,42 @@ def scalar_function(
         if not func:
             raise Exception(f"Unknown function {function} for {signature}")
 
+        # Create URN extension
         func_extension_urns = [
             ste.SimpleExtensionURN(
                 extension_urn_anchor=registry.lookup_urn(urn), urn=urn
             )
         ]
 
+        # Create URI extension (convert URN to URI via bimap)
+        uri = registry.urn_to_uri(urn)
+        func_extension_uris = []
+        if uri:
+            uri_anchor = registry.lookup_uri_anchor(uri)
+            if uri_anchor:
+                func_extension_uris = [
+                    ste.SimpleExtensionURI(extension_uri_anchor=uri_anchor, uri=uri)
+                ]
+
+        # Create extension function declaration with both URI and URN references
         func_extensions = [
             ste.SimpleExtensionDeclaration(
                 extension_function=ste.SimpleExtensionDeclaration.ExtensionFunction(
                     extension_urn_reference=registry.lookup_urn(urn),
+                    extension_uri_reference=registry.lookup_uri_anchor(uri) if uri else 0,
                     function_anchor=func[0].anchor,
                     name=str(func[0]),
                 )
             )
         ]
 
+        # Merge extensions from all expressions
         extension_urns = merge_extension_urns(
             func_extension_urns, *[b.extension_urns for b in bound_expressions]
+        )
+
+        extension_uris = merge_extension_uris(
+            func_extension_uris, *[b.extension_uris for b in bound_expressions]
         )
 
         extensions = merge_extension_declarations(
@@ -277,6 +296,7 @@ def scalar_function(
             ],
             base_schema=base_schema,
             extension_urns=extension_urns,
+            extension_uris=extension_uris,
             extensions=extensions,
         )
 
@@ -309,24 +329,42 @@ def aggregate_function(
         if not func:
             raise Exception(f"Unknown function {function} for {signature}")
 
+        # Create URN extension
         func_extension_urns = [
             ste.SimpleExtensionURN(
                 extension_urn_anchor=registry.lookup_urn(urn), urn=urn
             )
         ]
 
+        # Create URI extension (convert URN to URI via bimap)
+        uri = registry.urn_to_uri(urn)
+        func_extension_uris = []
+        if uri:
+            uri_anchor = registry.lookup_uri_anchor(uri)
+            if uri_anchor:
+                func_extension_uris = [
+                    ste.SimpleExtensionURI(extension_uri_anchor=uri_anchor, uri=uri)
+                ]
+
+        # Create extension function declaration with both URI and URN references
         func_extensions = [
             ste.SimpleExtensionDeclaration(
                 extension_function=ste.SimpleExtensionDeclaration.ExtensionFunction(
                     extension_urn_reference=registry.lookup_urn(urn),
+                    extension_uri_reference=registry.lookup_uri_anchor(uri) if uri else 0,
                     function_anchor=func[0].anchor,
                     name=str(func[0]),
                 )
             )
         ]
 
+        # Merge extensions from all expressions
         extension_urns = merge_extension_urns(
             func_extension_urns, *[b.extension_urns for b in bound_expressions]
+        )
+
+        extension_uris = merge_extension_uris(
+            func_extension_uris, *[b.extension_uris for b in bound_expressions]
         )
 
         extensions = merge_extension_declarations(
@@ -353,6 +391,7 @@ def aggregate_function(
             ],
             base_schema=base_schema,
             extension_urns=extension_urns,
+            extension_uris=extension_uris,
             extensions=extensions,
         )
 
@@ -391,26 +430,46 @@ def window_function(
         if not func:
             raise Exception(f"Unknown function {function} for {signature}")
 
+        # Create URN extension
         func_extension_urns = [
             ste.SimpleExtensionURN(
                 extension_urn_anchor=registry.lookup_urn(urn), urn=urn
             )
         ]
 
+        # Create URI extension (convert URN to URI via bimap)
+        uri = registry.urn_to_uri(urn)
+        func_extension_uris = []
+        if uri:
+            uri_anchor = registry.lookup_uri_anchor(uri)
+            if uri_anchor:
+                func_extension_uris = [
+                    ste.SimpleExtensionURI(extension_uri_anchor=uri_anchor, uri=uri)
+                ]
+
+        # Create extension function declaration with both URI and URN references
         func_extensions = [
             ste.SimpleExtensionDeclaration(
                 extension_function=ste.SimpleExtensionDeclaration.ExtensionFunction(
                     extension_urn_reference=registry.lookup_urn(urn),
+                    extension_uri_reference=registry.lookup_uri_anchor(uri) if uri else 0,
                     function_anchor=func[0].anchor,
                     name=str(func[0]),
                 )
             )
         ]
 
+        # Merge extensions from all expressions
         extension_urns = merge_extension_urns(
             func_extension_urns,
             *[b.extension_urns for b in bound_expressions],
             *[b.extension_urns for b in bound_partitions],
+        )
+
+        extension_uris = merge_extension_uris(
+            func_extension_uris,
+            *[b.extension_uris for b in bound_expressions],
+            *[b.extension_uris for b in bound_partitions],
         )
 
         extensions = merge_extension_declarations(
@@ -446,6 +505,7 @@ def window_function(
             ],
             base_schema=base_schema,
             extension_urns=extension_urns,
+            extension_uris=extension_uris,
             extensions=extensions,
         )
 

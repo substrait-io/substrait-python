@@ -6,6 +6,7 @@ from substrait.derivation_expression import _parse
 
 content = """%YAML 1.2
 ---
+urn: test
 scalar_functions:
   - name: "test_fn"
     description: ""

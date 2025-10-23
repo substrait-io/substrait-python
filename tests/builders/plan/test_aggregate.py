@@ -11,6 +11,7 @@ import yaml
 
 content = """%YAML 1.2
 ---
+urn: test_uri
 aggregate_functions:
   - name: "count"
     description: Count a set of values

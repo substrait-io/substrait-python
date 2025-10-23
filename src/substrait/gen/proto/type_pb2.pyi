@@ -533,6 +533,21 @@ class Type(google.protobuf.message.Message):
 
         def WhichOneof(self, oneof_group: typing.Literal['parameter', b'parameter']) -> typing.Literal['null', 'data_type', 'boolean', 'integer', 'enum', 'string'] | None:
             ...
+
+    @typing.final
+    class TypeAliasReference(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+        TYPE_ALIAS_REFERENCE_FIELD_NUMBER: builtins.int
+        NULLABILITY_FIELD_NUMBER: builtins.int
+        type_alias_reference: builtins.int
+        nullability: global___Type.Nullability.ValueType
+        'Nullability of the referenced type alias. Must be specified.'
+
+        def __init__(self, *, type_alias_reference: builtins.int=..., nullability: global___Type.Nullability.ValueType=...) -> None:
+            ...
+
+        def ClearField(self, field_name: typing.Literal['nullability', b'nullability', 'type_alias_reference', b'type_alias_reference']) -> None:
+            ...
     BOOL_FIELD_NUMBER: builtins.int
     I8_FIELD_NUMBER: builtins.int
     I16_FIELD_NUMBER: builtins.int
@@ -562,6 +577,7 @@ class Type(google.protobuf.message.Message):
     MAP_FIELD_NUMBER: builtins.int
     USER_DEFINED_FIELD_NUMBER: builtins.int
     USER_DEFINED_TYPE_REFERENCE_FIELD_NUMBER: builtins.int
+    ALIAS_FIELD_NUMBER: builtins.int
     user_defined_type_reference: builtins.int
     'Deprecated in favor of user_defined, which allows nullability and\n    variations to be specified. If user_defined_type_reference is\n    encountered, treat it as being non-nullable and having the default\n    variation.\n    '
 
@@ -677,18 +693,51 @@ class Type(google.protobuf.message.Message):
     def user_defined(self) -> global___Type.UserDefined:
         ...
 
-    def __init__(self, *, bool: global___Type.Boolean | None=..., i8: global___Type.I8 | None=..., i16: global___Type.I16 | None=..., i32: global___Type.I32 | None=..., i64: global___Type.I64 | None=..., fp32: global___Type.FP32 | None=..., fp64: global___Type.FP64 | None=..., string: global___Type.String | None=..., binary: global___Type.Binary | None=..., timestamp: global___Type.Timestamp | None=..., date: global___Type.Date | None=..., time: global___Type.Time | None=..., interval_year: global___Type.IntervalYear | None=..., interval_day: global___Type.IntervalDay | None=..., interval_compound: global___Type.IntervalCompound | None=..., timestamp_tz: global___Type.TimestampTZ | None=..., uuid: global___Type.UUID | None=..., fixed_char: global___Type.FixedChar | None=..., varchar: global___Type.VarChar | None=..., fixed_binary: global___Type.FixedBinary | None=..., decimal: global___Type.Decimal | None=..., precision_time: global___Type.PrecisionTime | None=..., precision_timestamp: global___Type.PrecisionTimestamp | None=..., precision_timestamp_tz: global___Type.PrecisionTimestampTZ | None=..., struct: global___Type.Struct | None=..., list: global___Type.List | None=..., map: global___Type.Map | None=..., user_defined: global___Type.UserDefined | None=..., user_defined_type_reference: builtins.int=...) -> None:
+    @property
+    def alias(self) -> global___Type.TypeAliasReference:
+        """Reference an aliased type in `Plan.type_aliases`."""
+
+    def __init__(self, *, bool: global___Type.Boolean | None=..., i8: global___Type.I8 | None=..., i16: global___Type.I16 | None=..., i32: global___Type.I32 | None=..., i64: global___Type.I64 | None=..., fp32: global___Type.FP32 | None=..., fp64: global___Type.FP64 | None=..., string: global___Type.String | None=..., binary: global___Type.Binary | None=..., timestamp: global___Type.Timestamp | None=..., date: global___Type.Date | None=..., time: global___Type.Time | None=..., interval_year: global___Type.IntervalYear | None=..., interval_day: global___Type.IntervalDay | None=..., interval_compound: global___Type.IntervalCompound | None=..., timestamp_tz: global___Type.TimestampTZ | None=..., uuid: global___Type.UUID | None=..., fixed_char: global___Type.FixedChar | None=..., varchar: global___Type.VarChar | None=..., fixed_binary: global___Type.FixedBinary | None=..., decimal: global___Type.Decimal | None=..., precision_time: global___Type.PrecisionTime | None=..., precision_timestamp: global___Type.PrecisionTimestamp | None=..., precision_timestamp_tz: global___Type.PrecisionTimestampTZ | None=..., struct: global___Type.Struct | None=..., list: global___Type.List | None=..., map: global___Type.Map | None=..., user_defined: global___Type.UserDefined | None=..., user_defined_type_reference: builtins.int=..., alias: global___Type.TypeAliasReference | None=...) -> None:
         ...
 
-    def HasField(self, field_name: typing.Literal['binary', b'binary', 'bool', b'bool', 'date', b'date', 'decimal', b'decimal', 'fixed_binary', b'fixed_binary', 'fixed_char', b'fixed_char', 'fp32', b'fp32', 'fp64', b'fp64', 'i16', b'i16', 'i32', b'i32', 'i64', b'i64', 'i8', b'i8', 'interval_compound', b'interval_compound', 'interval_day', b'interval_day', 'interval_year', b'interval_year', 'kind', b'kind', 'list', b'list', 'map', b'map', 'precision_time', b'precision_time', 'precision_timestamp', b'precision_timestamp', 'precision_timestamp_tz', b'precision_timestamp_tz', 'string', b'string', 'struct', b'struct', 'time', b'time', 'timestamp', b'timestamp', 'timestamp_tz', b'timestamp_tz', 'user_defined', b'user_defined', 'user_defined_type_reference', b'user_defined_type_reference', 'uuid', b'uuid', 'varchar', b'varchar']) -> builtins.bool:
+    def HasField(self, field_name: typing.Literal['alias', b'alias', 'binary', b'binary', 'bool', b'bool', 'date', b'date', 'decimal', b'decimal', 'fixed_binary', b'fixed_binary', 'fixed_char', b'fixed_char', 'fp32', b'fp32', 'fp64', b'fp64', 'i16', b'i16', 'i32', b'i32', 'i64', b'i64', 'i8', b'i8', 'interval_compound', b'interval_compound', 'interval_day', b'interval_day', 'interval_year', b'interval_year', 'kind', b'kind', 'list', b'list', 'map', b'map', 'precision_time', b'precision_time', 'precision_timestamp', b'precision_timestamp', 'precision_timestamp_tz', b'precision_timestamp_tz', 'string', b'string', 'struct', b'struct', 'time', b'time', 'timestamp', b'timestamp', 'timestamp_tz', b'timestamp_tz', 'user_defined', b'user_defined', 'user_defined_type_reference', b'user_defined_type_reference', 'uuid', b'uuid', 'varchar', b'varchar']) -> builtins.bool:
         ...
 
-    def ClearField(self, field_name: typing.Literal['binary', b'binary', 'bool', b'bool', 'date', b'date', 'decimal', b'decimal', 'fixed_binary', b'fixed_binary', 'fixed_char', b'fixed_char', 'fp32', b'fp32', 'fp64', b'fp64', 'i16', b'i16', 'i32', b'i32', 'i64', b'i64', 'i8', b'i8', 'interval_compound', b'interval_compound', 'interval_day', b'interval_day', 'interval_year', b'interval_year', 'kind', b'kind', 'list', b'list', 'map', b'map', 'precision_time', b'precision_time', 'precision_timestamp', b'precision_timestamp', 'precision_timestamp_tz', b'precision_timestamp_tz', 'string', b'string', 'struct', b'struct', 'time', b'time', 'timestamp', b'timestamp', 'timestamp_tz', b'timestamp_tz', 'user_defined', b'user_defined', 'user_defined_type_reference', b'user_defined_type_reference', 'uuid', b'uuid', 'varchar', b'varchar']) -> None:
+    def ClearField(self, field_name: typing.Literal['alias', b'alias', 'binary', b'binary', 'bool', b'bool', 'date', b'date', 'decimal', b'decimal', 'fixed_binary', b'fixed_binary', 'fixed_char', b'fixed_char', 'fp32', b'fp32', 'fp64', b'fp64', 'i16', b'i16', 'i32', b'i32', 'i64', b'i64', 'i8', b'i8', 'interval_compound', b'interval_compound', 'interval_day', b'interval_day', 'interval_year', b'interval_year', 'kind', b'kind', 'list', b'list', 'map', b'map', 'precision_time', b'precision_time', 'precision_timestamp', b'precision_timestamp', 'precision_timestamp_tz', b'precision_timestamp_tz', 'string', b'string', 'struct', b'struct', 'time', b'time', 'timestamp', b'timestamp', 'timestamp_tz', b'timestamp_tz', 'user_defined', b'user_defined', 'user_defined_type_reference', b'user_defined_type_reference', 'uuid', b'uuid', 'varchar', b'varchar']) -> None:
         ...
 
-    def WhichOneof(self, oneof_group: typing.Literal['kind', b'kind']) -> typing.Literal['bool', 'i8', 'i16', 'i32', 'i64', 'fp32', 'fp64', 'string', 'binary', 'timestamp', 'date', 'time', 'interval_year', 'interval_day', 'interval_compound', 'timestamp_tz', 'uuid', 'fixed_char', 'varchar', 'fixed_binary', 'decimal', 'precision_time', 'precision_timestamp', 'precision_timestamp_tz', 'struct', 'list', 'map', 'user_defined', 'user_defined_type_reference'] | None:
+    def WhichOneof(self, oneof_group: typing.Literal['kind', b'kind']) -> typing.Literal['bool', 'i8', 'i16', 'i32', 'i64', 'fp32', 'fp64', 'string', 'binary', 'timestamp', 'date', 'time', 'interval_year', 'interval_day', 'interval_compound', 'timestamp_tz', 'uuid', 'fixed_char', 'varchar', 'fixed_binary', 'decimal', 'precision_time', 'precision_timestamp', 'precision_timestamp_tz', 'struct', 'list', 'map', 'user_defined', 'user_defined_type_reference', 'alias'] | None:
         ...
 global___Type = Type
+
+@typing.final
+class TypeAlias(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+    TYPE_ALIAS_ANCHOR_FIELD_NUMBER: builtins.int
+    TYPE_FIELD_NUMBER: builtins.int
+    type_alias_anchor: builtins.int
+    'A surrogate key used in the context of a single plan to reference a\n    specific type alias.\n    '
+
+    @property
+    def type(self) -> global___Type:
+        """A concrete type to be aliased.
+
+        * All type parameters must be specified.
+        * Cannot directly be another alias.
+        * Type parameters can reference other aliased types as long as no circular dependencies are introduced.
+        * Nullability of aliased type is **ignored**. Nullability must be specified when the aliased type is referenced.
+        * Type variation may be specified in the aliased type.
+        """
+
+    def __init__(self, *, type_alias_anchor: builtins.int=..., type: global___Type | None=...) -> None:
+        ...
+
+    def HasField(self, field_name: typing.Literal['type', b'type']) -> builtins.bool:
+        ...
+
+    def ClearField(self, field_name: typing.Literal['type', b'type', 'type_alias_anchor', b'type_alias_anchor']) -> None:
+        ...
+global___TypeAlias = TypeAlias
 
 @typing.final
 class NamedStruct(google.protobuf.message.Message):

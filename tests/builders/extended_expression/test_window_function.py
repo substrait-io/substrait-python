@@ -21,6 +21,7 @@ named_struct = stt.NamedStruct(
 
 content = """%YAML 1.2
 ---
+urn: test_uri
 window_functions:
   - name: "row_number"
     description: "the number of the current row within its partition, starting at 1"

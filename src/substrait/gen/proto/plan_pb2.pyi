@@ -47,11 +47,13 @@ class Plan(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
     VERSION_FIELD_NUMBER: builtins.int
     EXTENSION_URIS_FIELD_NUMBER: builtins.int
+    EXTENSION_URNS_FIELD_NUMBER: builtins.int
     EXTENSIONS_FIELD_NUMBER: builtins.int
     RELATIONS_FIELD_NUMBER: builtins.int
     ADVANCED_EXTENSIONS_FIELD_NUMBER: builtins.int
     EXPECTED_TYPE_URLS_FIELD_NUMBER: builtins.int
     PARAMETER_BINDINGS_FIELD_NUMBER: builtins.int
+    TYPE_ALIASES_FIELD_NUMBER: builtins.int
 
     @property
     def version(self) -> global___Version:
@@ -61,7 +63,13 @@ class Plan(google.protobuf.message.Message):
 
     @property
     def extension_uris(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[proto.extensions.extensions_pb2.SimpleExtensionURI]:
-        """a list of yaml specifications this plan may depend on"""
+        """a list of yaml specifications this plan may depend on
+        this is now deprecated and extension_urns should be used instead.
+        """
+
+    @property
+    def extension_urns(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[proto.extensions.extensions_pb2.SimpleExtensionURN]:
+        """a list of extension URNs this plan may depend on"""
 
     @property
     def extensions(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[proto.extensions.extensions_pb2.SimpleExtensionDeclaration]:
@@ -90,13 +98,24 @@ class Plan(google.protobuf.message.Message):
         Each binding maps a parameter_anchor to its corresponding runtime value.
         """
 
-    def __init__(self, *, version: global___Version | None=..., extension_uris: collections.abc.Iterable[proto.extensions.extensions_pb2.SimpleExtensionURI] | None=..., extensions: collections.abc.Iterable[proto.extensions.extensions_pb2.SimpleExtensionDeclaration] | None=..., relations: collections.abc.Iterable[global___PlanRel] | None=..., advanced_extensions: proto.extensions.extensions_pb2.AdvancedExtension | None=..., expected_type_urls: collections.abc.Iterable[builtins.str] | None=..., parameter_bindings: collections.abc.Iterable[global___DynamicParameterBinding] | None=...) -> None:
+    @property
+    def type_aliases(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[proto.type_pb2.TypeAlias]:
+        """An optional list of type aliases. Types can be specified here once, and
+        then referenced within the plan using the TypeAliasReference type. This
+        feature is intended to assist with the usability of parameterized types,
+        which require that all parameters be specified when they are declared.
+        This can bloat plans with redundant redeclarations, especially if the
+        parameterized types being declared have many parameters (e.g., struct with
+        many fields, nested parameterized types, string as a type parameter).
+        """
+
+    def __init__(self, *, version: global___Version | None=..., extension_uris: collections.abc.Iterable[proto.extensions.extensions_pb2.SimpleExtensionURI] | None=..., extension_urns: collections.abc.Iterable[proto.extensions.extensions_pb2.SimpleExtensionURN] | None=..., extensions: collections.abc.Iterable[proto.extensions.extensions_pb2.SimpleExtensionDeclaration] | None=..., relations: collections.abc.Iterable[global___PlanRel] | None=..., advanced_extensions: proto.extensions.extensions_pb2.AdvancedExtension | None=..., expected_type_urls: collections.abc.Iterable[builtins.str] | None=..., parameter_bindings: collections.abc.Iterable[global___DynamicParameterBinding] | None=..., type_aliases: collections.abc.Iterable[proto.type_pb2.TypeAlias] | None=...) -> None:
         ...
 
     def HasField(self, field_name: typing.Literal['advanced_extensions', b'advanced_extensions', 'version', b'version']) -> builtins.bool:
         ...
 
-    def ClearField(self, field_name: typing.Literal['advanced_extensions', b'advanced_extensions', 'expected_type_urls', b'expected_type_urls', 'extension_uris', b'extension_uris', 'extensions', b'extensions', 'parameter_bindings', b'parameter_bindings', 'relations', b'relations', 'version', b'version']) -> None:
+    def ClearField(self, field_name: typing.Literal['advanced_extensions', b'advanced_extensions', 'expected_type_urls', b'expected_type_urls', 'extension_uris', b'extension_uris', 'extension_urns', b'extension_urns', 'extensions', b'extensions', 'parameter_bindings', b'parameter_bindings', 'relations', b'relations', 'type_aliases', b'type_aliases', 'version', b'version']) -> None:
         ...
 global___Plan = Plan
 

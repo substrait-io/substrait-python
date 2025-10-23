@@ -1,5 +1,6 @@
 import yaml
 import itertools
+import re
 from substrait.gen.proto.type_pb2 import Type
 from importlib.resources import files as importlib_files
 from collections import defaultdict
@@ -9,9 +10,14 @@ from .derivation_expression import evaluate, _evaluate, _parse
 from substrait.gen.antlr.SubstraitTypeParser import SubstraitTypeParser
 from substrait.gen.json import simple_extensions as se
 from substrait.simple_extension_utils import build_simple_extensions
+from .bimap import UriUrnBiDiMap
 
 
 DEFAULT_URN_PREFIX = "https://github.com/substrait-io/substrait/blob/main/extensions"
+
+# Format: extension:<organization>:<name>
+# Example: extension:io.substrait:functions_arithmetic
+URN_PATTERN = re.compile(r"^extension:[^:]+:[^:]+$")
 
 
 # mapping from argument types to shortened signature names: https://substrait.io/extensions/#function-signature-compound-names
@@ -244,7 +250,7 @@ class FunctionEntry:
 
 class ExtensionRegistry:
     def __init__(self, load_default_extensions=True) -> None:
-        self._urn_mapping: dict = defaultdict(dict)
+        self._urn_mapping: dict = defaultdict(dict)  # URN -> anchor ID
         self._urn_id_generator = itertools.count(1)
 
         self._function_mapping: dict = defaultdict(dict)
@@ -252,26 +258,53 @@ class ExtensionRegistry:
 
         self._urn_aliases = {}
 
+        # Bidirectional URI <-> URN mapping (temporary during migration)
+        self._uri_urn_bimap = UriUrnBiDiMap()
+
         if load_default_extensions:
             for fpath in importlib_files("substrait.extensions").glob(  # type: ignore
                 "functions*.yaml"
             ):
-                self.register_extension_yaml(fpath)
+                # Derive URI from DEFAULT_URN_PREFIX and filename
+                uri = f"{DEFAULT_URN_PREFIX}/{fpath.name}"
+                self.register_extension_yaml(fpath, uri=uri)
 
     def register_extension_yaml(
         self,
         fname: Union[str, Path],
+        uri: str,
     ) -> None:
+        """Register extensions from a YAML file.
+
+        Args:
+            fname: Path to the YAML file
+            uri: URI for the extension (for URI/URN bimap)
+        """
         fname = Path(fname)
         with open(fname) as f:  # type: ignore
             extension_definitions = yaml.safe_load(f)
 
-        self.register_extension_dict(extension_definitions)
+        self.register_extension_dict(extension_definitions, uri=uri)
 
-    def register_extension_dict(self, definitions: dict) -> None:
+    def register_extension_dict(self, definitions: dict, uri: str) -> None:
+        """Register extensions from a dictionary (parsed YAML).
+
+        Args:
+            definitions: The extension definitions dictionary
+            uri: URI for the extension (for URI/URN bimap)
+        """
         urn = definitions.get("urn")
-        print(f"THIS IS MY URN {urn}")
+        if not urn:
+            raise ValueError("Extension definitions must contain a 'urn' field")
+
+        # Validate URN format
+        self._validate_urn_format(urn)
+
+        # Assign anchor to URN (URI will use the same anchor during output)
         self._urn_mapping[urn] = next(self._urn_id_generator)
+
+        # Store URI <-> URN mapping for output generation
+        self._uri_urn_bimap.put(uri, urn)
 
         simple_extensions = build_simple_extensions(definitions)
 
@@ -318,3 +351,61 @@ class ExtensionRegistry:
     def lookup_urn(self, urn: str) -> Optional[int]:
         urn = self._urn_aliases.get(urn, urn)
         return self._urn_mapping.get(urn, None)
+
+    def lookup_uri_anchor(self, uri: str) -> Optional[int]:
+        """Look up the anchor ID for a URI.
+
+        During the migration period, URI and URN share the same anchor.
+        This method converts the URI to its URN and returns the URN's anchor.
+
+        Args:
+            uri: The extension URI to look up
+
+        Returns:
+            The anchor ID for the URI (same as its corresponding URN), or None if not found
+        """
+        urn = self._uri_urn_bimap.get_urn(uri)
+        if urn:
+            return self._urn_mapping.get(urn)
+        return None
+
+    def uri_to_urn(self, uri: str) -> Optional[str]:
+        """Convert a URI to its corresponding URN using the bimap.
+
+        Args:
+            uri: The extension URI
+
+        Returns:
+            The corresponding URN, or None if not in the bimap
+        """
+        return self._uri_urn_bimap.get_urn(uri)
+
+    def urn_to_uri(self, urn: str) -> Optional[str]:
+        """Convert a URN to its corresponding URI using the bimap.
+
+        Args:
+            urn: The extension URN
+
+        Returns:
+            The corresponding URI, or None if not in the bimap
+        """
+        return self._uri_urn_bimap.get_uri(urn)
+
+    def _validate_urn_format(self, urn: str) -> None:
+        """Validate that a URN follows the expected format.
+
+        Expected format: extension:<organization>:<name>
+        Example: extension:io.substrait:functions_arithmetic
+
+        Args:
+            urn: The URN to validate
+
+        Raises:
+            ValueError: If the URN format is invalid
+        """
+        if not URN_PATTERN.match(urn):
+            raise ValueError(
+                f"Invalid URN format: '{urn}'. "
+                f"Expected format: extension:<organization>:<name> "
+                f"(e.g., 'extension:io.substrait:functions_arithmetic')"
+            )

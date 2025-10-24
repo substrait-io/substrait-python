@@ -524,6 +524,12 @@ def if_then(
 
         bound_else = resolve_expression(_else, base_schema, registry)
 
+        extension_uris = merge_extension_uris(
+            *[b[0].extension_uris for b in bound_ifs],
+            *[b[1].extension_uris for b in bound_ifs],
+            bound_else.extension_uris,
+        )
+
         extension_urns = merge_extension_urns(
             *[b[0].extension_urns for b in bound_ifs],
             *[b[1].extension_urns for b in bound_ifs],
@@ -575,6 +581,7 @@ def if_then(
                 )
             ],
             base_schema=base_schema,
+            extension_uris=extension_uris,
             extension_urns=extension_urns,
             extensions=extensions,
         )

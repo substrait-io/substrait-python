@@ -1,6 +1,5 @@
 from substrait.sql.sql_to_substrait import convert
 import pyarrow
-from google.protobuf import json_format
 import tempfile
 import pyarrow.substrait as pa_substrait
 import pytest
@@ -91,10 +90,9 @@ def assert_query_duckdb(query: str, ignore_order=True):
         conn.install_extension("substrait", repository="community")
         conn.load_extension("substrait")
 
-        plan_json = json_format.MessageToJson(plan)
-        sql = f"CALL from_substrait_json('{plan_json}')"
+        sql = "CALL from_substrait(?)"
+        substrait_out = conn.sql(sql, params=[plan.SerializeToString()])
 
-        substrait_out = conn.sql(sql)
         sql_out = conn.sql(query)
 
         substrait_arrow = substrait_out.arrow()
@@ -131,7 +129,6 @@ def test_select_field(engine: str):
     assert_query("""SELECT store_id FROM stores""", engine)
 
 
-@pytest.mark.xfail
 @pytest.mark.parametrize("engine", engines)
 def test_inner_join_filtered(engine: str):
     assert_query(
@@ -143,7 +140,7 @@ def test_inner_join_filtered(engine: str):
         engine,
     )
 
-@pytest.mark.xfail
+
 @pytest.mark.parametrize("engine", engines)
 def test_left_join(engine: str):
     assert_query(
@@ -154,7 +151,7 @@ def test_left_join(engine: str):
         engine,
     )
 
-@pytest.mark.xfail
+
 @pytest.mark.parametrize("engine", engines)
 def test_right_join(engine: str):
     assert_query(
@@ -176,7 +173,7 @@ def test_group_by_empty_measures(engine: str):
         engine,
     )
 
-@pytest.mark.xfail
+
 @pytest.mark.parametrize("engine", engines)
 def test_group_by_count(engine: str):
     assert_query(
@@ -187,7 +184,7 @@ def test_group_by_count(engine: str):
         engine,
     )
 
-@pytest.mark.xfail
+
 @pytest.mark.parametrize("engine", engines)
 def test_group_by_unnamed_expr(engine: str):
     assert_query(
@@ -198,7 +195,7 @@ def test_group_by_unnamed_expr(engine: str):
         engine,
     )
 
-@pytest.mark.xfail
+
 @pytest.mark.parametrize("engine", engines)
 def test_sum(engine: str):
     assert_query(
@@ -219,7 +216,7 @@ def test_group_by_hidden_dimension(engine: str):
         engine,
     )
 
-@pytest.mark.xfail
+
 @pytest.mark.parametrize("engine", engines)
 def test_group_by_having_no_duplicate(engine: str):
     assert_query(
@@ -231,7 +228,7 @@ def test_group_by_having_no_duplicate(engine: str):
         engine,
     )
 
-@pytest.mark.xfail
+
 @pytest.mark.parametrize("engine", engines)
 def test_group_by_having_duplicate(engine: str):
     assert_query(

@@ -15,78 +15,20 @@ import pytest
 import yaml
 
 import substrait.gen.proto.type_pb2 as stt
+import substrait.gen.proto.plan_pb2 as stp
+import substrait.gen.proto.algebra_pb2 as stalg
 import substrait.gen.proto.extended_expression_pb2 as stee
 import substrait.gen.proto.extensions.extensions_pb2 as ste
-from substrait.builders.extended_expression import scalar_function, literal
+from substrait.builders.extended_expression import (
+    scalar_function,
+    literal,
+    column,
+    aggregate_function,
+)
+from substrait.builders.type import i64, boolean
+from substrait.builders.plan import read_named_table, aggregate, project, filter
 from substrait.extension_registry import ExtensionRegistry
-
-
-# ============================================================================
-# ExtensionRegistry URI/URN Bimap Tests
-# ============================================================================
-
-
-class TestExtensionRegistryBimap:
-    """Tests for ExtensionRegistry URI/URN bimap functionality."""
-
-    def test_register_with_uri(self):
-        """Test registering an extension with both URN and URI."""
-        content = """%YAML 1.2
----
-urn: extension:example:test
-scalar_functions:
-  - name: "test_func"
-    description: ""
-    impls:
-      - args:
-          - value: i8
-        return: i8
-"""
-        uri = "https://example.com/test.yaml"
-        registry = ExtensionRegistry(load_default_extensions=False)
-        registry.register_extension_dict(yaml.safe_load(content), uri=uri)
-
-        # Test URN lookup
-        assert registry.lookup_urn("extension:example:test") is not None
-
-        # Test URI lookup
-        assert registry.lookup_uri_anchor(uri) is not None
-
-        # Test bimap conversions
-        assert registry.uri_to_urn(uri) == "extension:example:test"
-        assert registry.urn_to_uri("extension:example:test") == uri
-
-    def test_register_requires_uri(self):
-        """Test that registering an extension requires a URI during migration."""
-        content = """%YAML 1.2
----
-urn: extension:example:test
-scalar_functions: []
-"""
-        registry = ExtensionRegistry(load_default_extensions=False)
-
-        # During migration, URI is required - this should fail with TypeError
-        with pytest.raises(TypeError):
-            registry.register_extension_dict(yaml.safe_load(content))
-
-    def test_default_extensions_have_uris(self):
-        """Test that default extensions are registered with URIs."""
-        registry = ExtensionRegistry(load_default_extensions=True)
-
-        # Check one of the default extensions
-        urn = "extension:io.substrait:functions_comparison"
-        uri_from_bimap = registry.urn_to_uri(urn)
-
-        # Should have a URI derived from DEFAULT_URN_PREFIX
-        assert uri_from_bimap is not None
-        assert "https://github.com/substrait-io/substrait/blob/main/extensions" in uri_from_bimap
-        assert "functions_comparison.yaml" in uri_from_bimap
-
-
-# ============================================================================
-# Extension Output Tests (Both URI and URN)
-# ============================================================================
-
+from substrait.type_inference import infer_plan_schema
 
 class TestExtensionOutput:
     """Tests that extension outputs include both URI and URN."""
@@ -165,8 +107,8 @@ scalar_functions:
         assert registry.lookup_uri_anchor(uri) is not None
 
         # Verify bimap has both directions
-        assert registry.uri_to_urn(uri) == "extension:test:functions_paired"
-        assert registry.urn_to_uri("extension:test:functions_paired") == uri
+        assert registry._uri_urn_bimap.get_urn(uri) == "extension:test:functions_paired"
+        assert registry._uri_urn_bimap.get_uri("extension:test:functions_paired") == uri
 
 
 # ============================================================================
@@ -263,3 +205,242 @@ scalar_functions:
         assert len(merged_urns) == 2
         assert merged_urns[0].urn == "extension:example:test"
         assert merged_urns[1].urn == "extension:example:other"
+
+
+# ============================================================================
+# Plan Builder URI/URN Output Tests
+# ============================================================================
+
+
+class TestPlanOutput:
+    """Tests that plan builders output both URI and URN in proto plans."""
+
+    def test_project_with_scalar_function(self):
+        """Test that project plans with scalar functions have both URI and URN in proto."""
+        content = """%YAML 1.2
+---
+urn: extension:test:math
+scalar_functions:
+  - name: "add"
+    description: ""
+    impls:
+      - args:
+          - value: i64
+          - value: i64
+        return: i64
+"""
+        registry = ExtensionRegistry(load_default_extensions=False)
+        registry.register_extension_dict(
+            yaml.safe_load(content), uri="https://test.example.com/math.yaml"
+        )
+
+        struct = stt.Type.Struct(types=[i64(nullable=False), i64(nullable=False)])
+        named_struct = stt.NamedStruct(names=["a", "b"], struct=struct)
+
+        table = read_named_table("table", named_struct)
+        add_expr = scalar_function(
+            "extension:test:math",
+            "add",
+            expressions=[column("a"), column("b")],
+            alias=["add"],
+        )
+
+        actual = project(table, [add_expr])(registry)
+
+        ns = infer_plan_schema(table(None))
+
+        expected = stp.Plan(
+            extension_urns=[
+                ste.SimpleExtensionURN(extension_urn_anchor=1, urn="extension:test:math")
+            ],
+            extension_uris=[
+                ste.SimpleExtensionURI(
+                    extension_uri_anchor=1, uri="https://test.example.com/math.yaml"
+                )
+            ],
+            extensions=[
+                ste.SimpleExtensionDeclaration(
+                    extension_function=ste.SimpleExtensionDeclaration.ExtensionFunction(
+                        extension_urn_reference=1,
+                        extension_uri_reference=1,
+                        function_anchor=1,
+                        name="add:i64_i64",
+                    )
+                )
+            ],
+            relations=[
+                stp.PlanRel(
+                    root=stalg.RelRoot(
+                        input=stalg.Rel(
+                            project=stalg.ProjectRel(
+                                common=stalg.RelCommon(emit=stalg.RelCommon.Emit(output_mapping=[2])),
+                                input=table(None).relations[-1].root.input,
+                                expressions=[add_expr(ns, registry).referred_expr[0].expression],
+                            )
+                        ),
+                        names=["add"],
+                    )
+                )
+            ],
+        )
+
+        assert actual == expected
+
+    def test_filter_with_scalar_function(self):
+        """Test that filter plans with scalar functions have both URI and URN in proto."""
+        content = """%YAML 1.2
+---
+urn: extension:test:comparison
+scalar_functions:
+  - name: "greater_than"
+    description: ""
+    impls:
+      - args:
+          - value: i64
+          - value: i64
+        return: boolean
+"""
+        registry = ExtensionRegistry(load_default_extensions=False)
+        registry.register_extension_dict(
+            yaml.safe_load(content), uri="https://test.example.com/comparison.yaml"
+        )
+
+        struct = stt.Type.Struct(types=[i64(nullable=False)])
+        named_struct = stt.NamedStruct(names=["value"], struct=struct)
+
+        table = read_named_table("table", named_struct)
+        gt_expr = scalar_function(
+            "extension:test:comparison",
+            "greater_than",
+            expressions=[column("value"), literal(100, i64(nullable=False))],
+        )
+
+        actual = filter(table, gt_expr)(registry)
+
+        ns = infer_plan_schema(table(None))
+
+        expected = stp.Plan(
+            extension_urns=[
+                ste.SimpleExtensionURN(
+                    extension_urn_anchor=1, urn="extension:test:comparison"
+                )
+            ],
+            extension_uris=[
+                ste.SimpleExtensionURI(
+                    extension_uri_anchor=1, uri="https://test.example.com/comparison.yaml"
+                )
+            ],
+            extensions=[
+                ste.SimpleExtensionDeclaration(
+                    extension_function=ste.SimpleExtensionDeclaration.ExtensionFunction(
+                        extension_urn_reference=1,
+                        extension_uri_reference=1,
+                        function_anchor=1,
+                        name="greater_than:i64_i64",
+                    )
+                )
+            ],
+            relations=[
+                stp.PlanRel(
+                    root=stalg.RelRoot(
+                        input=stalg.Rel(
+                            filter=stalg.FilterRel(
+                                input=table(None).relations[-1].root.input,
+                                condition=gt_expr(ns, registry).referred_expr[0].expression,
+                            )
+                        ),
+                        names=["value"],
+                    )
+                )
+            ],
+        )
+
+        assert actual == expected
+
+    def test_aggregate_with_aggregate_function(self):
+        """Test that aggregate plans with aggregate functions have both URI and URN in proto."""
+        content = """%YAML 1.2
+---
+urn: extension:test:aggregate
+aggregate_functions:
+  - name: "sum"
+    description: ""
+    impls:
+      - args:
+          - value: i64
+        nullability: DECLARED_OUTPUT
+        decomposable: MANY
+        intermediate: i64
+        return: i64
+"""
+        registry = ExtensionRegistry(load_default_extensions=False)
+        registry.register_extension_dict(
+            yaml.safe_load(content), uri="https://test.example.com/aggregate.yaml"
+        )
+
+        struct = stt.Type.Struct(types=[i64(nullable=False), i64(nullable=False)])
+        named_struct = stt.NamedStruct(names=["id", "value"], struct=struct)
+
+        table = read_named_table("table", named_struct)
+        sum_expr = aggregate_function(
+            "extension:test:aggregate", "sum", expressions=[column("value")], alias=["sum"]
+        )
+
+        actual = aggregate(table, grouping_expressions=[column("id")], measures=[sum_expr])(
+            registry
+        )
+
+        ns = infer_plan_schema(table(None))
+
+        expected = stp.Plan(
+            extension_urns=[
+                ste.SimpleExtensionURN(
+                    extension_urn_anchor=1, urn="extension:test:aggregate"
+                )
+            ],
+            extension_uris=[
+                ste.SimpleExtensionURI(
+                    extension_uri_anchor=1, uri="https://test.example.com/aggregate.yaml"
+                )
+            ],
+            extensions=[
+                ste.SimpleExtensionDeclaration(
+                    extension_function=ste.SimpleExtensionDeclaration.ExtensionFunction(
+                        extension_urn_reference=1,
+                        extension_uri_reference=1,
+                        function_anchor=1,
+                        name="sum:i64",
+                    )
+                )
+            ],
+            relations=[
+                stp.PlanRel(
+                    root=stalg.RelRoot(
+                        input=stalg.Rel(
+                            aggregate=stalg.AggregateRel(
+                                input=table(None).relations[-1].root.input,
+                                grouping_expressions=[
+                                    column("id")(ns, registry).referred_expr[0].expression
+                                ],
+                                groupings=[
+                                    stalg.AggregateRel.Grouping(
+                                        grouping_expressions=[
+                                            column("id")(ns, registry).referred_expr[0].expression
+                                        ],
+                                        expression_references=[0],
+                                    )
+                                ],
+                                measures=[
+                                    stalg.AggregateRel.Measure(
+                                        measure=sum_expr(ns, registry).referred_expr[0].measure
+                                    )
+                                ],
+                            )
+                        ),
+                        names=["id", "sum"],
+                    )
+                )
+            ],
+        )
+
+        assert actual == expected

@@ -28,8 +28,8 @@ PlanOrUnbound = Union[stp.Plan, UnboundPlan]
 def _merge_extensions(*objs):
     """Merge extension URIs, URNs, and declarations from multiple plan/expression objects.
 
-    During the URI/URN migration period, we maintain both URI and URN references
-    for maximum compatibility.
+    During the URI -> URN migration period, we maintain both URI and URN references
+    for backwards compatibility. 
     """
     return {
         "extension_uris": merge_extension_uris(*[b.extension_uris for b in objs if b]),

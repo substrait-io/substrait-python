@@ -340,16 +340,12 @@ def test_covers_any():
     assert covers(decimal(10, 8), _parse("any"), {})
 
 
-# ============================================================================
-# URI/URN Bimap Tests
-# ============================================================================
-
-
-def test_registry_uri_to_urn_conversion():
+def test_registry_uri_urn():
     """Test that URI to URN conversion works via the bimap."""
-    content_with_urn = """%YAML 1.2
+    urn = "extension:test:bimap"
+    content_with_urn = f"""%YAML 1.2
 ---
-urn: extension:test:bimap
+urn: {urn}
 scalar_functions:
   - name: "test_func"
     description: ""
@@ -362,29 +358,10 @@ scalar_functions:
     registry = ExtensionRegistry(load_default_extensions=False)
     registry.register_extension_dict(yaml.safe_load(content_with_urn), uri=uri)
 
-    # Test URI to URN conversion
-    assert registry.uri_to_urn(uri) == "extension:test:bimap"
 
+    assert registry._uri_urn_bimap.get_urn(uri) == urn
+    assert registry._uri_urn_bimap.get_uri(urn) == uri
 
-def test_registry_urn_to_uri_conversion():
-    """Test that URN to URI conversion works via the bimap."""
-    content_with_urn = """%YAML 1.2
----
-urn: extension:test:bimap2
-scalar_functions:
-  - name: "test_func"
-    description: ""
-    impls:
-      - args:
-          - value: i8
-        return: i8
-"""
-    uri = "https://test.example.com/bimap2.yaml"
-    registry = ExtensionRegistry(load_default_extensions=False)
-    registry.register_extension_dict(yaml.safe_load(content_with_urn), uri=uri)
-
-    # Test URN to URI conversion
-    assert registry.urn_to_uri("extension:test:bimap2") == uri
 
 
 def test_registry_uri_anchor_lookup():
@@ -404,35 +381,20 @@ scalar_functions: []
     assert anchor > 0
 
 
-def test_registry_nonexistent_uri_urn_returns_none():
-    """Test that looking up non-existent URI/URN returns None."""
-    registry = ExtensionRegistry(load_default_extensions=False)
-
-    assert registry.uri_to_urn("https://nonexistent.com/test.yaml") is None
-    assert registry.urn_to_uri("extension:nonexistent:test") is None
-    assert registry.lookup_uri_anchor("https://nonexistent.com/test.yaml") is None
-
-
 def test_registry_default_extensions_have_uri_mappings():
     """Test that default extensions have URI mappings."""
     registry = ExtensionRegistry(load_default_extensions=True)
 
     # Check that at least one default extension has a URI mapping
     urn = "extension:io.substrait:functions_comparison"
-    uri = registry.urn_to_uri(urn)
+    uri = registry._uri_urn_bimap.get_uri(urn)
 
     assert uri is not None
     assert "https://github.com/substrait-io/substrait/blob/main/extensions" in uri
     assert "functions_comparison.yaml" in uri
 
     # Verify reverse mapping works
-    assert registry.uri_to_urn(uri) == urn
-
-
-# ============================================================================
-# URN Validation Tests
-# ============================================================================
-
+    assert registry._uri_urn_bimap.get_urn(uri) == urn
 
 def test_valid_urn_format():
     """Test that valid URN formats are accepted."""
@@ -500,3 +462,17 @@ scalar_functions: []
             yaml.safe_load(content),
             uri="https://test.example.com/missing_urn.yaml"
         )
+
+
+def test_register_requires_uri():
+    """Test that registering an extension requires a URI during migration."""
+    content = """%YAML 1.2
+---
+urn: extension:example:test
+scalar_functions: []
+"""
+    registry = ExtensionRegistry(load_default_extensions=False)
+
+    # During migration, URI is required - this should fail with TypeError
+    with pytest.raises(TypeError):
+        registry.register_extension_dict(yaml.safe_load(content))

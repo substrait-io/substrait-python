@@ -251,6 +251,7 @@ class FunctionEntry:
 class ExtensionRegistry:
     def __init__(self, load_default_extensions=True) -> None:
         self._urn_mapping: dict = defaultdict(dict)  # URN -> anchor ID
+        # NOTE: during the URI -> URN migration, we only need an id generator for URN. We can use the same anchor for plan construction for URIs.
         self._urn_id_generator = itertools.count(1)
 
         self._function_mapping: dict = defaultdict(dict)
@@ -278,7 +279,7 @@ class ExtensionRegistry:
 
         Args:
             fname: Path to the YAML file
-            uri: URI for the extension (for URI/URN bimap)
+            uri: URI for the extension (this is required during the URI -> URN migration)
         """
         fname = Path(fname)
         with open(fname) as f:  # type: ignore
@@ -297,13 +298,10 @@ class ExtensionRegistry:
         if not urn:
             raise ValueError("Extension definitions must contain a 'urn' field")
 
-        # Validate URN format
         self._validate_urn_format(urn)
 
-        # Assign anchor to URN (URI will use the same anchor during output)
         self._urn_mapping[urn] = next(self._urn_id_generator)
 
-        # Store URI <-> URN mapping for output generation
         self._uri_urn_bimap.put(uri, urn)
 
         simple_extensions = build_simple_extensions(definitions)
@@ -368,28 +366,6 @@ class ExtensionRegistry:
         if urn:
             return self._urn_mapping.get(urn)
         return None
-
-    def uri_to_urn(self, uri: str) -> Optional[str]:
-        """Convert a URI to its corresponding URN using the bimap.
-
-        Args:
-            uri: The extension URI
-
-        Returns:
-            The corresponding URN, or None if not in the bimap
-        """
-        return self._uri_urn_bimap.get_urn(uri)
-
-    def urn_to_uri(self, urn: str) -> Optional[str]:
-        """Convert a URN to its corresponding URI using the bimap.
-
-        Args:
-            urn: The extension URN
-
-        Returns:
-            The corresponding URI, or None if not in the bimap
-        """
-        return self._uri_urn_bimap.get_uri(urn)
 
     def _validate_urn_format(self, urn: str) -> None:
         """Validate that a URN follows the expected format.

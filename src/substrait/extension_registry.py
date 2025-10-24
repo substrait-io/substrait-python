@@ -257,8 +257,6 @@ class ExtensionRegistry:
         self._function_mapping: dict = defaultdict(dict)
         self._id_generator = itertools.count(1)
 
-        self._urn_aliases = {}
-
         # Bidirectional URI <-> URN mapping (temporary during migration)
         self._uri_urn_bimap = UriUrnBiDiMap()
 
@@ -330,8 +328,6 @@ class ExtensionRegistry:
     def lookup_function(
         self, urn: str, function_name: str, signature: tuple
     ) -> Optional[tuple[FunctionEntry, Type]]:
-        urn = self._urn_aliases.get(urn, urn)
-
         if (
             urn not in self._function_mapping
             or function_name not in self._function_mapping[urn]
@@ -347,7 +343,6 @@ class ExtensionRegistry:
         return None
 
     def lookup_urn(self, urn: str) -> Optional[int]:
-        urn = self._urn_aliases.get(urn, urn)
         return self._urn_mapping.get(urn, None)
 
     def lookup_uri_anchor(self, uri: str) -> Optional[int]:

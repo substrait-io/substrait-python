@@ -21,7 +21,7 @@ registry = ExtensionRegistry(load_default_extensions=True)
 def basic_example():
     ns = named_struct(
         names=["id", "is_applicable"],
-        struct=struct(types=[i64(nullable=False), boolean()]),
+        struct=struct(types=[i64(nullable=False), boolean()], nullable=False),
     )
 
     table = read_named_table("example_table", ns)
@@ -29,9 +29,9 @@ def basic_example():
     table = filter(
         table,
         expression=scalar_function(
-            "functions_comparison.yaml",
+            "extension:io.substrait:functions_comparison",
             "lt",
-            expressions=[column("id"), literal(100, i64())],
+            expressions=[column("id"), literal(100, i64(nullable=False))],
         ),
     )
     table = project(table, expressions=[column("id")])
@@ -40,15 +40,16 @@ def basic_example():
     pretty_print_plan(table(registry), use_colors=True)
 
     """
-  extension_urns {
-    extension_urn_anchor: 13
-    urn: "functions_comparison.yaml"
+  extension_uris {
+    extension_uri_anchor: 2
+    uri: "https://github.com/substrait-io/substrait/blob/main/extensions/functions_comparison.yaml"
   }
   extensions {
     extension_function {
-      extension_urn_reference: 13
-      function_anchor: 495
-      name: "lt"
+      extension_uri_reference: 2
+      function_anchor: 124
+      name: "lt:any_any"
+      extension_urn_reference: 2
     }
   }
   relations {
@@ -84,7 +85,7 @@ def basic_example():
                               nullability: NULLABILITY_NULLABLE
                             }
                           }
-                          nullability: NULLABILITY_NULLABLE
+                          nullability: NULLABILITY_REQUIRED
                         }
                       }
                       named_table {
@@ -107,10 +108,10 @@ def basic_example():
               }
               condition {
                 scalar_function {
-                  function_reference: 495
+                  function_reference: 124
                   output_type {
                     bool {
-                      nullability: NULLABILITY_NULLABLE
+                      nullability: NULLABILITY_REQUIRED
                     }
                   }
                   arguments {
@@ -129,7 +130,6 @@ def basic_example():
                     value {
                       literal {
                         i64: 100
-                        nullable: true
                       }
                     }
                   }
@@ -152,7 +152,11 @@ def basic_example():
       names: "id"
     }
   }
-  """
+  extension_urns {
+    extension_urn_anchor: 2
+    urn: "extension:io.substrait:functions_comparison"
+  }
+    """
 
 
 def advanced_example():
@@ -160,7 +164,7 @@ def advanced_example():
     # Simple example (original)
     ns = named_struct(
         names=["id", "is_applicable"],
-        struct=struct(types=[i64(nullable=False), boolean()]),
+        struct=struct(types=[i64(nullable=False), boolean()], nullable=False),
     )
 
     table = read_named_table("example_table", ns)
@@ -168,9 +172,9 @@ def advanced_example():
     table = filter(
         table,
         expression=scalar_function(
-            "functions_comparison.yaml",
+            "extension:io.substrait:functions_comparison",
             "lt",
-            expressions=[column("id"), literal(100, i64())],
+            expressions=[column("id"), literal(100, i64(nullable=False))],
         ),
     )
     table = project(table, expressions=[column("id")])
@@ -190,7 +194,8 @@ def advanced_example():
                 string(nullable=False),  # name
                 i64(nullable=False),  # age
                 fp64(nullable=False),  # salary
-            ]
+            ],
+            nullable=False,
         ),
     )
 
@@ -200,7 +205,7 @@ def advanced_example():
     adult_users = filter(
         users,
         expression=scalar_function(
-            "functions_comparison.yaml",
+            "extension:io.substrait:functions_comparison",
             "gt",
             expressions=[column("age"), literal(25, i64())],
         ),
@@ -216,7 +221,7 @@ def advanced_example():
             column("salary"),
             # Add a calculated field (this would show function options if available)
             scalar_function(
-                "functions_arithmetic.yaml",
+                "extension:io.substrait:functions_arithmetic",
                 "multiply",
                 expressions=[column("salary"), literal(1.1, fp64())],
                 alias="salary_with_bonus",
@@ -238,7 +243,8 @@ def advanced_example():
                 i64(nullable=False),  # order_id
                 fp64(nullable=False),  # amount
                 string(nullable=False),  # status
-            ]
+            ],
+            nullable=False,
         ),
     )
 
@@ -248,7 +254,7 @@ def advanced_example():
     high_value_orders = filter(
         orders,
         expression=scalar_function(
-            "functions_comparison.yaml",
+            "extension:io.substrait:functions_comparison",
             "gt",
             expressions=[column("amount"), literal(50.0, fp64())],
         ),
@@ -280,16 +286,16 @@ def expression_only_example():
     print("=== Expression-Only Example ===")
     # Show complex expression structure
     complex_expr = scalar_function(
-        "functions_arithmetic.yaml",
+        "extension:io.substrait:functions_arithmetic",
         "multiply",
         expressions=[
             scalar_function(
-                "functions_arithmetic.yaml",
+                "extension:io.substrait:functions_arithmetic",
                 "add",
                 expressions=[
                     column("base_salary"),
                     scalar_function(
-                        "functions_arithmetic.yaml",
+                        "extension:io.substrait:functions_arithmetic",
                         "multiply",
                         expressions=[
                             column("base_salary"),
@@ -299,7 +305,7 @@ def expression_only_example():
                 ],
             ),
             scalar_function(
-                "functions_arithmetic.yaml",
+                "extension:io.substrait:functions_arithmetic",
                 "subtract",
                 expressions=[
                     literal(1.0, fp64()),
@@ -312,7 +318,7 @@ def expression_only_example():
     print("Complex salary calculation expression:")
     # Create a simple plan to wrap the expression
     dummy_schema = named_struct(
-        names=["base_salary"], struct=struct(types=[fp64(nullable=False)])
+        names=["base_salary"], struct=struct(types=[fp64(nullable=False)], nullable=False)
     )
     dummy_table = read_named_table("dummy", dummy_schema)
     dummy_plan = project(dummy_table, expressions=[complex_expr])

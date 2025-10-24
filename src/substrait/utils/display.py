@@ -721,8 +721,9 @@ class PlanPrinter:
                 f"{indent}{self._color('fp64', Colors.BLUE)}: {self._color(literal.fp64, Colors.GREEN)}\n"
             )
         elif literal.HasField("string"):
+            string_value = f'"{literal.string}"'
             stream.write(
-                f"{indent}{self._color('string', Colors.BLUE)}: {self._color(f'"{literal.string}"', Colors.GREEN)}\n"
+                f'{indent}{self._color("string", Colors.BLUE)}: {self._color(string_value, Colors.GREEN)}\n'
             )
         elif literal.HasField("date"):
             stream.write(
@@ -782,8 +783,9 @@ class PlanPrinter:
                         f"{self._get_indent_with_arrow(depth + 2)}{self._color('i32', Colors.BLUE)}: {self._color(field.i32, Colors.GREEN)}\n"
                     )
                 elif field.HasField("string"):
+                    field_string_value = f'"{field.string}"'
                     stream.write(
-                        f"{self._get_indent_with_arrow(depth + 2)}{self._color('string', Colors.BLUE)}: {self._color(f'"{field.string}"', Colors.GREEN)}\n"
+                        f"{self._get_indent_with_arrow(depth + 2)}{self._color('string', Colors.BLUE)}: {self._color(field_string_value, Colors.GREEN)}\n"
                     )
                 elif field.HasField("boolean"):
                     stream.write(

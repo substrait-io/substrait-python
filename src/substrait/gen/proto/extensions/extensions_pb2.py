@@ -7,22 +7,32 @@ from google.protobuf.internal import builder as _builder
 _runtime_version.ValidateProtobufRuntimeVersion(_runtime_version.Domain.PUBLIC, 5, 29, 5, '', 'proto/extensions/extensions.proto')
 _sym_db = _symbol_database.Default()
 from google.protobuf import any_pb2 as google_dot_protobuf_dot_any__pb2
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n!proto/extensions/extensions.proto\x12\x10proto.extensions\x1a\x19google/protobuf/any.proto"X\n\x12SimpleExtensionURI\x120\n\x14extension_uri_anchor\x18\x01 \x01(\rR\x12extensionUriAnchor\x12\x10\n\x03uri\x18\x02 \x01(\tR\x03uri"\xa7\x06\n\x1aSimpleExtensionDeclaration\x12c\n\x0eextension_type\x18\x01 \x01(\x0b2:.proto.extensions.SimpleExtensionDeclaration.ExtensionTypeH\x00R\rextensionType\x12\x7f\n\x18extension_type_variation\x18\x02 \x01(\x0b2C.proto.extensions.SimpleExtensionDeclaration.ExtensionTypeVariationH\x00R\x16extensionTypeVariation\x12o\n\x12extension_function\x18\x03 \x01(\x0b2>.proto.extensions.SimpleExtensionDeclaration.ExtensionFunctionH\x00R\x11extensionFunction\x1a|\n\rExtensionType\x126\n\x17extension_uri_reference\x18\x01 \x01(\rR\x15extensionUriReference\x12\x1f\n\x0btype_anchor\x18\x02 \x01(\rR\ntypeAnchor\x12\x12\n\x04name\x18\x03 \x01(\tR\x04name\x1a\x98\x01\n\x16ExtensionTypeVariation\x126\n\x17extension_uri_reference\x18\x01 \x01(\rR\x15extensionUriReference\x122\n\x15type_variation_anchor\x18\x02 \x01(\rR\x13typeVariationAnchor\x12\x12\n\x04name\x18\x03 \x01(\tR\x04name\x1a\x88\x01\n\x11ExtensionFunction\x126\n\x17extension_uri_reference\x18\x01 \x01(\rR\x15extensionUriReference\x12\'\n\x0ffunction_anchor\x18\x02 \x01(\rR\x0efunctionAnchor\x12\x12\n\x04name\x18\x03 \x01(\tR\x04nameB\x0e\n\x0cmapping_type"\x85\x01\n\x11AdvancedExtension\x128\n\x0coptimization\x18\x01 \x03(\x0b2\x14.google.protobuf.AnyR\x0coptimization\x126\n\x0benhancement\x18\x02 \x01(\x0b2\x14.google.protobuf.AnyR\x0benhancementB#\n\x0eio.proto.protoP\x01\xaa\x02\x0eProto.Protobufb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n!proto/extensions/extensions.proto\x12\x10proto.extensions\x1a\x19google/protobuf/any.proto"\\\n\x12SimpleExtensionURI\x120\n\x14extension_uri_anchor\x18\x01 \x01(\rR\x12extensionUriAnchor\x12\x10\n\x03uri\x18\x02 \x01(\tR\x03uri:\x02\x18\x01"X\n\x12SimpleExtensionURN\x120\n\x14extension_urn_anchor\x18\x01 \x01(\rR\x12extensionUrnAnchor\x12\x10\n\x03urn\x18\x02 \x01(\tR\x03urn"\xdc\x07\n\x1aSimpleExtensionDeclaration\x12c\n\x0eextension_type\x18\x01 \x01(\x0b2:.proto.extensions.SimpleExtensionDeclaration.ExtensionTypeH\x00R\rextensionType\x12\x7f\n\x18extension_type_variation\x18\x02 \x01(\x0b2C.proto.extensions.SimpleExtensionDeclaration.ExtensionTypeVariationH\x00R\x16extensionTypeVariation\x12o\n\x12extension_function\x18\x03 \x01(\x0b2>.proto.extensions.SimpleExtensionDeclaration.ExtensionFunctionH\x00R\x11extensionFunction\x1a\xb8\x01\n\rExtensionType\x12:\n\x17extension_uri_reference\x18\x01 \x01(\rB\x02\x18\x01R\x15extensionUriReference\x126\n\x17extension_urn_reference\x18\x04 \x01(\rR\x15extensionUrnReference\x12\x1f\n\x0btype_anchor\x18\x02 \x01(\rR\ntypeAnchor\x12\x12\n\x04name\x18\x03 \x01(\tR\x04name\x1a\xd4\x01\n\x16ExtensionTypeVariation\x12:\n\x17extension_uri_reference\x18\x01 \x01(\rB\x02\x18\x01R\x15extensionUriReference\x126\n\x17extension_urn_reference\x18\x04 \x01(\rR\x15extensionUrnReference\x122\n\x15type_variation_anchor\x18\x02 \x01(\rR\x13typeVariationAnchor\x12\x12\n\x04name\x18\x03 \x01(\tR\x04name\x1a\xc4\x01\n\x11ExtensionFunction\x12:\n\x17extension_uri_reference\x18\x01 \x01(\rB\x02\x18\x01R\x15extensionUriReference\x126\n\x17extension_urn_reference\x18\x04 \x01(\rR\x15extensionUrnReference\x12\'\n\x0ffunction_anchor\x18\x02 \x01(\rR\x0efunctionAnchor\x12\x12\n\x04name\x18\x03 \x01(\tR\x04nameB\x0e\n\x0cmapping_type"\x85\x01\n\x11AdvancedExtension\x128\n\x0coptimization\x18\x01 \x03(\x0b2\x14.google.protobuf.AnyR\x0coptimization\x126\n\x0benhancement\x18\x02 \x01(\x0b2\x14.google.protobuf.AnyR\x0benhancementB#\n\x0eio.proto.protoP\x01\xaa\x02\x0eProto.Protobufb\x06proto3')
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'proto.extensions.extensions_pb2', _globals)
 if not _descriptor._USE_C_DESCRIPTORS:
     _globals['DESCRIPTOR']._loaded_options = None
     _globals['DESCRIPTOR']._serialized_options = b'\n\x0eio.proto.protoP\x01\xaa\x02\x0eProto.Protobuf'
+    _globals['_SIMPLEEXTENSIONURI']._loaded_options = None
+    _globals['_SIMPLEEXTENSIONURI']._serialized_options = b'\x18\x01'
+    _globals['_SIMPLEEXTENSIONDECLARATION_EXTENSIONTYPE'].fields_by_name['extension_uri_reference']._loaded_options = None
+    _globals['_SIMPLEEXTENSIONDECLARATION_EXTENSIONTYPE'].fields_by_name['extension_uri_reference']._serialized_options = b'\x18\x01'
+    _globals['_SIMPLEEXTENSIONDECLARATION_EXTENSIONTYPEVARIATION'].fields_by_name['extension_uri_reference']._loaded_options = None
+    _globals['_SIMPLEEXTENSIONDECLARATION_EXTENSIONTYPEVARIATION'].fields_by_name['extension_uri_reference']._serialized_options = b'\x18\x01'
+    _globals['_SIMPLEEXTENSIONDECLARATION_EXTENSIONFUNCTION'].fields_by_name['extension_uri_reference']._loaded_options = None
+    _globals['_SIMPLEEXTENSIONDECLARATION_EXTENSIONFUNCTION'].fields_by_name['extension_uri_reference']._serialized_options = b'\x18\x01'
     _globals['_SIMPLEEXTENSIONURI']._serialized_start = 82
-    _globals['_SIMPLEEXTENSIONURI']._serialized_end = 170
-    _globals['_SIMPLEEXTENSIONDECLARATION']._serialized_start = 173
-    _globals['_SIMPLEEXTENSIONDECLARATION']._serialized_end = 980
-    _globals['_SIMPLEEXTENSIONDECLARATION_EXTENSIONTYPE']._serialized_start = 546
-    _globals['_SIMPLEEXTENSIONDECLARATION_EXTENSIONTYPE']._serialized_end = 670
-    _globals['_SIMPLEEXTENSIONDECLARATION_EXTENSIONTYPEVARIATION']._serialized_start = 673
-    _globals['_SIMPLEEXTENSIONDECLARATION_EXTENSIONTYPEVARIATION']._serialized_end = 825
-    _globals['_SIMPLEEXTENSIONDECLARATION_EXTENSIONFUNCTION']._serialized_start = 828
-    _globals['_SIMPLEEXTENSIONDECLARATION_EXTENSIONFUNCTION']._serialized_end = 964
-    _globals['_ADVANCEDEXTENSION']._serialized_start = 983
-    _globals['_ADVANCEDEXTENSION']._serialized_end = 1116
+    _globals['_SIMPLEEXTENSIONURI']._serialized_end = 174
+    _globals['_SIMPLEEXTENSIONURN']._serialized_start = 176
+    _globals['_SIMPLEEXTENSIONURN']._serialized_end = 264
+    _globals['_SIMPLEEXTENSIONDECLARATION']._serialized_start = 267
+    _globals['_SIMPLEEXTENSIONDECLARATION']._serialized_end = 1255
+    _globals['_SIMPLEEXTENSIONDECLARATION_EXTENSIONTYPE']._serialized_start = 641
+    _globals['_SIMPLEEXTENSIONDECLARATION_EXTENSIONTYPE']._serialized_end = 825
+    _globals['_SIMPLEEXTENSIONDECLARATION_EXTENSIONTYPEVARIATION']._serialized_start = 828
+    _globals['_SIMPLEEXTENSIONDECLARATION_EXTENSIONTYPEVARIATION']._serialized_end = 1040
+    _globals['_SIMPLEEXTENSIONDECLARATION_EXTENSIONFUNCTION']._serialized_start = 1043
+    _globals['_SIMPLEEXTENSIONDECLARATION_EXTENSIONFUNCTION']._serialized_end = 1239
+    _globals['_ADVANCEDEXTENSION']._serialized_start = 1258
+    _globals['_ADVANCEDEXTENSION']._serialized_end = 1391

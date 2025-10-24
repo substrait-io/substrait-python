@@ -21,6 +21,7 @@ named_struct = stt.NamedStruct(
 
 content = """%YAML 1.2
 ---
+urn: test_uri
 scalar_functions:
   - name: "test_func"
     description: ""

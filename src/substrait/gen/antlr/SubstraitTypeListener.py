@@ -206,6 +206,15 @@ class SubstraitTypeListener(ParseTreeListener):
         pass
 
 
+    # Enter a parse tree produced by SubstraitTypeParser#precisionTime.
+    def enterPrecisionTime(self, ctx:SubstraitTypeParser.PrecisionTimeContext):
+        pass
+
+    # Exit a parse tree produced by SubstraitTypeParser#precisionTime.
+    def exitPrecisionTime(self, ctx:SubstraitTypeParser.PrecisionTimeContext):
+        pass
+
+
     # Enter a parse tree produced by SubstraitTypeParser#precisionTimestamp.
     def enterPrecisionTimestamp(self, ctx:SubstraitTypeParser.PrecisionTimestampContext):
         pass

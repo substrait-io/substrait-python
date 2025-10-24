@@ -11,7 +11,6 @@ extension references will be used, and the UriUrnBiDiMap will no longer be neede
 Note: Tests for the UriUrnBiDiMap class itself are in test_bimap.py
 """
 
-import pytest
 import yaml
 
 import substrait.gen.proto.type_pb2 as stt
@@ -25,7 +24,7 @@ from substrait.builders.extended_expression import (
     column,
     aggregate_function,
 )
-from substrait.builders.type import i64, boolean
+from substrait.builders.type import i64
 from substrait.builders.plan import read_named_table, aggregate, project, filter
 from substrait.extension_registry import ExtensionRegistry
 from substrait.type_inference import infer_plan_schema

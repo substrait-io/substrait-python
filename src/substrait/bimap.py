@@ -2,7 +2,7 @@
 Bidirectional map for URI <-> URN conversion during the migration period.
 
 This module provides a UriUrnBiDiMap class that maintains a bidirectional mapping
-between URIs and URNs, ensuring consistency and detecting conflicts.
+between URIs and URNs.
 
 NOTE: This file is temporary and can be removed once the URI -> URN migration
 is complete across all Substrait implementations. At that point, only URN-based
@@ -34,8 +34,8 @@ class UriUrnBiDiMap:
             ValueError: If the URI or URN already exists with a different mapping
         """
         # Check for conflicts
-        if uri in self._uri_to_urn:
-            existing_urn = self._uri_to_urn[uri]
+        if self.contains_uri(uri):
+            existing_urn = self.get_urn(uri)
             if existing_urn != urn:
                 raise ValueError(
                     f"URI '{uri}' is already mapped to URN '{existing_urn}', "
@@ -44,8 +44,8 @@ class UriUrnBiDiMap:
             # Already have this exact mapping, nothing to do
             return
 
-        if urn in self._urn_to_uri:
-            existing_uri = self._urn_to_uri[urn]
+        if self.contains_urn(urn):
+            existing_uri = self.get_uri(urn)
             if existing_uri != uri:
                 raise ValueError(
                     f"URN '{urn}' is already mapped to URI '{existing_uri}', "
@@ -54,7 +54,6 @@ class UriUrnBiDiMap:
             # Already have this exact mapping, nothing to do
             return
 
-        # Add the bidirectional mapping
         self._uri_to_urn[uri] = urn
         self._urn_to_uri[urn] = uri
 
@@ -101,11 +100,3 @@ class UriUrnBiDiMap:
             True if the URN is in the map, False otherwise
         """
         return urn in self._urn_to_uri
-
-    def __len__(self) -> int:
-        """Return the number of mappings in the bimap."""
-        return len(self._uri_to_urn)
-
-    def __repr__(self) -> str:
-        """Return a string representation of the bimap."""
-        return f"UriUrnBiDiMap({len(self)} mappings)"

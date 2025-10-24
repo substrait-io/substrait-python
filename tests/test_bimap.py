@@ -78,24 +78,3 @@ class TestUriUrnBiDiMap:
 
         assert bimap.contains_uri(uri)
         assert bimap.contains_urn(urn)
-
-    def test_len(self):
-        """Test the length of the bimap."""
-        bimap = UriUrnBiDiMap()
-
-        assert len(bimap) == 0
-
-        bimap.put("uri1", "urn1")
-        assert len(bimap) == 1
-
-        bimap.put("uri2", "urn2")
-        assert len(bimap) == 2
-
-    def test_repr(self):
-        """Test the string representation of the bimap."""
-        bimap = UriUrnBiDiMap()
-
-        assert repr(bimap) == "UriUrnBiDiMap(0 mappings)"
-
-        bimap.put("uri1", "urn1")
-        assert repr(bimap) == "UriUrnBiDiMap(1 mappings)"

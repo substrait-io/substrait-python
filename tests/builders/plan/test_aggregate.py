@@ -27,7 +27,9 @@ aggregate_functions:
 
 
 registry = ExtensionRegistry(load_default_extensions=False)
-registry.register_extension_dict(yaml.safe_load(content), uri="https://test.example.com/test.yaml")
+registry.register_extension_dict(
+    yaml.safe_load(content), uri="https://test.example.com/test.yaml"
+)
 
 struct = stt.Type.Struct(
     types=[i64(nullable=False), boolean()], nullability=stt.Type.NULLABILITY_REQUIRED
@@ -41,7 +43,10 @@ def test_aggregate():
 
     group_expr = column("id")
     measure_expr = aggregate_function(
-        "extension:test:urn", "count", expressions=[column("is_applicable")], alias=["count"]
+        "extension:test:urn",
+        "count",
+        expressions=[column("is_applicable")],
+        alias=["count"],
     )
 
     actual = aggregate(
@@ -51,15 +56,21 @@ def test_aggregate():
     ns = infer_plan_schema(table(None))
 
     expected = stp.Plan(
-        extension_urns=[ste.SimpleExtensionURN(extension_urn_anchor=1, urn="extension:test:urn")],
-        extension_uris=[ste.SimpleExtensionURI(extension_uri_anchor=1, uri="https://test.example.com/test.yaml")],
+        extension_urns=[
+            ste.SimpleExtensionURN(extension_urn_anchor=1, urn="extension:test:urn")
+        ],
+        extension_uris=[
+            ste.SimpleExtensionURI(
+                extension_uri_anchor=1, uri="https://test.example.com/test.yaml"
+            )
+        ],
         extensions=[
             ste.SimpleExtensionDeclaration(
                 extension_function=ste.SimpleExtensionDeclaration.ExtensionFunction(
                     extension_urn_reference=1,
                     extension_uri_reference=1,
                     function_anchor=1,
-                    name="count:any"
+                    name="count:any",
                 )
             )
         ],

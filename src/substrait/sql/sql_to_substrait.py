@@ -36,7 +36,9 @@ function_mapping = {
     "Eq": ("extension:io.substrait:functions_comparison", "equal"),
 }
 
-aggregate_function_mapping = {"SUM": ("extension:io.substrait:functions_arithmetic", "sum")}
+aggregate_function_mapping = {
+    "SUM": ("extension:io.substrait:functions_arithmetic", "sum")
+}
 
 window_function_mapping = {
     "row_number": ("extension:io.substrait:functions_arithmetic", "row_number"),

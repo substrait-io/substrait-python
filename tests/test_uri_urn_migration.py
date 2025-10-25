@@ -54,7 +54,9 @@ scalar_functions:
         expressions=[
             literal(
                 10,
-                type=stt.Type(i8=stt.Type.I8(nullability=stt.Type.NULLABILITY_REQUIRED)),
+                type=stt.Type(
+                    i8=stt.Type.I8(nullability=stt.Type.NULLABILITY_REQUIRED)
+                ),
             )
         ],
     )
@@ -63,11 +65,11 @@ scalar_functions:
 
     expected = stex.ExtendedExpression(
         extension_urns=[
-            ste.SimpleExtensionURN(extension_urn_anchor=1, urn="extension:test:functions")
+            ste.SimpleExtensionURN(
+                extension_urn_anchor=1, urn="extension:test:functions"
+            )
         ],
-        extension_uris=[
-            ste.SimpleExtensionURI(extension_uri_anchor=1, uri=uri)
-        ],
+        extension_uris=[ste.SimpleExtensionURI(extension_uri_anchor=1, uri=uri)],
         extensions=[
             ste.SimpleExtensionDeclaration(
                 extension_function=ste.SimpleExtensionDeclaration.ExtensionFunction(
@@ -95,15 +97,17 @@ scalar_functions:
                         ],
                     )
                 ),
-                output_names=["test_func(Literal(10))"]
+                output_names=["test_func(Literal(10))"],
             )
         ],
         base_schema=stt.NamedStruct(
             names=["value"],
             struct=stt.Type.Struct(
-                types=[stt.Type(i8=stt.Type.I8(nullability=stt.Type.NULLABILITY_REQUIRED))]
-            )
-        )
+                types=[
+                    stt.Type(i8=stt.Type.I8(nullability=stt.Type.NULLABILITY_REQUIRED))
+                ]
+            ),
+        ),
     )
 
     assert actual == expected
@@ -167,9 +171,13 @@ scalar_functions:
                 root=stalg.RelRoot(
                     input=stalg.Rel(
                         project=stalg.ProjectRel(
-                            common=stalg.RelCommon(emit=stalg.RelCommon.Emit(output_mapping=[2])),
+                            common=stalg.RelCommon(
+                                emit=stalg.RelCommon.Emit(output_mapping=[2])
+                            ),
                             input=table(None).relations[-1].root.input,
-                            expressions=[add_expr(ns, registry).referred_expr[0].expression],
+                            expressions=[
+                                add_expr(ns, registry).referred_expr[0].expression
+                            ],
                         )
                     ),
                     names=["add"],
@@ -179,6 +187,7 @@ scalar_functions:
     )
 
     assert actual == expected
+
 
 def test_filter_outputs_both_uri_and_urn():
     """Test that filter plans with scalar functions have both URI and URN in proto."""
@@ -251,6 +260,7 @@ scalar_functions:
 
     assert actual == expected
 
+
 def test_aggregate_with_aggregate_function():
     """Test that aggregate plans with aggregate functions have both URI and URN in proto."""
     content = """%YAML 1.2
@@ -319,14 +329,18 @@ aggregate_functions:
                             groupings=[
                                 stalg.AggregateRel.Grouping(
                                     grouping_expressions=[
-                                        column("id")(ns, registry).referred_expr[0].expression
+                                        column("id")(ns, registry)
+                                        .referred_expr[0]
+                                        .expression
                                     ],
                                     expression_references=[0],
                                 )
                             ],
                             measures=[
                                 stalg.AggregateRel.Measure(
-                                    measure=sum_expr(ns, registry).referred_expr[0].measure
+                                    measure=sum_expr(ns, registry)
+                                    .referred_expr[0]
+                                    .measure
                                 )
                             ],
                         )
@@ -334,7 +348,7 @@ aggregate_functions:
                     names=["id", "sum"],
                 )
             )
-            ],
-        )
+        ],
+    )
 
     assert actual == expected

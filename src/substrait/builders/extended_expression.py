@@ -250,7 +250,9 @@ def scalar_function(
             ste.SimpleExtensionDeclaration(
                 extension_function=ste.SimpleExtensionDeclaration.ExtensionFunction(
                     extension_urn_reference=registry.lookup_urn(urn),
-                    extension_uri_reference=registry.lookup_uri_anchor(uri) if uri else 0,
+                    extension_uri_reference=registry.lookup_uri_anchor(uri)
+                    if uri
+                    else 0,
                     function_anchor=func[0].anchor,
                     name=str(func[0]),
                 )
@@ -346,7 +348,9 @@ def aggregate_function(
             ste.SimpleExtensionDeclaration(
                 extension_function=ste.SimpleExtensionDeclaration.ExtensionFunction(
                     extension_urn_reference=registry.lookup_urn(urn),
-                    extension_uri_reference=registry.lookup_uri_anchor(uri) if uri else 0,
+                    extension_uri_reference=registry.lookup_uri_anchor(uri)
+                    if uri
+                    else 0,
                     function_anchor=func[0].anchor,
                     name=str(func[0]),
                 )
@@ -444,13 +448,14 @@ def window_function(
             ste.SimpleExtensionDeclaration(
                 extension_function=ste.SimpleExtensionDeclaration.ExtensionFunction(
                     extension_urn_reference=registry.lookup_urn(urn),
-                    extension_uri_reference=registry.lookup_uri_anchor(uri) if uri else 0,
+                    extension_uri_reference=registry.lookup_uri_anchor(uri)
+                    if uri
+                    else 0,
                     function_anchor=func[0].anchor,
                     name=str(func[0]),
                 )
             )
         ]
-
 
         extension_urns = merge_extension_urns(
             func_extension_urns,
@@ -609,6 +614,12 @@ def switch(
         ]
         bound_else = resolve_expression(_else, base_schema, registry)
 
+        extension_uris = merge_extension_uris(
+            bound_match.extension_uris,
+            *[b.extension_uris for _, b in bound_ifs],
+            bound_else.extension_uris,
+        )
+
         extension_urns = merge_extension_urns(
             bound_match.extension_urns,
             *[b.extension_urns for _, b in bound_ifs],
@@ -644,6 +655,7 @@ def switch(
             ],
             base_schema=base_schema,
             extension_urns=extension_urns,
+            extension_uris=extension_uris,
             extensions=extensions,
         )
 
@@ -660,6 +672,10 @@ def singular_or_list(
     ) -> stee.ExtendedExpression:
         bound_value = resolve_expression(value, base_schema, registry)
         bound_options = [resolve_expression(o, base_schema, registry) for o in options]
+
+        extension_uris = merge_extension_uris(
+            bound_value.extension_uris, *[b.extension_uris for b in bound_options]
+        )
 
         extension_urns = merge_extension_urns(
             bound_value.extension_urns, *[b.extension_urns for b in bound_options]
@@ -687,6 +703,7 @@ def singular_or_list(
             ],
             base_schema=base_schema,
             extension_urns=extension_urns,
+            extension_uris=extension_uris,
             extensions=extensions,
         )
 
@@ -707,12 +724,17 @@ def multi_or_list(
             [resolve_expression(e, base_schema, registry) for e in o] for o in options
         ]
 
+        extension_uris = merge_extension_uris(
+            *[b.extension_uris for b in bound_value],
+            *[e.extension_uris for b in bound_options for e in b],
+        )
+
         extension_urns = merge_extension_urns(
             *[b.extension_urns for b in bound_value],
             *[e.extension_urns for b in bound_options for e in b],
         )
 
-        extensions = merge_extension_urns(
+        extensions = merge_extension_declarations(
             *[b.extensions for b in bound_value],
             *[e.extensions for b in bound_options for e in b],
         )
@@ -738,6 +760,7 @@ def multi_or_list(
             ],
             base_schema=base_schema,
             extension_urns=extension_urns,
+            extension_uris=extension_uris,
             extensions=extensions,
         )
 
@@ -767,6 +790,7 @@ def cast(input: ExtendedExpressionOrUnbound, type: stp.Type):
             ],
             base_schema=base_schema,
             extension_urns=bound_input.extension_urns,
+            extension_uris=bound_input.extension_uris,
             extensions=bound_input.extensions,
         )
 

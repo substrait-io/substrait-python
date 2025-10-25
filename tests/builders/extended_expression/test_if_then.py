@@ -2,7 +2,12 @@ import substrait.gen.proto.algebra_pb2 as stalg
 import substrait.gen.proto.type_pb2 as stt
 import substrait.gen.proto.extended_expression_pb2 as stee
 import substrait.gen.proto.extensions.extensions_pb2 as ste
-from substrait.builders.extended_expression import if_then, literal, scalar_function, column
+from substrait.builders.extended_expression import (
+    if_then,
+    literal,
+    scalar_function,
+    column,
+)
 from substrait.extension_registry import ExtensionRegistry
 
 
@@ -78,11 +83,10 @@ def test_if_else():
 
     assert actual == expected
 
+
 def test_if_then_with_extension():
-    """Test if_then with scalar function to verify both URI and URN are present."""
     import yaml
 
-    # Use a minimal registry with only the comparison extension
     registry = ExtensionRegistry(load_default_extensions=False)
     content = """%YAML 1.2
 ---
@@ -98,7 +102,7 @@ scalar_functions:
 """
     registry.register_extension_dict(
         yaml.safe_load(content),
-        uri="https://github.com/substrait-io/substrait/blob/main/extensions/functions_comparison.yaml"
+        uri="https://github.com/substrait-io/substrait/blob/main/extensions/functions_comparison.yaml",
     )
 
     # Create if_then: if order_total > 100 then "expensive" else "cheap"
@@ -110,15 +114,22 @@ scalar_functions:
                     "gt",
                     expressions=[
                         column("order_total"),
-                        literal(100.0, type=stt.Type(
-                            fp32=stt.Type.FP32(nullability=stt.Type.NULLABILITY_REQUIRED)
-                        )),
+                        literal(
+                            100.0,
+                            type=stt.Type(
+                                fp32=stt.Type.FP32(
+                                    nullability=stt.Type.NULLABILITY_REQUIRED
+                                )
+                            ),
+                        ),
                     ],
                 ),
                 literal(
                     "expensive",
                     type=stt.Type(
-                        string=stt.Type.String(nullability=stt.Type.NULLABILITY_REQUIRED)
+                        string=stt.Type.String(
+                            nullability=stt.Type.NULLABILITY_REQUIRED
+                        )
                     ),
                 ),
             )
@@ -135,13 +146,13 @@ scalar_functions:
         extension_uris=[
             ste.SimpleExtensionURI(
                 extension_uri_anchor=1,
-                uri="https://github.com/substrait-io/substrait/blob/main/extensions/functions_comparison.yaml"
+                uri="https://github.com/substrait-io/substrait/blob/main/extensions/functions_comparison.yaml",
             )
         ],
         extension_urns=[
             ste.SimpleExtensionURN(
                 extension_urn_anchor=1,
-                urn="extension:io.substrait:functions_comparison"
+                urn="extension:io.substrait:functions_comparison",
             )
         ],
         extensions=[
@@ -150,7 +161,7 @@ scalar_functions:
                     extension_uri_reference=1,
                     extension_urn_reference=1,
                     function_anchor=1,
-                    name="gt:fp32_fp32"
+                    name="gt:fp32_fp32",
                 )
             )
         ],
@@ -179,7 +190,7 @@ scalar_functions:
                                                                         field=2
                                                                     )
                                                                 ),
-                                                                root_reference=stalg.Expression.FieldReference.RootReference()
+                                                                root_reference=stalg.Expression.FieldReference.RootReference(),
                                                             )
                                                         )
                                                     ),
@@ -190,7 +201,7 @@ scalar_functions:
                                                             )
                                                         )
                                                     ),
-                                                ]
+                                                ],
                                             )
                                         ),
                                         "then": stalg.Expression(
@@ -202,14 +213,14 @@ scalar_functions:
                                 )
                             ],
                             "else": stalg.Expression(
-                                literal=stalg.Expression.Literal(
-                                    string="cheap"
-                                )
+                                literal=stalg.Expression.Literal(string="cheap")
                             ),
                         }
                     )
                 ),
-                output_names=["IfThen(gt(order_total,Literal(100.0)),Literal(expensive),Literal(cheap))"],
+                output_names=[
+                    "IfThen(gt(order_total,Literal(100.0)),Literal(expensive),Literal(cheap))"
+                ],
             )
         ],
         base_schema=named_struct,

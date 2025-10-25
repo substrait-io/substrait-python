@@ -92,13 +92,18 @@ def test_type_num_names_nested_list():
 def test_merge_extension_uris_deduplicates():
     """Test that merging extension URIs deduplicates correctly."""
     # Create duplicate URI extensions
-    uri1 = ste.SimpleExtensionURI(extension_uri_anchor=1, uri="https://example.com/test.yaml")
-    uri2 = ste.SimpleExtensionURI(extension_uri_anchor=1, uri="https://example.com/test.yaml")
-    uri3 = ste.SimpleExtensionURI(extension_uri_anchor=2, uri="https://example.com/other.yaml")
+    uri1 = ste.SimpleExtensionURI(
+        extension_uri_anchor=1, uri="https://example.com/test.yaml"
+    )
+    uri2 = ste.SimpleExtensionURI(
+        extension_uri_anchor=1, uri="https://example.com/test.yaml"
+    )
+    uri3 = ste.SimpleExtensionURI(
+        extension_uri_anchor=2, uri="https://example.com/other.yaml"
+    )
 
     merged_uris = merge_extension_uris([uri1], [uri2, uri3])
 
-    # Should have 2 unique URIs
     assert len(merged_uris) == 2
     assert merged_uris[0].uri == "https://example.com/test.yaml"
     assert merged_uris[1].uri == "https://example.com/other.yaml"
@@ -113,7 +118,6 @@ def test_merge_extension_urns_deduplicates():
 
     merged_urns = merge_extension_urns([urn1], [urn2, urn3])
 
-    # Should have 2 unique URNs
     assert len(merged_urns) == 2
     assert merged_urns[0].urn == "extension:example:test"
     assert merged_urns[1].urn == "extension:example:other"

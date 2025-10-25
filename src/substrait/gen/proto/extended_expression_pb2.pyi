@@ -51,6 +51,7 @@ class ExtendedExpression(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
     VERSION_FIELD_NUMBER: builtins.int
     EXTENSION_URIS_FIELD_NUMBER: builtins.int
+    EXTENSION_URNS_FIELD_NUMBER: builtins.int
     EXTENSIONS_FIELD_NUMBER: builtins.int
     REFERRED_EXPR_FIELD_NUMBER: builtins.int
     BASE_SCHEMA_FIELD_NUMBER: builtins.int
@@ -65,7 +66,15 @@ class ExtendedExpression(google.protobuf.message.Message):
 
     @property
     def extension_uris(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[proto.extensions.extensions_pb2.SimpleExtensionURI]:
-        """a list of yaml specifications this expression may depend on"""
+        """a list of yaml specifications this expression may depend on
+        this is now deprecated and extension_urns should be used instead.
+        """
+
+    @property
+    def extension_urns(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[proto.extensions.extensions_pb2.SimpleExtensionURN]:
+        """a list of extension specifications this expression may depend on,
+        referenced by Extension URN
+        """
 
     @property
     def extensions(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[proto.extensions.extensions_pb2.SimpleExtensionDeclaration]:
@@ -92,12 +101,12 @@ class ExtendedExpression(google.protobuf.message.Message):
         one or more message types defined here are unknown.
         """
 
-    def __init__(self, *, version: proto.plan_pb2.Version | None=..., extension_uris: collections.abc.Iterable[proto.extensions.extensions_pb2.SimpleExtensionURI] | None=..., extensions: collections.abc.Iterable[proto.extensions.extensions_pb2.SimpleExtensionDeclaration] | None=..., referred_expr: collections.abc.Iterable[global___ExpressionReference] | None=..., base_schema: proto.type_pb2.NamedStruct | None=..., advanced_extensions: proto.extensions.extensions_pb2.AdvancedExtension | None=..., expected_type_urls: collections.abc.Iterable[builtins.str] | None=...) -> None:
+    def __init__(self, *, version: proto.plan_pb2.Version | None=..., extension_uris: collections.abc.Iterable[proto.extensions.extensions_pb2.SimpleExtensionURI] | None=..., extension_urns: collections.abc.Iterable[proto.extensions.extensions_pb2.SimpleExtensionURN] | None=..., extensions: collections.abc.Iterable[proto.extensions.extensions_pb2.SimpleExtensionDeclaration] | None=..., referred_expr: collections.abc.Iterable[global___ExpressionReference] | None=..., base_schema: proto.type_pb2.NamedStruct | None=..., advanced_extensions: proto.extensions.extensions_pb2.AdvancedExtension | None=..., expected_type_urls: collections.abc.Iterable[builtins.str] | None=...) -> None:
         ...
 
     def HasField(self, field_name: typing.Literal['advanced_extensions', b'advanced_extensions', 'base_schema', b'base_schema', 'version', b'version']) -> builtins.bool:
         ...
 
-    def ClearField(self, field_name: typing.Literal['advanced_extensions', b'advanced_extensions', 'base_schema', b'base_schema', 'expected_type_urls', b'expected_type_urls', 'extension_uris', b'extension_uris', 'extensions', b'extensions', 'referred_expr', b'referred_expr', 'version', b'version']) -> None:
+    def ClearField(self, field_name: typing.Literal['advanced_extensions', b'advanced_extensions', 'base_schema', b'base_schema', 'expected_type_urls', b'expected_type_urls', 'extension_uris', b'extension_uris', 'extension_urns', b'extension_urns', 'extensions', b'extensions', 'referred_expr', b'referred_expr', 'version', b'version']) -> None:
         ...
 global___ExtendedExpression = ExtendedExpression

@@ -1,0 +1,36 @@
+name: Run examples
+
+on:
+  pull_request:
+  push:
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+jobs:
+  example:
+    name: Run ${{ matrix.example }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        example:
+          - builder_example.py
+          - duckdb_example.py
+          - adbc_example.py
+          - pyarrow_example.py
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+        with:
+          submodules: recursive
+      - name: Install uv with python
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.10"
+      - name: Install package dependencies
+        run: |
+          uv sync --frozen --extra extensions
+      - name: Run ${{ matrix.example }}
+        run: |
+          uv run examples/${{ matrix.example }}

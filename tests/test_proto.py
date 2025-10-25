@@ -11,7 +11,7 @@ def test_imports():
     from substrait.gen.proto.plan_pb2 import Plan
     from substrait.gen.proto.type_expressions_pb2 import DerivationExpression
     from substrait.gen.proto.type_pb2 import Type
-    from substrait.gen.proto.extensions.extensions_pb2 import SimpleExtensionURI
+    from substrait.gen.proto.extensions.extensions_pb2 import SimpleExtensionURN
 
 
 def test_proto_proxy_module():

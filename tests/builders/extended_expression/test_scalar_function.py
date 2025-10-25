@@ -21,6 +21,7 @@ named_struct = stt.NamedStruct(
 
 content = """%YAML 1.2
 ---
+urn: extension:test:urn
 scalar_functions:
   - name: "test_func"
     description: ""
@@ -40,12 +41,13 @@ scalar_functions:
 
 
 registry = ExtensionRegistry(load_default_extensions=False)
-registry.register_extension_dict(yaml.safe_load(content), uri="test_uri")
+test_uri = "https://test.example.com/extension_test_urn.yaml"
+registry.register_extension_dict(yaml.safe_load(content), uri=test_uri)
 
 
 def test_sclar_add():
     e = scalar_function(
-        "test_uri",
+        "extension:test:urn",
         "test_func",
         expressions=[
             literal(
@@ -64,11 +66,22 @@ def test_sclar_add():
     )(named_struct, registry)
 
     expected = stee.ExtendedExpression(
-        extension_uris=[ste.SimpleExtensionURI(extension_uri_anchor=1, uri="test_uri")],
+        extension_urns=[
+            ste.SimpleExtensionURN(extension_urn_anchor=1, urn="extension:test:urn")
+        ],
+        extension_uris=[
+            ste.SimpleExtensionURI(
+                extension_uri_anchor=1,
+                uri="https://test.example.com/extension_test_urn.yaml",
+            )
+        ],
         extensions=[
             ste.SimpleExtensionDeclaration(
                 extension_function=ste.SimpleExtensionDeclaration.ExtensionFunction(
-                    extension_uri_reference=1, function_anchor=1, name="test_func:i8"
+                    extension_urn_reference=1,
+                    extension_uri_reference=1,
+                    function_anchor=1,
+                    name="test_func:i8",
                 )
             )
         ],
@@ -109,11 +122,11 @@ def test_sclar_add():
 
 def test_nested_scalar_calls():
     e = scalar_function(
-        "test_uri",
+        "extension:test:urn",
         "is_positive",
         expressions=[
             scalar_function(
-                "test_uri",
+                "extension:test:urn",
                 "test_func",
                 expressions=[
                     literal(
@@ -135,16 +148,30 @@ def test_nested_scalar_calls():
     )(named_struct, registry)
 
     expected = stee.ExtendedExpression(
-        extension_uris=[ste.SimpleExtensionURI(extension_uri_anchor=1, uri="test_uri")],
+        extension_urns=[
+            ste.SimpleExtensionURN(extension_urn_anchor=1, urn="extension:test:urn")
+        ],
+        extension_uris=[
+            ste.SimpleExtensionURI(
+                extension_uri_anchor=1,
+                uri="https://test.example.com/extension_test_urn.yaml",
+            )
+        ],
         extensions=[
             ste.SimpleExtensionDeclaration(
                 extension_function=ste.SimpleExtensionDeclaration.ExtensionFunction(
-                    extension_uri_reference=1, function_anchor=2, name="is_positive:i8"
+                    extension_urn_reference=1,
+                    extension_uri_reference=1,
+                    function_anchor=2,
+                    name="is_positive:i8",
                 )
             ),
             ste.SimpleExtensionDeclaration(
                 extension_function=ste.SimpleExtensionDeclaration.ExtensionFunction(
-                    extension_uri_reference=1, function_anchor=1, name="test_func:i8"
+                    extension_urn_reference=1,
+                    extension_uri_reference=1,
+                    function_anchor=1,
+                    name="test_func:i8",
                 )
             ),
         ],

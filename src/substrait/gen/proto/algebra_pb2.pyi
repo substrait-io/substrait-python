@@ -152,15 +152,23 @@ class RelCommon(google.protobuf.message.Message):
             DESCRIPTOR: google.protobuf.descriptor.Descriptor
             COMPUTATION_ID_FIELD_NUMBER: builtins.int
             TYPE_FIELD_NUMBER: builtins.int
+            ADVANCED_EXTENSION_FIELD_NUMBER: builtins.int
             computation_id: builtins.int
             'The value corresponds to a plan unique number for that datastructure.  Any particular\n            computation may be saved only once but it may be loaded multiple times.\n            '
             type: global___RelCommon.Hint.ComputationType.ValueType
             'The type of this computation.  While a plan may use COMPUTATION_TYPE_UNKNOWN for all\n            of its types it is recommended to use a more specific type so that the optimization\n            is more portable.  The consumer should be able to decide if an unknown type here\n            matches the same unknown type at a different plan and ignore the optimization if they\n            are mismatched.\n            '
 
-            def __init__(self, *, computation_id: builtins.int=..., type: global___RelCommon.Hint.ComputationType.ValueType=...) -> None:
+            @property
+            def advanced_extension(self) -> proto.extensions.extensions_pb2.AdvancedExtension:
                 ...
 
-            def ClearField(self, field_name: typing.Literal['computation_id', b'computation_id', 'type', b'type']) -> None:
+            def __init__(self, *, computation_id: builtins.int=..., type: global___RelCommon.Hint.ComputationType.ValueType=..., advanced_extension: proto.extensions.extensions_pb2.AdvancedExtension | None=...) -> None:
+                ...
+
+            def HasField(self, field_name: typing.Literal['advanced_extension', b'advanced_extension']) -> builtins.bool:
+                ...
+
+            def ClearField(self, field_name: typing.Literal['advanced_extension', b'advanced_extension', 'computation_id', b'computation_id', 'type', b'type']) -> None:
                 ...
 
         @typing.final
@@ -168,15 +176,23 @@ class RelCommon(google.protobuf.message.Message):
             DESCRIPTOR: google.protobuf.descriptor.Descriptor
             COMPUTATION_ID_REFERENCE_FIELD_NUMBER: builtins.int
             TYPE_FIELD_NUMBER: builtins.int
+            ADVANCED_EXTENSION_FIELD_NUMBER: builtins.int
             computation_id_reference: builtins.int
             'The value corresponds to a plan unique number for that datastructure.  Any particular\n            computation may be saved only once but it may be loaded multiple times.\n            '
             type: global___RelCommon.Hint.ComputationType.ValueType
             'The type of this computation.  While a plan may use COMPUTATION_TYPE_UNKNOWN for all\n            of its types it is recommended to use a more specific type so that the optimization\n            is more portable.  The consumer should be able to decide if an unknown type here\n            matches the same unknown type at a different plan and ignore the optimization if they\n            are mismatched.\n            '
 
-            def __init__(self, *, computation_id_reference: builtins.int=..., type: global___RelCommon.Hint.ComputationType.ValueType=...) -> None:
+            @property
+            def advanced_extension(self) -> proto.extensions.extensions_pb2.AdvancedExtension:
                 ...
 
-            def ClearField(self, field_name: typing.Literal['computation_id_reference', b'computation_id_reference', 'type', b'type']) -> None:
+            def __init__(self, *, computation_id_reference: builtins.int=..., type: global___RelCommon.Hint.ComputationType.ValueType=..., advanced_extension: proto.extensions.extensions_pb2.AdvancedExtension | None=...) -> None:
+                ...
+
+            def HasField(self, field_name: typing.Literal['advanced_extension', b'advanced_extension']) -> builtins.bool:
+                ...
+
+            def ClearField(self, field_name: typing.Literal['advanced_extension', b'advanced_extension', 'computation_id_reference', b'computation_id_reference', 'type', b'type']) -> None:
                 ...
         STATS_FIELD_NUMBER: builtins.int
         CONSTRAINT_FIELD_NUMBER: builtins.int

@@ -50,3 +50,104 @@ def test_singular_or_list():
     )
 
     assert e == expected
+
+
+def test_singular_or_list_with_extension():
+    import yaml
+    import substrait.gen.proto.extensions.extensions_pb2 as ste
+    from substrait.builders.extended_expression import scalar_function
+
+    registry_with_ext = ExtensionRegistry(load_default_extensions=False)
+    content = """%YAML 1.2
+---
+urn: extension:test:functions
+scalar_functions:
+  - name: "add"
+    description: ""
+    impls:
+      - args:
+          - value: i8
+          - value: i8
+        return: i8
+"""
+    registry_with_ext.register_extension_dict(
+        yaml.safe_load(content), uri="https://test.example.com/functions.yaml"
+    )
+
+    actual = singular_or_list(
+        value=scalar_function(
+            "extension:test:functions",
+            "add",
+            expressions=[literal(1, i8()), literal(2, i8())],
+        ),
+        options=[literal(3, i8()), literal(4, i8())],
+    )(named_struct, registry_with_ext)
+
+    expected = stee.ExtendedExpression(
+        extension_uris=[
+            ste.SimpleExtensionURI(
+                extension_uri_anchor=1, uri="https://test.example.com/functions.yaml"
+            )
+        ],
+        extension_urns=[
+            ste.SimpleExtensionURN(
+                extension_urn_anchor=1, urn="extension:test:functions"
+            )
+        ],
+        extensions=[
+            ste.SimpleExtensionDeclaration(
+                extension_function=ste.SimpleExtensionDeclaration.ExtensionFunction(
+                    extension_uri_reference=1,
+                    extension_urn_reference=1,
+                    function_anchor=1,
+                    name="add:i8_i8",
+                )
+            )
+        ],
+        referred_expr=[
+            stee.ExpressionReference(
+                expression=stalg.Expression(
+                    singular_or_list=stalg.Expression.SingularOrList(
+                        value=stalg.Expression(
+                            scalar_function=stalg.Expression.ScalarFunction(
+                                function_reference=1,
+                                output_type=stt.Type(
+                                    i8=stt.Type.I8(
+                                        nullability=stt.Type.NULLABILITY_NULLABLE
+                                    )
+                                ),
+                                arguments=[
+                                    stalg.FunctionArgument(
+                                        value=stalg.Expression(
+                                            literal=stalg.Expression.Literal(
+                                                i8=1, nullable=True
+                                            )
+                                        )
+                                    ),
+                                    stalg.FunctionArgument(
+                                        value=stalg.Expression(
+                                            literal=stalg.Expression.Literal(
+                                                i8=2, nullable=True
+                                            )
+                                        )
+                                    ),
+                                ],
+                            )
+                        ),
+                        options=[
+                            stalg.Expression(
+                                literal=stalg.Expression.Literal(i8=3, nullable=True)
+                            ),
+                            stalg.Expression(
+                                literal=stalg.Expression.Literal(i8=4, nullable=True)
+                            ),
+                        ],
+                    )
+                ),
+                output_names=["singular_or_list"],
+            )
+        ],
+        base_schema=named_struct,
+    )
+
+    assert actual == expected

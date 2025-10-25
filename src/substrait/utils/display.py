@@ -723,7 +723,7 @@ class PlanPrinter:
         elif literal.HasField("string"):
             string_value = f'"{literal.string}"'
             stream.write(
-                f'{indent}{self._color("string", Colors.BLUE)}: {self._color(string_value, Colors.GREEN)}\n'
+                f"{indent}{self._color('string', Colors.BLUE)}: {self._color(string_value, Colors.GREEN)}\n"
             )
         elif literal.HasField("date"):
             stream.write(

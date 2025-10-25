@@ -111,7 +111,7 @@ registry = ExtensionRegistry()
 
 registry.register_extension_dict(
     yaml.safe_load(content),
-    uri="https://test.example.com/extension_test_functions.yaml"
+    uri="https://test.example.com/extension_test_functions.yaml",
 )
 
 
@@ -177,7 +177,9 @@ def test_non_existing_function():
 
 def test_non_existing_function_signature():
     assert (
-        registry.lookup_function(urn="extension:test:functions", function_name="add", signature=[i8()])
+        registry.lookup_function(
+            urn="extension:test:functions", function_name="add", signature=[i8()]
+        )
         is None
     )
 
@@ -190,14 +192,18 @@ def test_exact_match():
 
 def test_wildcard_match():
     assert registry.lookup_function(
-        urn="extension:test:functions", function_name="add", signature=[i8(), i8(), bool()]
+        urn="extension:test:functions",
+        function_name="add",
+        signature=[i8(), i8(), bool()],
     )[1] == Type(i16=Type.I16(nullability=Type.NULLABILITY_REQUIRED))
 
 
 def test_wildcard_match_fails_with_constraits():
     assert (
         registry.lookup_function(
-            urn="extension:test:functions", function_name="add", signature=[i8(), i16(), i16()]
+            urn="extension:test:functions",
+            function_name="add",
+            signature=[i8(), i16(), i16()],
         )
         is None
     )
@@ -206,7 +212,9 @@ def test_wildcard_match_fails_with_constraits():
 def test_wildcard_match_with_constraits():
     assert (
         registry.lookup_function(
-            urn="extension:test:functions", function_name="add", signature=[i16(), i16(), i8()]
+            urn="extension:test:functions",
+            function_name="add",
+            signature=[i16(), i16(), i8()],
         )[1]
         == i8()
     )
@@ -215,7 +223,9 @@ def test_wildcard_match_with_constraits():
 def test_variadic():
     assert (
         registry.lookup_function(
-            urn="extension:test:functions", function_name="test_fn", signature=[i8(), i8(), i8()]
+            urn="extension:test:functions",
+            function_name="test_fn",
+            signature=[i8(), i8(), i8()],
         )[1]
         == i8()
     )
@@ -234,7 +244,9 @@ def test_variadic_any():
 
 def test_variadic_fails_min_constraint():
     assert (
-        registry.lookup_function(urn="extension:test:functions", function_name="test_fn", signature=[i8()])
+        registry.lookup_function(
+            urn="extension:test:functions", function_name="test_fn", signature=[i8()]
+        )
         is None
     )
 
@@ -290,26 +302,34 @@ def test_enum_with_nonexistent_option():
 
 def test_function_with_nullable_args():
     assert registry.lookup_function(
-        urn="extension:test:functions", function_name="add", signature=[i8(nullable=True), i8()]
+        urn="extension:test:functions",
+        function_name="add",
+        signature=[i8(nullable=True), i8()],
     )[1] == i8(nullable=True)
 
 
 def test_function_with_declared_output_nullability():
     assert registry.lookup_function(
-        urn="extension:test:functions", function_name="add_declared", signature=[i8(), i8()]
+        urn="extension:test:functions",
+        function_name="add_declared",
+        signature=[i8(), i8()],
     )[1] == i8(nullable=True)
 
 
 def test_function_with_discrete_nullability():
     assert registry.lookup_function(
-        urn="extension:test:functions", function_name="add_discrete", signature=[i8(nullable=True), i8()]
+        urn="extension:test:functions",
+        function_name="add_discrete",
+        signature=[i8(nullable=True), i8()],
     )[1] == i8(nullable=True)
 
 
 def test_function_with_discrete_nullability_nonexisting():
     assert (
         registry.lookup_function(
-            urn="extension:test:functions", function_name="add_discrete", signature=[i8(), i8()]
+            urn="extension:test:functions",
+            function_name="add_discrete",
+            signature=[i8(), i8()],
         )
         is None
     )
@@ -358,10 +378,8 @@ scalar_functions:
     registry = ExtensionRegistry(load_default_extensions=False)
     registry.register_extension_dict(yaml.safe_load(content_with_urn), uri=uri)
 
-
     assert registry._uri_urn_bimap.get_urn(uri) == urn
     assert registry._uri_urn_bimap.get_uri(urn) == uri
-
 
 
 def test_registry_uri_anchor_lookup():
@@ -375,7 +393,6 @@ scalar_functions: []
     registry = ExtensionRegistry(load_default_extensions=False)
     registry.register_extension_dict(yaml.safe_load(content_with_urn), uri=uri)
 
-    # Test URI anchor lookup
     anchor = registry.lookup_uri_anchor(uri)
     assert anchor is not None
     assert anchor > 0
@@ -393,8 +410,8 @@ def test_registry_default_extensions_have_uri_mappings():
     assert "https://github.com/substrait-io/substrait/blob/main/extensions" in uri
     assert "functions_comparison.yaml" in uri
 
-    # Verify reverse mapping works
     assert registry._uri_urn_bimap.get_urn(uri) == urn
+
 
 def test_valid_urn_format():
     """Test that valid URN formats are accepted."""
@@ -410,11 +427,10 @@ scalar_functions:
         return: i8
 """
     registry = ExtensionRegistry(load_default_extensions=False)
-    # Should not raise
+
     registry.register_extension_dict(
-        yaml.safe_load(content),
-        uri="https://test.example.com/functions_test.yaml"
-    )
+        yaml.safe_load(content), uri="https://test.example.com/functions_test.yaml"
+    )  # Should not raise
 
 
 def test_invalid_urn_no_prefix():
@@ -428,8 +444,7 @@ scalar_functions: []
 
     with pytest.raises(ValueError, match="Invalid URN format"):
         registry.register_extension_dict(
-            yaml.safe_load(content),
-            uri="https://test.example.com/invalid.yaml"
+            yaml.safe_load(content), uri="https://test.example.com/invalid.yaml"
         )
 
 
@@ -444,8 +459,7 @@ scalar_functions: []
 
     with pytest.raises(ValueError, match="Invalid URN format"):
         registry.register_extension_dict(
-            yaml.safe_load(content),
-            uri="https://test.example.com/invalid.yaml"
+            yaml.safe_load(content), uri="https://test.example.com/invalid.yaml"
         )
 
 
@@ -459,8 +473,7 @@ scalar_functions: []
 
     with pytest.raises(ValueError, match="must contain a 'urn' field"):
         registry.register_extension_dict(
-            yaml.safe_load(content),
-            uri="https://test.example.com/missing_urn.yaml"
+            yaml.safe_load(content), uri="https://test.example.com/missing_urn.yaml"
         )
 
 

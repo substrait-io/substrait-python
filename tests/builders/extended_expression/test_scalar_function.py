@@ -41,7 +41,6 @@ scalar_functions:
 
 
 registry = ExtensionRegistry(load_default_extensions=False)
-# Register with URI for URI/URN migration testing
 test_uri = "https://test.example.com/extension_test_urn.yaml"
 registry.register_extension_dict(yaml.safe_load(content), uri=test_uri)
 
@@ -67,15 +66,22 @@ def test_sclar_add():
     )(named_struct, registry)
 
     expected = stee.ExtendedExpression(
-        extension_urns=[ste.SimpleExtensionURN(extension_urn_anchor=1, urn="extension:test:urn")],
-        extension_uris=[ste.SimpleExtensionURI(extension_uri_anchor=1, uri="https://test.example.com/extension_test_urn.yaml")],
+        extension_urns=[
+            ste.SimpleExtensionURN(extension_urn_anchor=1, urn="extension:test:urn")
+        ],
+        extension_uris=[
+            ste.SimpleExtensionURI(
+                extension_uri_anchor=1,
+                uri="https://test.example.com/extension_test_urn.yaml",
+            )
+        ],
         extensions=[
             ste.SimpleExtensionDeclaration(
                 extension_function=ste.SimpleExtensionDeclaration.ExtensionFunction(
                     extension_urn_reference=1,
                     extension_uri_reference=1,
                     function_anchor=1,
-                    name="test_func:i8"
+                    name="test_func:i8",
                 )
             )
         ],
@@ -142,15 +148,22 @@ def test_nested_scalar_calls():
     )(named_struct, registry)
 
     expected = stee.ExtendedExpression(
-        extension_urns=[ste.SimpleExtensionURN(extension_urn_anchor=1, urn="extension:test:urn")],
-        extension_uris=[ste.SimpleExtensionURI(extension_uri_anchor=1, uri="https://test.example.com/extension_test_urn.yaml")],
+        extension_urns=[
+            ste.SimpleExtensionURN(extension_urn_anchor=1, urn="extension:test:urn")
+        ],
+        extension_uris=[
+            ste.SimpleExtensionURI(
+                extension_uri_anchor=1,
+                uri="https://test.example.com/extension_test_urn.yaml",
+            )
+        ],
         extensions=[
             ste.SimpleExtensionDeclaration(
                 extension_function=ste.SimpleExtensionDeclaration.ExtensionFunction(
                     extension_urn_reference=1,
                     extension_uri_reference=1,
                     function_anchor=2,
-                    name="is_positive:i8"
+                    name="is_positive:i8",
                 )
             ),
             ste.SimpleExtensionDeclaration(
@@ -158,7 +171,7 @@ def test_nested_scalar_calls():
                     extension_urn_reference=1,
                     extension_uri_reference=1,
                     function_anchor=1,
-                    name="test_func:i8"
+                    name="test_func:i8",
                 )
             ),
         ],

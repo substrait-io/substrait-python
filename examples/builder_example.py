@@ -318,7 +318,8 @@ def expression_only_example():
     print("Complex salary calculation expression:")
     # Create a simple plan to wrap the expression
     dummy_schema = named_struct(
-        names=["base_salary"], struct=struct(types=[fp64(nullable=False)], nullable=False)
+        names=["base_salary"],
+        struct=struct(types=[fp64(nullable=False)], nullable=False),
     )
     dummy_table = read_named_table("dummy", dummy_schema)
     dummy_plan = project(dummy_table, expressions=[complex_expr])

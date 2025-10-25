@@ -333,7 +333,13 @@ def translate(ast: dict, schema_resolver: SchemaResolver, registry: ExtensionReg
         raise Exception(f"Unknown op {op}")
 
 
-def convert(query: str, dialect: str, schema_resolver: SchemaResolver):
+def convert(
+    query: str,
+    dialect: str,
+    schema_resolver: SchemaResolver,
+    registry: ExtensionRegistry = None,
+):
     ast = parse_sql(sql=query, dialect=dialect)[0]
-    registry = ExtensionRegistry(load_default_extensions=True)
+    if not registry:
+        registry = ExtensionRegistry(load_default_extensions=True)
     return translate(ast, schema_resolver=schema_resolver, registry=registry)

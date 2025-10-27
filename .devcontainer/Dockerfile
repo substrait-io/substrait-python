@@ -4,7 +4,7 @@ RUN curl -s "https://get.sdkman.io" | bash
 RUN bash -c "source $HOME/.sdkman/bin/sdkman-init.sh && \
     sdk install java 25-graalce"
 RUN mkdir -p ~/lib && cd ~/lib && curl -L -O http://www.antlr.org/download/antlr-4.13.2-complete.jar
-ENV ANTLR_JAR="~/lib/antlr-4.13.1-complete.jar"
+ENV ANTLR_JAR="~/lib/antlr-4.13.2-complete.jar"
 # protoc 29.5 is the last version with protobuf python v5 which is compatible with protoletariat v3
 RUN cd ~ && curl -LO https://github.com/protocolbuffers/protobuf/releases/download/v29.5/protoc-29.5-linux-x86_64.zip && \
     unzip protoc-29.5-linux-x86_64.zip -d ~/.local && \

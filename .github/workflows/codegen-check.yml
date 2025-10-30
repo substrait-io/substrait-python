@@ -27,13 +27,13 @@ jobs:
             ./gen_proto.sh
             make codegen-extensions
 
-      - name: Check for uncommitted changes (ignoring timestamps)
+      - name: Check for uncommitted changes
         run: |
           # Check for diffs, ignoring timestamp lines
-          if ! git diff -I '#.*timestamp:.*' --quiet --exit-code src/substrait/gen/; then
+          if ! git diff --quiet --exit-code src/substrait/gen/; then
             echo "Code generation produced changes. Generated code is out of sync!"
             echo ""
-            git diff -I '#.*timestamp:.*' src/substrait/gen/
+            git diff src/substrait/gen/
             echo ""
             echo "To fix this, run:"
             echo "  make antlr"

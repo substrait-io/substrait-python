@@ -1,0 +1,44 @@
+name: Code Generation Check
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  codegen-check:
+    name: Verify Code Generation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+        with:
+          submodules: recursive
+
+      - name: Run code generation in devcontainer
+        uses: devcontainers/ci@v0.3
+        with:
+          runCmd: |
+            # Ensure dependencies are installed
+            uv sync --extra test --extra gen_proto
+            # Run all code generation steps
+            make antlr
+            ./gen_proto.sh
+            make codegen-extensions
+
+      - name: Check for uncommitted changes
+        run: |
+          # Check for diffs, ignoring timestamp lines
+          if ! git diff --quiet --exit-code src/substrait/gen/; then
+            echo "Code generation produced changes. Generated code is out of sync!"
+            echo ""
+            git diff src/substrait/gen/
+            echo ""
+            echo "To fix this, run:"
+            echo "  make antlr"
+            echo "  ./gen_proto.sh"
+            echo "  make codegen-extensions"
+            echo "Then commit the changes."
+            exit 1
+          fi

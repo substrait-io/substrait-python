@@ -28,18 +28,20 @@ from deepdiff import DeepDiff
 SchemaResolver = Callable[[str], stt.NamedStruct]
 
 function_mapping = {
-    "Plus": ("functions_arithmetic.yaml", "add"),
-    "Minus": ("functions_arithmetic.yaml", "subtract"),
-    "Gt": ("functions_comparison.yaml", "gt"),
-    "GtEq": ("functions_comparison.yaml", "gte"),
-    "Lt": ("functions_comparison.yaml", "lt"),
-    "Eq": ("functions_comparison.yaml", "equal"),
+    "Plus": ("extension:io.substrait:functions_arithmetic", "add"),
+    "Minus": ("extension:io.substrait:functions_arithmetic", "subtract"),
+    "Gt": ("extension:io.substrait:functions_comparison", "gt"),
+    "GtEq": ("extension:io.substrait:functions_comparison", "gte"),
+    "Lt": ("extension:io.substrait:functions_comparison", "lt"),
+    "Eq": ("extension:io.substrait:functions_comparison", "equal"),
 }
 
-aggregate_function_mapping = {"SUM": ("functions_arithmetic.yaml", "sum")}
+aggregate_function_mapping = {
+    "SUM": ("extension:io.substrait:functions_arithmetic", "sum")
+}
 
 window_function_mapping = {
-    "row_number": ("functions_arithmetic.yaml", "row_number"),
+    "row_number": ("extension:io.substrait:functions_arithmetic", "row_number"),
 }
 
 

@@ -1,7 +1,6 @@
 from substrait.extension_registry import ExtensionRegistry
 from substrait.sql.sql_to_substrait import convert
 import pyarrow
-from google.protobuf import json_format
 import tempfile
 import pyarrow.substrait as pa_substrait
 import pytest
@@ -94,10 +93,9 @@ def assert_query_duckdb(query: str, ignore_order=True):
         conn.install_extension("substrait", repository="community")
         conn.load_extension("substrait")
 
-        plan_json = json_format.MessageToJson(plan)
-        sql = f"CALL from_substrait_json('{plan_json}')"
+        sql = "CALL from_substrait(?)"
+        substrait_out = conn.sql(sql, params=[plan.SerializeToString()])
 
-        substrait_out = conn.sql(sql)
         sql_out = conn.sql(query)
 
         substrait_arrow = substrait_out.arrow()

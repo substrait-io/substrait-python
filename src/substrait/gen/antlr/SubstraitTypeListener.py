@@ -1,4 +1,4 @@
-# Generated from SubstraitType.g4 by ANTLR 4.13.1
+# Generated from SubstraitType.g4 by ANTLR 4.13.2
 from antlr4 import *
 if "." in __name__:
     from .SubstraitTypeParser import SubstraitTypeParser
@@ -203,6 +203,15 @@ class SubstraitTypeListener(ParseTreeListener):
 
     # Exit a parse tree produced by SubstraitTypeParser#precisionIntervalDay.
     def exitPrecisionIntervalDay(self, ctx:SubstraitTypeParser.PrecisionIntervalDayContext):
+        pass
+
+
+    # Enter a parse tree produced by SubstraitTypeParser#precisionTime.
+    def enterPrecisionTime(self, ctx:SubstraitTypeParser.PrecisionTimeContext):
+        pass
+
+    # Exit a parse tree produced by SubstraitTypeParser#precisionTime.
+    def exitPrecisionTime(self, ctx:SubstraitTypeParser.PrecisionTimeContext):
         pass
 
 

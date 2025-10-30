@@ -18,7 +18,7 @@ rm -rf "$dest_dir/proto"
 
 # Generate the new python protobuf files
 buf generate
-protol --in-place --create-package --python-out "$dest_dir" buf
+uv run protol --in-place --create-package --python-out "$dest_dir" buf
 
 # Remove the old extension files
 rm -rf "$extension_dir"

@@ -22,6 +22,7 @@ named_struct = stt.NamedStruct(
 
 content = """%YAML 1.2
 ---
+urn: extension:test:urn
 aggregate_functions:
   - name: "count"
     description: Count a set of values
@@ -37,12 +38,14 @@ aggregate_functions:
 
 
 registry = ExtensionRegistry(load_default_extensions=False)
-registry.register_extension_dict(yaml.safe_load(content), uri="test_uri")
+registry.register_extension_dict(
+    yaml.safe_load(content), uri="https://test.example.com/test.yaml"
+)
 
 
 def test_aggregate_count():
     e = aggregate_function(
-        "test_uri",
+        "extension:test:urn",
         "count",
         expressions=[
             literal(
@@ -56,11 +59,21 @@ def test_aggregate_count():
     )(named_struct, registry)
 
     expected = stee.ExtendedExpression(
-        extension_uris=[ste.SimpleExtensionURI(extension_uri_anchor=1, uri="test_uri")],
+        extension_urns=[
+            ste.SimpleExtensionURN(extension_urn_anchor=1, urn="extension:test:urn")
+        ],
+        extension_uris=[
+            ste.SimpleExtensionURI(
+                extension_uri_anchor=1, uri="https://test.example.com/test.yaml"
+            )
+        ],
         extensions=[
             ste.SimpleExtensionDeclaration(
                 extension_function=ste.SimpleExtensionDeclaration.ExtensionFunction(
-                    extension_uri_reference=1, function_anchor=1, name="count:any"
+                    extension_urn_reference=1,
+                    extension_uri_reference=1,
+                    function_anchor=1,
+                    name="count:any",
                 )
             )
         ],

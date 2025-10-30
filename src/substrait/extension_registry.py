@@ -1,5 +1,6 @@
 import yaml
 import itertools
+import re
 from substrait.gen.proto.type_pb2 import Type
 from importlib.resources import files as importlib_files
 from collections import defaultdict
@@ -9,9 +10,14 @@ from .derivation_expression import evaluate, _evaluate, _parse
 from substrait.gen.antlr.SubstraitTypeParser import SubstraitTypeParser
 from substrait.gen.json import simple_extensions as se
 from substrait.simple_extension_utils import build_simple_extensions
+from .bimap import UriUrnBiDiMap
 
 
-DEFAULT_URI_PREFIX = "https://github.com/substrait-io/substrait/blob/main/extensions"
+DEFAULT_URN_PREFIX = "https://github.com/substrait-io/substrait/blob/main/extensions"
+
+# Format: extension:<organization>:<name>
+# Example: extension:io.substrait:functions_arithmetic
+URN_PATTERN = re.compile(r"^extension:[^:]+:[^:]+$")
 
 
 # mapping from argument types to shortened signature names: https://substrait.io/extensions/#function-signature-compound-names
@@ -167,12 +173,12 @@ def covers(
 
 class FunctionEntry:
     def __init__(
-        self, uri: str, name: str, impl: Union[se.Impl, se.Impl1, se.Impl2], anchor: int
+        self, urn: str, name: str, impl: Union[se.Impl, se.Impl1, se.Impl2], anchor: int
     ) -> None:
         self.name = name
         self.impl = impl
         self.normalized_inputs: list = []
-        self.uri: str = uri
+        self.urn: str = urn
         self.anchor = anchor
         self.arguments = []
         self.nullability = (
@@ -244,35 +250,57 @@ class FunctionEntry:
 
 class ExtensionRegistry:
     def __init__(self, load_default_extensions=True) -> None:
-        self._uri_mapping: dict = defaultdict(dict)
-        self._uri_id_generator = itertools.count(1)
+        self._urn_mapping: dict = defaultdict(dict)  # URN -> anchor ID
+        # NOTE: during the URI -> URN migration, we only need an id generator for URN. We can use the same anchor for plan construction for URIs.
+        self._urn_id_generator = itertools.count(1)
 
         self._function_mapping: dict = defaultdict(dict)
         self._id_generator = itertools.count(1)
 
-        self._uri_aliases = {}
+        # Bidirectional URI <-> URN mapping (temporary during migration)
+        self._uri_urn_bimap = UriUrnBiDiMap()
 
         if load_default_extensions:
             for fpath in importlib_files("substrait.extensions").glob(  # type: ignore
                 "functions*.yaml"
             ):
-                uri = f"{DEFAULT_URI_PREFIX}/{fpath.name}"
-                self._uri_aliases[fpath.name] = uri
-                self.register_extension_yaml(fpath, uri)
+                # Derive URI from DEFAULT_URN_PREFIX and filename
+                uri = f"{DEFAULT_URN_PREFIX}/{fpath.name}"
+                self.register_extension_yaml(fpath, uri=uri)
 
     def register_extension_yaml(
         self,
         fname: Union[str, Path],
         uri: str,
     ) -> None:
+        """Register extensions from a YAML file.
+
+        Args:
+            fname: Path to the YAML file
+            uri: URI for the extension (this is required during the URI -> URN migration)
+        """
         fname = Path(fname)
         with open(fname) as f:  # type: ignore
             extension_definitions = yaml.safe_load(f)
 
-        self.register_extension_dict(extension_definitions, uri)
+        self.register_extension_dict(extension_definitions, uri=uri)
 
     def register_extension_dict(self, definitions: dict, uri: str) -> None:
-        self._uri_mapping[uri] = next(self._uri_id_generator)
+        """Register extensions from a dictionary (parsed YAML).
+
+        Args:
+            definitions: The extension definitions dictionary
+            uri: URI for the extension (for URI/URN bimap)
+        """
+        urn = definitions.get("urn")
+        if not urn:
+            raise ValueError("Extension definitions must contain a 'urn' field")
+
+        self._validate_urn_format(urn)
+
+        self._urn_mapping[urn] = next(self._urn_id_generator)
+
+        self._uri_urn_bimap.put(uri, urn)
 
         simple_extensions = build_simple_extensions(definitions)
 
@@ -286,28 +314,26 @@ class ExtensionRegistry:
             for function in functions:
                 for impl in function.impls:
                     func = FunctionEntry(
-                        uri, function.name, impl, next(self._id_generator)
+                        urn, function.name, impl, next(self._id_generator)
                     )
                     if (
-                        func.uri in self._function_mapping
-                        and function.name in self._function_mapping[func.uri]
+                        func.urn in self._function_mapping
+                        and function.name in self._function_mapping[func.urn]
                     ):
-                        self._function_mapping[func.uri][function.name].append(func)
+                        self._function_mapping[func.urn][function.name].append(func)
                     else:
-                        self._function_mapping[func.uri][function.name] = [func]
+                        self._function_mapping[func.urn][function.name] = [func]
 
     # TODO add an optional return type check
     def lookup_function(
-        self, uri: str, function_name: str, signature: tuple
+        self, urn: str, function_name: str, signature: tuple
     ) -> Optional[tuple[FunctionEntry, Type]]:
-        uri = self._uri_aliases.get(uri, uri)
-
         if (
-            uri not in self._function_mapping
-            or function_name not in self._function_mapping[uri]
+            urn not in self._function_mapping
+            or function_name not in self._function_mapping[urn]
         ):
             return None
-        functions = self._function_mapping[uri][function_name]
+        functions = self._function_mapping[urn][function_name]
         for f in functions:
             assert isinstance(f, FunctionEntry)
             rtn = f.satisfies_signature(signature)
@@ -316,6 +342,41 @@ class ExtensionRegistry:
 
         return None
 
-    def lookup_uri(self, uri: str) -> Optional[int]:
-        uri = self._uri_aliases.get(uri, uri)
-        return self._uri_mapping.get(uri, None)
+    def lookup_urn(self, urn: str) -> Optional[int]:
+        return self._urn_mapping.get(urn, None)
+
+    def lookup_uri_anchor(self, uri: str) -> Optional[int]:
+        """Look up the anchor ID for a URI.
+
+        During the migration period, URI and URN share the same anchor.
+        This method converts the URI to its URN and returns the URN's anchor.
+
+        Args:
+            uri: The extension URI to look up
+
+        Returns:
+            The anchor ID for the URI (same as its corresponding URN), or None if not found
+        """
+        urn = self._uri_urn_bimap.get_urn(uri)
+        if urn:
+            return self._urn_mapping.get(urn)
+        return None
+
+    def _validate_urn_format(self, urn: str) -> None:
+        """Validate that a URN follows the expected format.
+
+        Expected format: extension:<organization>:<name>
+        Example: extension:io.substrait:functions_arithmetic
+
+        Args:
+            urn: The URN to validate
+
+        Raises:
+            ValueError: If the URN format is invalid
+        """
+        if not URN_PATTERN.match(urn):
+            raise ValueError(
+                f"Invalid URN format: '{urn}'. "
+                f"Expected format: extension:<organization>:<name> "
+                f"(e.g., 'extension:io.substrait:functions_arithmetic')"
+            )

@@ -18,7 +18,11 @@ from substrait.builders.extended_expression import (
     resolve_expression,
 )
 from substrait.type_inference import infer_plan_schema
-from substrait.utils import merge_extension_declarations, merge_extension_uris
+from substrait.utils import (
+    merge_extension_declarations,
+    merge_extension_urns,
+    merge_extension_uris,
+)
 
 UnboundPlan = Callable[[ExtensionRegistry], stp.Plan]
 
@@ -26,8 +30,14 @@ PlanOrUnbound = Union[stp.Plan, UnboundPlan]
 
 
 def _merge_extensions(*objs):
+    """Merge extension URIs, URNs, and declarations from multiple plan/expression objects.
+
+    During the URI -> URN migration period, we maintain both URI and URN references
+    for backwards compatibility.
+    """
     return {
         "extension_uris": merge_extension_uris(*[b.extension_uris for b in objs if b]),
+        "extension_urns": merge_extension_urns(*[b.extension_urns for b in objs if b]),
         "extensions": merge_extension_declarations(*[b.extensions for b in objs if b]),
     }
 

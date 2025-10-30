@@ -49,8 +49,7 @@ scalar_functions:
     named_struct = stt.NamedStruct(names=["value"], struct=struct)
 
     func_expr = scalar_function(
-        "extension:test:functions",
-        "test_func",
+        "extension:test:functions:test_func",
         expressions=[
             literal(
                 10,
@@ -137,8 +136,7 @@ scalar_functions:
 
     table = read_named_table("table", named_struct)
     add_expr = scalar_function(
-        "extension:test:math",
-        "add",
+        "extension:test:math:add",
         expressions=[column("a"), column("b")],
         alias=["add"],
     )
@@ -213,8 +211,7 @@ scalar_functions:
 
     table = read_named_table("table", named_struct)
     gt_expr = scalar_function(
-        "extension:test:comparison",
-        "greater_than",
+        "extension:test:comparison:greater_than",
         expressions=[column("value"), literal(100, i64(nullable=False))],
     )
 
@@ -287,7 +284,7 @@ aggregate_functions:
 
     table = read_named_table("table", named_struct)
     sum_expr = aggregate_function(
-        "extension:test:aggregate", "sum", expressions=[column("value")], alias=["sum"]
+        "extension:test:aggregate:sum", expressions=[column("value")], alias=["sum"]
     )
 
     actual = aggregate(table, grouping_expressions=[column("id")], measures=[sum_expr])(

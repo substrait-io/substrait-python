@@ -205,12 +205,12 @@ def column(field: Union[str, int], alias: Union[Iterable[str], str] = None):
 
 
 def scalar_function(
-    urn: str,
-    function: str,
+    function: Union[str, Iterable[str]],
     expressions: Iterable[ExtendedExpressionOrUnbound],
     alias: Union[Iterable[str], str] = None,
 ):
     """Builds a resolver for ExtendedExpression containing a ScalarFunction expression"""
+    functions = [function] if isinstance(function, str) else function
 
     def resolve(
         base_schema: stp.NamedStruct, registry: ExtensionRegistry
@@ -225,10 +225,16 @@ def scalar_function(
 
         signature = [typ for es in expression_schemas for typ in es.types]
 
-        func = registry.lookup_function(urn, function, signature)
+        for f in functions:
+            urn, name = f.rsplit(":", 1)
+            func = registry.lookup_function(urn, name, signature)
+            if func:
+                break
 
         if not func:
             raise Exception(f"Unknown function {function} for {signature}")
+
+        resolved_func, return_type = func
 
         func_extension_urns = [
             ste.SimpleExtensionURN(
@@ -288,7 +294,7 @@ def scalar_function(
                     ),
                     output_names=_alias_or_inferred(
                         alias,
-                        function,
+                        name,
                         [e.referred_expr[0].output_names[0] for e in bound_expressions],
                     ),
                 )
@@ -303,12 +309,12 @@ def scalar_function(
 
 
 def aggregate_function(
-    urn: str,
-    function: str,
+    function: Union[str, Iterable[str]],
     expressions: Iterable[ExtendedExpressionOrUnbound],
     alias: Union[Iterable[str], str] = None,
 ):
     """Builds a resolver for ExtendedExpression containing a AggregateFunction measure"""
+    functions = [function] if isinstance(function, str) else function
 
     def resolve(
         base_schema: stp.NamedStruct, registry: ExtensionRegistry
@@ -323,10 +329,16 @@ def aggregate_function(
 
         signature = [typ for es in expression_schemas for typ in es.types]
 
-        func = registry.lookup_function(urn, function, signature)
+        for f in functions:
+            urn, name = f.rsplit(":", 1)
+            func = registry.lookup_function(urn, name, signature)
+            if func:
+                break
 
         if not func:
             raise Exception(f"Unknown function {function} for {signature}")
+
+        resolved_func, return_type = func
 
         func_extension_urns = [
             ste.SimpleExtensionURN(
@@ -382,7 +394,7 @@ def aggregate_function(
                     ),
                     output_names=_alias_or_inferred(
                         alias,
-                        "IfThen",
+                        name,
                         [e.referred_expr[0].output_names[0] for e in bound_expressions],
                     ),
                 )
@@ -398,13 +410,13 @@ def aggregate_function(
 
 # TODO bounds, sorts
 def window_function(
-    urn: str,
-    function: str,
+    function: Union[str, Iterable[str]],
     expressions: Iterable[ExtendedExpressionOrUnbound],
     partitions: Iterable[ExtendedExpressionOrUnbound] = [],
     alias: Union[Iterable[str], str] = None,
 ):
     """Builds a resolver for ExtendedExpression containing a WindowFunction expression"""
+    functions = [function] if isinstance(function, str) else function
 
     def resolve(
         base_schema: stp.NamedStruct, registry: ExtensionRegistry
@@ -423,10 +435,16 @@ def window_function(
 
         signature = [typ for es in expression_schemas for typ in es.types]
 
-        func = registry.lookup_function(urn, function, signature)
+        for f in functions:
+            urn, name = f.rsplit(":", 1)
+            func = registry.lookup_function(urn, name, signature)
+            if func:
+                break
 
         if not func:
             raise Exception(f"Unknown function {function} for {signature}")
+
+        resolved_func, return_type = func
 
         func_extension_urns = [
             ste.SimpleExtensionURN(
@@ -495,7 +513,7 @@ def window_function(
                     ),
                     output_names=_alias_or_inferred(
                         alias,
-                        function,
+                        name,
                         [e.referred_expr[0].output_names[0] for e in bound_expressions],
                     ),
                 )

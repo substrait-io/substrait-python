@@ -70,8 +70,7 @@ scalar_functions:
 
     actual = cast(
         input=scalar_function(
-            "extension:test:functions",
-            "add",
+            "extension:test:functions:add",
             expressions=[literal(1, i8()), literal(2, i8())],
         ),
         type=i16(),

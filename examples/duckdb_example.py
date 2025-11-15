@@ -9,7 +9,7 @@
 
 
 import duckdb
-from substrait.builders.plan import read_named_table, project, filter
+from substrait.builders.plan import read_named_table, select, filter
 from substrait.builders.extended_expression import column, scalar_function, literal
 from substrait.builders.type import i32
 from substrait.extension_registry import ExtensionRegistry
@@ -46,7 +46,7 @@ table = filter(
         expressions=[column("c_nationkey"), literal(3, i32())],
     ),
 )
-table = project(
+table = select(
     table, expressions=[column("c_name"), column("c_address"), column("c_nationkey")]
 )
 sql = "CALL from_substrait(?)"

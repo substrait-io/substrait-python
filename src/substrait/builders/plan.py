@@ -85,6 +85,40 @@ def project(
             resolve_expression(e, ns, registry) for e in expressions
         ]
 
+        names = list(_plan.relations[-1].root.names) + [
+            e.output_names[0] for ee in bound_expressions for e in ee.referred_expr
+        ]
+
+        rel = stalg.Rel(
+            project=stalg.ProjectRel(
+                input=_plan.relations[-1].root.input,
+                expressions=[
+                    e.expression for ee in bound_expressions for e in ee.referred_expr
+                ],
+                advanced_extension=extension,
+            )
+        )
+
+        return stp.Plan(
+            relations=[stp.PlanRel(root=stalg.RelRoot(input=rel, names=names))],
+            **_merge_extensions(_plan, *bound_expressions),
+        )
+
+    return resolve
+
+
+def select(
+    plan: PlanOrUnbound,
+    expressions: Iterable[ExtendedExpressionOrUnbound],
+    extension: Optional[AdvancedExtension] = None,
+) -> UnboundPlan:
+    def resolve(registry: ExtensionRegistry) -> stp.Plan:
+        _plan = plan if isinstance(plan, stp.Plan) else plan(registry)
+        ns = infer_plan_schema(_plan)
+        bound_expressions: Iterable[stee.ExtendedExpression] = [
+            resolve_expression(e, ns, registry) for e in expressions
+        ]
+
         start_index = len(_plan.relations[-1].root.names)
 
         names = [

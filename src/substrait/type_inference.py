@@ -191,9 +191,11 @@ def infer_expression_type(
     elif rex_type == "window_function":
         return expression.window_function.output_type
     elif rex_type == "if_then":
-        return infer_expression_type(expression.if_then.ifs[0].then)
+        return infer_expression_type(expression.if_then.ifs[0].then, parent_schema)
     elif rex_type == "switch_expression":
-        return infer_expression_type(expression.switch_expression.ifs[0].then)
+        return infer_expression_type(
+            expression.switch_expression.ifs[0].then, parent_schema
+        )
     elif rex_type == "cast":
         return expression.cast.type
     elif rex_type == "singular_or_list" or rex_type == "multi_or_list":

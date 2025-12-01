@@ -257,4 +257,9 @@ def map(key: stt.Type, value: stt.Type, nullable=True) -> stt.Type:
 
 
 def named_struct(names: Iterable[str], struct: stt.Type) -> stt.NamedStruct:
+    if struct.struct.nullability is stt.Type.NULLABILITY_NULLABLE:
+        raise Exception("NamedStruct must not contain a nullable struct")
+    elif struct.struct.nullability is stt.Type.NULLABILITY_UNSPECIFIED:
+        struct.struct.nullability = stt.Type.NULLABILITY_REQUIRED
+
     return stt.NamedStruct(names=names, struct=struct.struct)

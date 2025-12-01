@@ -28,18 +28,20 @@ from deepdiff import DeepDiff
 SchemaResolver = Callable[[str], stt.NamedStruct]
 
 function_mapping = {
-    "Plus": ("functions_arithmetic.yaml", "add"),
-    "Minus": ("functions_arithmetic.yaml", "subtract"),
-    "Gt": ("functions_comparison.yaml", "gt"),
-    "GtEq": ("functions_comparison.yaml", "gte"),
-    "Lt": ("functions_comparison.yaml", "lt"),
-    "Eq": ("functions_comparison.yaml", "equal"),
+    "Plus": ("extension:io.substrait:functions_arithmetic", "add"),
+    "Minus": ("extension:io.substrait:functions_arithmetic", "subtract"),
+    "Gt": ("extension:io.substrait:functions_comparison", "gt"),
+    "GtEq": ("extension:io.substrait:functions_comparison", "gte"),
+    "Lt": ("extension:io.substrait:functions_comparison", "lt"),
+    "Eq": ("extension:io.substrait:functions_comparison", "equal"),
 }
 
-aggregate_function_mapping = {"SUM": ("functions_arithmetic.yaml", "sum")}
+aggregate_function_mapping = {
+    "SUM": ("extension:io.substrait:functions_arithmetic", "sum")
+}
 
 window_function_mapping = {
-    "row_number": ("functions_arithmetic.yaml", "row_number"),
+    "row_number": ("extension:io.substrait:functions_arithmetic", "row_number"),
 }
 
 
@@ -333,7 +335,13 @@ def translate(ast: dict, schema_resolver: SchemaResolver, registry: ExtensionReg
         raise Exception(f"Unknown op {op}")
 
 
-def convert(query: str, dialect: str, schema_resolver: SchemaResolver):
+def convert(
+    query: str,
+    dialect: str,
+    schema_resolver: SchemaResolver,
+    registry: ExtensionRegistry = None,
+):
     ast = parse_sql(sql=query, dialect=dialect)[0]
-    registry = ExtensionRegistry(load_default_extensions=True)
+    if not registry:
+        registry = ExtensionRegistry(load_default_extensions=True)
     return translate(ast, schema_resolver=schema_resolver, registry=registry)

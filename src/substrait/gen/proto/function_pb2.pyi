@@ -17,12 +17,12 @@ else:
     import typing_extensions
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
-@typing_extensions.final
+@typing.final
 class FunctionSignature(google.protobuf.message.Message):
     """List of function signatures available."""
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    @typing_extensions.final
+    @typing.final
     class FinalArgVariadic(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -58,17 +58,17 @@ class FunctionSignature(google.protobuf.message.Message):
         def __init__(self, *, min_args: builtins.int=..., max_args: builtins.int=..., consistency: global___FunctionSignature.FinalArgVariadic.ParameterConsistency.ValueType=...) -> None:
             ...
 
-        def ClearField(self, field_name: typing_extensions.Literal['consistency', b'consistency', 'max_args', b'max_args', 'min_args', b'min_args']) -> None:
+        def ClearField(self, field_name: typing.Literal['consistency', b'consistency', 'max_args', b'max_args', 'min_args', b'min_args']) -> None:
             ...
 
-    @typing_extensions.final
+    @typing.final
     class FinalArgNormal(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
         def __init__(self) -> None:
             ...
 
-    @typing_extensions.final
+    @typing.final
     class Scalar(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
         ARGUMENTS_FIELD_NUMBER: builtins.int
@@ -80,6 +80,8 @@ class FunctionSignature(google.protobuf.message.Message):
         VARIADIC_FIELD_NUMBER: builtins.int
         NORMAL_FIELD_NUMBER: builtins.int
         IMPLEMENTATIONS_FIELD_NUMBER: builtins.int
+        deterministic: builtins.bool
+        session_dependent: builtins.bool
 
         @property
         def arguments(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___FunctionSignature.Argument]:
@@ -92,8 +94,6 @@ class FunctionSignature(google.protobuf.message.Message):
         @property
         def description(self) -> global___FunctionSignature.Description:
             ...
-        deterministic: builtins.bool
-        session_dependent: builtins.bool
 
         @property
         def output_type(self) -> proto.type_expressions_pb2.DerivationExpression:
@@ -114,16 +114,16 @@ class FunctionSignature(google.protobuf.message.Message):
         def __init__(self, *, arguments: collections.abc.Iterable[global___FunctionSignature.Argument] | None=..., name: collections.abc.Iterable[builtins.str] | None=..., description: global___FunctionSignature.Description | None=..., deterministic: builtins.bool=..., session_dependent: builtins.bool=..., output_type: proto.type_expressions_pb2.DerivationExpression | None=..., variadic: global___FunctionSignature.FinalArgVariadic | None=..., normal: global___FunctionSignature.FinalArgNormal | None=..., implementations: collections.abc.Iterable[global___FunctionSignature.Implementation] | None=...) -> None:
             ...
 
-        def HasField(self, field_name: typing_extensions.Literal['description', b'description', 'final_variable_behavior', b'final_variable_behavior', 'normal', b'normal', 'output_type', b'output_type', 'variadic', b'variadic']) -> builtins.bool:
+        def HasField(self, field_name: typing.Literal['description', b'description', 'final_variable_behavior', b'final_variable_behavior', 'normal', b'normal', 'output_type', b'output_type', 'variadic', b'variadic']) -> builtins.bool:
             ...
 
-        def ClearField(self, field_name: typing_extensions.Literal['arguments', b'arguments', 'description', b'description', 'deterministic', b'deterministic', 'final_variable_behavior', b'final_variable_behavior', 'implementations', b'implementations', 'name', b'name', 'normal', b'normal', 'output_type', b'output_type', 'session_dependent', b'session_dependent', 'variadic', b'variadic']) -> None:
+        def ClearField(self, field_name: typing.Literal['arguments', b'arguments', 'description', b'description', 'deterministic', b'deterministic', 'final_variable_behavior', b'final_variable_behavior', 'implementations', b'implementations', 'name', b'name', 'normal', b'normal', 'output_type', b'output_type', 'session_dependent', b'session_dependent', 'variadic', b'variadic']) -> None:
             ...
 
-        def WhichOneof(self, oneof_group: typing_extensions.Literal['final_variable_behavior', b'final_variable_behavior']) -> typing_extensions.Literal['variadic', 'normal'] | None:
+        def WhichOneof(self, oneof_group: typing.Literal['final_variable_behavior', b'final_variable_behavior']) -> typing.Literal['variadic', 'normal'] | None:
             ...
 
-    @typing_extensions.final
+    @typing.final
     class Aggregate(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
         ARGUMENTS_FIELD_NUMBER: builtins.int
@@ -138,17 +138,19 @@ class FunctionSignature(google.protobuf.message.Message):
         MAX_SET_FIELD_NUMBER: builtins.int
         INTERMEDIATE_TYPE_FIELD_NUMBER: builtins.int
         IMPLEMENTATIONS_FIELD_NUMBER: builtins.int
+        name: builtins.str
+        deterministic: builtins.bool
+        session_dependent: builtins.bool
+        ordered: builtins.bool
+        max_set: builtins.int
 
         @property
         def arguments(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___FunctionSignature.Argument]:
             ...
-        name: builtins.str
 
         @property
         def description(self) -> global___FunctionSignature.Description:
             ...
-        deterministic: builtins.bool
-        session_dependent: builtins.bool
 
         @property
         def output_type(self) -> proto.type_expressions_pb2.DerivationExpression:
@@ -161,8 +163,6 @@ class FunctionSignature(google.protobuf.message.Message):
         @property
         def normal(self) -> global___FunctionSignature.FinalArgNormal:
             ...
-        ordered: builtins.bool
-        max_set: builtins.int
 
         @property
         def intermediate_type(self) -> proto.type_pb2.Type:
@@ -175,16 +175,16 @@ class FunctionSignature(google.protobuf.message.Message):
         def __init__(self, *, arguments: collections.abc.Iterable[global___FunctionSignature.Argument] | None=..., name: builtins.str=..., description: global___FunctionSignature.Description | None=..., deterministic: builtins.bool=..., session_dependent: builtins.bool=..., output_type: proto.type_expressions_pb2.DerivationExpression | None=..., variadic: global___FunctionSignature.FinalArgVariadic | None=..., normal: global___FunctionSignature.FinalArgNormal | None=..., ordered: builtins.bool=..., max_set: builtins.int=..., intermediate_type: proto.type_pb2.Type | None=..., implementations: collections.abc.Iterable[global___FunctionSignature.Implementation] | None=...) -> None:
             ...
 
-        def HasField(self, field_name: typing_extensions.Literal['description', b'description', 'final_variable_behavior', b'final_variable_behavior', 'intermediate_type', b'intermediate_type', 'normal', b'normal', 'output_type', b'output_type', 'variadic', b'variadic']) -> builtins.bool:
+        def HasField(self, field_name: typing.Literal['description', b'description', 'final_variable_behavior', b'final_variable_behavior', 'intermediate_type', b'intermediate_type', 'normal', b'normal', 'output_type', b'output_type', 'variadic', b'variadic']) -> builtins.bool:
             ...
 
-        def ClearField(self, field_name: typing_extensions.Literal['arguments', b'arguments', 'description', b'description', 'deterministic', b'deterministic', 'final_variable_behavior', b'final_variable_behavior', 'implementations', b'implementations', 'intermediate_type', b'intermediate_type', 'max_set', b'max_set', 'name', b'name', 'normal', b'normal', 'ordered', b'ordered', 'output_type', b'output_type', 'session_dependent', b'session_dependent', 'variadic', b'variadic']) -> None:
+        def ClearField(self, field_name: typing.Literal['arguments', b'arguments', 'description', b'description', 'deterministic', b'deterministic', 'final_variable_behavior', b'final_variable_behavior', 'implementations', b'implementations', 'intermediate_type', b'intermediate_type', 'max_set', b'max_set', 'name', b'name', 'normal', b'normal', 'ordered', b'ordered', 'output_type', b'output_type', 'session_dependent', b'session_dependent', 'variadic', b'variadic']) -> None:
             ...
 
-        def WhichOneof(self, oneof_group: typing_extensions.Literal['final_variable_behavior', b'final_variable_behavior']) -> typing_extensions.Literal['variadic', 'normal'] | None:
+        def WhichOneof(self, oneof_group: typing.Literal['final_variable_behavior', b'final_variable_behavior']) -> typing.Literal['variadic', 'normal'] | None:
             ...
 
-    @typing_extensions.final
+    @typing.final
     class Window(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -216,6 +216,11 @@ class FunctionSignature(google.protobuf.message.Message):
         MAX_SET_FIELD_NUMBER: builtins.int
         WINDOW_TYPE_FIELD_NUMBER: builtins.int
         IMPLEMENTATIONS_FIELD_NUMBER: builtins.int
+        deterministic: builtins.bool
+        session_dependent: builtins.bool
+        ordered: builtins.bool
+        max_set: builtins.int
+        window_type: global___FunctionSignature.Window.WindowType.ValueType
 
         @property
         def arguments(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___FunctionSignature.Argument]:
@@ -228,8 +233,6 @@ class FunctionSignature(google.protobuf.message.Message):
         @property
         def description(self) -> global___FunctionSignature.Description:
             ...
-        deterministic: builtins.bool
-        session_dependent: builtins.bool
 
         @property
         def intermediate_type(self) -> proto.type_expressions_pb2.DerivationExpression:
@@ -246,9 +249,6 @@ class FunctionSignature(google.protobuf.message.Message):
         @property
         def normal(self) -> global___FunctionSignature.FinalArgNormal:
             ...
-        ordered: builtins.bool
-        max_set: builtins.int
-        window_type: global___FunctionSignature.Window.WindowType.ValueType
 
         @property
         def implementations(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___FunctionSignature.Implementation]:
@@ -257,16 +257,16 @@ class FunctionSignature(google.protobuf.message.Message):
         def __init__(self, *, arguments: collections.abc.Iterable[global___FunctionSignature.Argument] | None=..., name: collections.abc.Iterable[builtins.str] | None=..., description: global___FunctionSignature.Description | None=..., deterministic: builtins.bool=..., session_dependent: builtins.bool=..., intermediate_type: proto.type_expressions_pb2.DerivationExpression | None=..., output_type: proto.type_expressions_pb2.DerivationExpression | None=..., variadic: global___FunctionSignature.FinalArgVariadic | None=..., normal: global___FunctionSignature.FinalArgNormal | None=..., ordered: builtins.bool=..., max_set: builtins.int=..., window_type: global___FunctionSignature.Window.WindowType.ValueType=..., implementations: collections.abc.Iterable[global___FunctionSignature.Implementation] | None=...) -> None:
             ...
 
-        def HasField(self, field_name: typing_extensions.Literal['description', b'description', 'final_variable_behavior', b'final_variable_behavior', 'intermediate_type', b'intermediate_type', 'normal', b'normal', 'output_type', b'output_type', 'variadic', b'variadic']) -> builtins.bool:
+        def HasField(self, field_name: typing.Literal['description', b'description', 'final_variable_behavior', b'final_variable_behavior', 'intermediate_type', b'intermediate_type', 'normal', b'normal', 'output_type', b'output_type', 'variadic', b'variadic']) -> builtins.bool:
             ...
 
-        def ClearField(self, field_name: typing_extensions.Literal['arguments', b'arguments', 'description', b'description', 'deterministic', b'deterministic', 'final_variable_behavior', b'final_variable_behavior', 'implementations', b'implementations', 'intermediate_type', b'intermediate_type', 'max_set', b'max_set', 'name', b'name', 'normal', b'normal', 'ordered', b'ordered', 'output_type', b'output_type', 'session_dependent', b'session_dependent', 'variadic', b'variadic', 'window_type', b'window_type']) -> None:
+        def ClearField(self, field_name: typing.Literal['arguments', b'arguments', 'description', b'description', 'deterministic', b'deterministic', 'final_variable_behavior', b'final_variable_behavior', 'implementations', b'implementations', 'intermediate_type', b'intermediate_type', 'max_set', b'max_set', 'name', b'name', 'normal', b'normal', 'ordered', b'ordered', 'output_type', b'output_type', 'session_dependent', b'session_dependent', 'variadic', b'variadic', 'window_type', b'window_type']) -> None:
             ...
 
-        def WhichOneof(self, oneof_group: typing_extensions.Literal['final_variable_behavior', b'final_variable_behavior']) -> typing_extensions.Literal['variadic', 'normal'] | None:
+        def WhichOneof(self, oneof_group: typing.Literal['final_variable_behavior', b'final_variable_behavior']) -> typing.Literal['variadic', 'normal'] | None:
             ...
 
-    @typing_extensions.final
+    @typing.final
     class Description(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
         LANGUAGE_FIELD_NUMBER: builtins.int
@@ -277,10 +277,10 @@ class FunctionSignature(google.protobuf.message.Message):
         def __init__(self, *, language: builtins.str=..., body: builtins.str=...) -> None:
             ...
 
-        def ClearField(self, field_name: typing_extensions.Literal['body', b'body', 'language', b'language']) -> None:
+        def ClearField(self, field_name: typing.Literal['body', b'body', 'language', b'language']) -> None:
             ...
 
-    @typing_extensions.final
+    @typing.final
     class Implementation(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -307,34 +307,34 @@ class FunctionSignature(google.protobuf.message.Message):
         def __init__(self, *, type: global___FunctionSignature.Implementation.Type.ValueType=..., uri: builtins.str=...) -> None:
             ...
 
-        def ClearField(self, field_name: typing_extensions.Literal['type', b'type', 'uri', b'uri']) -> None:
+        def ClearField(self, field_name: typing.Literal['type', b'type', 'uri', b'uri']) -> None:
             ...
 
-    @typing_extensions.final
+    @typing.final
     class Argument(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-        @typing_extensions.final
+        @typing.final
         class ValueArgument(google.protobuf.message.Message):
             DESCRIPTOR: google.protobuf.descriptor.Descriptor
             TYPE_FIELD_NUMBER: builtins.int
             CONSTANT_FIELD_NUMBER: builtins.int
+            constant: builtins.bool
 
             @property
             def type(self) -> proto.parameterized_types_pb2.ParameterizedType:
                 ...
-            constant: builtins.bool
 
             def __init__(self, *, type: proto.parameterized_types_pb2.ParameterizedType | None=..., constant: builtins.bool=...) -> None:
                 ...
 
-            def HasField(self, field_name: typing_extensions.Literal['type', b'type']) -> builtins.bool:
+            def HasField(self, field_name: typing.Literal['type', b'type']) -> builtins.bool:
                 ...
 
-            def ClearField(self, field_name: typing_extensions.Literal['constant', b'constant', 'type', b'type']) -> None:
+            def ClearField(self, field_name: typing.Literal['constant', b'constant', 'type', b'type']) -> None:
                 ...
 
-        @typing_extensions.final
+        @typing.final
         class TypeArgument(google.protobuf.message.Message):
             DESCRIPTOR: google.protobuf.descriptor.Descriptor
             TYPE_FIELD_NUMBER: builtins.int
@@ -346,27 +346,27 @@ class FunctionSignature(google.protobuf.message.Message):
             def __init__(self, *, type: proto.parameterized_types_pb2.ParameterizedType | None=...) -> None:
                 ...
 
-            def HasField(self, field_name: typing_extensions.Literal['type', b'type']) -> builtins.bool:
+            def HasField(self, field_name: typing.Literal['type', b'type']) -> builtins.bool:
                 ...
 
-            def ClearField(self, field_name: typing_extensions.Literal['type', b'type']) -> None:
+            def ClearField(self, field_name: typing.Literal['type', b'type']) -> None:
                 ...
 
-        @typing_extensions.final
+        @typing.final
         class EnumArgument(google.protobuf.message.Message):
             DESCRIPTOR: google.protobuf.descriptor.Descriptor
             OPTIONS_FIELD_NUMBER: builtins.int
             OPTIONAL_FIELD_NUMBER: builtins.int
+            optional: builtins.bool
 
             @property
             def options(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]:
                 ...
-            optional: builtins.bool
 
             def __init__(self, *, options: collections.abc.Iterable[builtins.str] | None=..., optional: builtins.bool=...) -> None:
                 ...
 
-            def ClearField(self, field_name: typing_extensions.Literal['optional', b'optional', 'options', b'options']) -> None:
+            def ClearField(self, field_name: typing.Literal['optional', b'optional', 'options', b'options']) -> None:
                 ...
         NAME_FIELD_NUMBER: builtins.int
         VALUE_FIELD_NUMBER: builtins.int
@@ -389,13 +389,13 @@ class FunctionSignature(google.protobuf.message.Message):
         def __init__(self, *, name: builtins.str=..., value: global___FunctionSignature.Argument.ValueArgument | None=..., type: global___FunctionSignature.Argument.TypeArgument | None=..., enum: global___FunctionSignature.Argument.EnumArgument | None=...) -> None:
             ...
 
-        def HasField(self, field_name: typing_extensions.Literal['argument_kind', b'argument_kind', 'enum', b'enum', 'type', b'type', 'value', b'value']) -> builtins.bool:
+        def HasField(self, field_name: typing.Literal['argument_kind', b'argument_kind', 'enum', b'enum', 'type', b'type', 'value', b'value']) -> builtins.bool:
             ...
 
-        def ClearField(self, field_name: typing_extensions.Literal['argument_kind', b'argument_kind', 'enum', b'enum', 'name', b'name', 'type', b'type', 'value', b'value']) -> None:
+        def ClearField(self, field_name: typing.Literal['argument_kind', b'argument_kind', 'enum', b'enum', 'name', b'name', 'type', b'type', 'value', b'value']) -> None:
             ...
 
-        def WhichOneof(self, oneof_group: typing_extensions.Literal['argument_kind', b'argument_kind']) -> typing_extensions.Literal['value', 'type', 'enum'] | None:
+        def WhichOneof(self, oneof_group: typing.Literal['argument_kind', b'argument_kind']) -> typing.Literal['value', 'type', 'enum'] | None:
             ...
 
     def __init__(self) -> None:

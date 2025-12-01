@@ -51,12 +51,12 @@ AGGREGATION_PHASE_INTERMEDIATE_TO_RESULT: AggregationPhase.ValueType
 'Specifies that the inputs of the aggregate or window function are the\nintermediate values of the function, generated previously using\nINITIAL_TO_INTERMEDIATE and possibly INTERMEDIATE_TO_INTERMEDIATE calls.\nThis call should combine the intermediate values to yield the final\nreturn value.\n'
 global___AggregationPhase = AggregationPhase
 
-@typing_extensions.final
+@typing.final
 class RelCommon(google.protobuf.message.Message):
     """Common fields for all relational operators"""
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    @typing_extensions.final
+    @typing.final
     class Direct(google.protobuf.message.Message):
         """Direct indicates no change on presence and ordering of fields in the output"""
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -64,7 +64,7 @@ class RelCommon(google.protobuf.message.Message):
         def __init__(self) -> None:
             ...
 
-    @typing_extensions.final
+    @typing.final
     class Emit(google.protobuf.message.Message):
         """Remap which fields are output and in which order"""
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -77,10 +77,10 @@ class RelCommon(google.protobuf.message.Message):
         def __init__(self, *, output_mapping: collections.abc.Iterable[builtins.int] | None=...) -> None:
             ...
 
-        def ClearField(self, field_name: typing_extensions.Literal['output_mapping', b'output_mapping']) -> None:
+        def ClearField(self, field_name: typing.Literal['output_mapping', b'output_mapping']) -> None:
             ...
 
-    @typing_extensions.final
+    @typing.final
     class Hint(google.protobuf.message.Message):
         """Changes to the operation that can influence efficiency/performance but
         should not impact correctness.
@@ -105,7 +105,7 @@ class RelCommon(google.protobuf.message.Message):
         COMPUTATION_TYPE_BLOOM_FILTER: RelCommon.Hint.ComputationType.ValueType
         COMPUTATION_TYPE_UNKNOWN: RelCommon.Hint.ComputationType.ValueType
 
-        @typing_extensions.final
+        @typing.final
         class Stats(google.protobuf.message.Message):
             """The statistics related to a hint (physical properties of records)"""
             DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -122,13 +122,13 @@ class RelCommon(google.protobuf.message.Message):
             def __init__(self, *, row_count: builtins.float=..., record_size: builtins.float=..., advanced_extension: proto.extensions.extensions_pb2.AdvancedExtension | None=...) -> None:
                 ...
 
-            def HasField(self, field_name: typing_extensions.Literal['advanced_extension', b'advanced_extension']) -> builtins.bool:
+            def HasField(self, field_name: typing.Literal['advanced_extension', b'advanced_extension']) -> builtins.bool:
                 ...
 
-            def ClearField(self, field_name: typing_extensions.Literal['advanced_extension', b'advanced_extension', 'record_size', b'record_size', 'row_count', b'row_count']) -> None:
+            def ClearField(self, field_name: typing.Literal['advanced_extension', b'advanced_extension', 'record_size', b'record_size', 'row_count', b'row_count']) -> None:
                 ...
 
-        @typing_extensions.final
+        @typing.final
         class RuntimeConstraint(google.protobuf.message.Message):
             """TODO: nodes, cpu threads/%, memory, iops, etc."""
             DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -141,42 +141,58 @@ class RelCommon(google.protobuf.message.Message):
             def __init__(self, *, advanced_extension: proto.extensions.extensions_pb2.AdvancedExtension | None=...) -> None:
                 ...
 
-            def HasField(self, field_name: typing_extensions.Literal['advanced_extension', b'advanced_extension']) -> builtins.bool:
+            def HasField(self, field_name: typing.Literal['advanced_extension', b'advanced_extension']) -> builtins.bool:
                 ...
 
-            def ClearField(self, field_name: typing_extensions.Literal['advanced_extension', b'advanced_extension']) -> None:
+            def ClearField(self, field_name: typing.Literal['advanced_extension', b'advanced_extension']) -> None:
                 ...
 
-        @typing_extensions.final
+        @typing.final
         class SavedComputation(google.protobuf.message.Message):
             DESCRIPTOR: google.protobuf.descriptor.Descriptor
             COMPUTATION_ID_FIELD_NUMBER: builtins.int
             TYPE_FIELD_NUMBER: builtins.int
+            ADVANCED_EXTENSION_FIELD_NUMBER: builtins.int
             computation_id: builtins.int
             'The value corresponds to a plan unique number for that datastructure.  Any particular\n            computation may be saved only once but it may be loaded multiple times.\n            '
             type: global___RelCommon.Hint.ComputationType.ValueType
             'The type of this computation.  While a plan may use COMPUTATION_TYPE_UNKNOWN for all\n            of its types it is recommended to use a more specific type so that the optimization\n            is more portable.  The consumer should be able to decide if an unknown type here\n            matches the same unknown type at a different plan and ignore the optimization if they\n            are mismatched.\n            '
 
-            def __init__(self, *, computation_id: builtins.int=..., type: global___RelCommon.Hint.ComputationType.ValueType=...) -> None:
+            @property
+            def advanced_extension(self) -> proto.extensions.extensions_pb2.AdvancedExtension:
                 ...
 
-            def ClearField(self, field_name: typing_extensions.Literal['computation_id', b'computation_id', 'type', b'type']) -> None:
+            def __init__(self, *, computation_id: builtins.int=..., type: global___RelCommon.Hint.ComputationType.ValueType=..., advanced_extension: proto.extensions.extensions_pb2.AdvancedExtension | None=...) -> None:
                 ...
 
-        @typing_extensions.final
+            def HasField(self, field_name: typing.Literal['advanced_extension', b'advanced_extension']) -> builtins.bool:
+                ...
+
+            def ClearField(self, field_name: typing.Literal['advanced_extension', b'advanced_extension', 'computation_id', b'computation_id', 'type', b'type']) -> None:
+                ...
+
+        @typing.final
         class LoadedComputation(google.protobuf.message.Message):
             DESCRIPTOR: google.protobuf.descriptor.Descriptor
             COMPUTATION_ID_REFERENCE_FIELD_NUMBER: builtins.int
             TYPE_FIELD_NUMBER: builtins.int
+            ADVANCED_EXTENSION_FIELD_NUMBER: builtins.int
             computation_id_reference: builtins.int
             'The value corresponds to a plan unique number for that datastructure.  Any particular\n            computation may be saved only once but it may be loaded multiple times.\n            '
             type: global___RelCommon.Hint.ComputationType.ValueType
             'The type of this computation.  While a plan may use COMPUTATION_TYPE_UNKNOWN for all\n            of its types it is recommended to use a more specific type so that the optimization\n            is more portable.  The consumer should be able to decide if an unknown type here\n            matches the same unknown type at a different plan and ignore the optimization if they\n            are mismatched.\n            '
 
-            def __init__(self, *, computation_id_reference: builtins.int=..., type: global___RelCommon.Hint.ComputationType.ValueType=...) -> None:
+            @property
+            def advanced_extension(self) -> proto.extensions.extensions_pb2.AdvancedExtension:
                 ...
 
-            def ClearField(self, field_name: typing_extensions.Literal['computation_id_reference', b'computation_id_reference', 'type', b'type']) -> None:
+            def __init__(self, *, computation_id_reference: builtins.int=..., type: global___RelCommon.Hint.ComputationType.ValueType=..., advanced_extension: proto.extensions.extensions_pb2.AdvancedExtension | None=...) -> None:
+                ...
+
+            def HasField(self, field_name: typing.Literal['advanced_extension', b'advanced_extension']) -> builtins.bool:
+                ...
+
+            def ClearField(self, field_name: typing.Literal['advanced_extension', b'advanced_extension', 'computation_id_reference', b'computation_id_reference', 'type', b'type']) -> None:
                 ...
         STATS_FIELD_NUMBER: builtins.int
         CONSTRAINT_FIELD_NUMBER: builtins.int
@@ -185,6 +201,8 @@ class RelCommon(google.protobuf.message.Message):
         ADVANCED_EXTENSION_FIELD_NUMBER: builtins.int
         SAVED_COMPUTATIONS_FIELD_NUMBER: builtins.int
         LOADED_COMPUTATIONS_FIELD_NUMBER: builtins.int
+        alias: builtins.str
+        "Name (alias) for this relation. Can be used for e.g. qualifying the relation (see e.g.\n        Spark's SubqueryAlias), or debugging.\n        "
 
         @property
         def stats(self) -> global___RelCommon.Hint.Stats:
@@ -193,8 +211,6 @@ class RelCommon(google.protobuf.message.Message):
         @property
         def constraint(self) -> global___RelCommon.Hint.RuntimeConstraint:
             ...
-        alias: builtins.str
-        "Name (alias) for this relation. Can be used for e.g. qualifying the relation (see e.g.\n        Spark's SubqueryAlias), or debugging.\n        "
 
         @property
         def output_names(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]:
@@ -220,10 +236,10 @@ class RelCommon(google.protobuf.message.Message):
         def __init__(self, *, stats: global___RelCommon.Hint.Stats | None=..., constraint: global___RelCommon.Hint.RuntimeConstraint | None=..., alias: builtins.str=..., output_names: collections.abc.Iterable[builtins.str] | None=..., advanced_extension: proto.extensions.extensions_pb2.AdvancedExtension | None=..., saved_computations: collections.abc.Iterable[global___RelCommon.Hint.SavedComputation] | None=..., loaded_computations: collections.abc.Iterable[global___RelCommon.Hint.LoadedComputation] | None=...) -> None:
             ...
 
-        def HasField(self, field_name: typing_extensions.Literal['advanced_extension', b'advanced_extension', 'constraint', b'constraint', 'stats', b'stats']) -> builtins.bool:
+        def HasField(self, field_name: typing.Literal['advanced_extension', b'advanced_extension', 'constraint', b'constraint', 'stats', b'stats']) -> builtins.bool:
             ...
 
-        def ClearField(self, field_name: typing_extensions.Literal['advanced_extension', b'advanced_extension', 'alias', b'alias', 'constraint', b'constraint', 'loaded_computations', b'loaded_computations', 'output_names', b'output_names', 'saved_computations', b'saved_computations', 'stats', b'stats']) -> None:
+        def ClearField(self, field_name: typing.Literal['advanced_extension', b'advanced_extension', 'alias', b'alias', 'constraint', b'constraint', 'loaded_computations', b'loaded_computations', 'output_names', b'output_names', 'saved_computations', b'saved_computations', 'stats', b'stats']) -> None:
             ...
     DIRECT_FIELD_NUMBER: builtins.int
     EMIT_FIELD_NUMBER: builtins.int
@@ -249,22 +265,22 @@ class RelCommon(google.protobuf.message.Message):
     def __init__(self, *, direct: global___RelCommon.Direct | None=..., emit: global___RelCommon.Emit | None=..., hint: global___RelCommon.Hint | None=..., advanced_extension: proto.extensions.extensions_pb2.AdvancedExtension | None=...) -> None:
         ...
 
-    def HasField(self, field_name: typing_extensions.Literal['advanced_extension', b'advanced_extension', 'direct', b'direct', 'emit', b'emit', 'emit_kind', b'emit_kind', 'hint', b'hint']) -> builtins.bool:
+    def HasField(self, field_name: typing.Literal['advanced_extension', b'advanced_extension', 'direct', b'direct', 'emit', b'emit', 'emit_kind', b'emit_kind', 'hint', b'hint']) -> builtins.bool:
         ...
 
-    def ClearField(self, field_name: typing_extensions.Literal['advanced_extension', b'advanced_extension', 'direct', b'direct', 'emit', b'emit', 'emit_kind', b'emit_kind', 'hint', b'hint']) -> None:
+    def ClearField(self, field_name: typing.Literal['advanced_extension', b'advanced_extension', 'direct', b'direct', 'emit', b'emit', 'emit_kind', b'emit_kind', 'hint', b'hint']) -> None:
         ...
 
-    def WhichOneof(self, oneof_group: typing_extensions.Literal['emit_kind', b'emit_kind']) -> typing_extensions.Literal['direct', 'emit'] | None:
+    def WhichOneof(self, oneof_group: typing.Literal['emit_kind', b'emit_kind']) -> typing.Literal['direct', 'emit'] | None:
         ...
 global___RelCommon = RelCommon
 
-@typing_extensions.final
+@typing.final
 class ReadRel(google.protobuf.message.Message):
     """The scan operator of base data (physical or virtual), including filtering and projection."""
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    @typing_extensions.final
+    @typing.final
     class NamedTable(google.protobuf.message.Message):
         """A base table. The list of string is used to represent namespacing (e.g., mydb.mytable).
         This assumes shared catalog between systems exchanging a message.
@@ -284,18 +300,18 @@ class ReadRel(google.protobuf.message.Message):
         def __init__(self, *, names: collections.abc.Iterable[builtins.str] | None=..., advanced_extension: proto.extensions.extensions_pb2.AdvancedExtension | None=...) -> None:
             ...
 
-        def HasField(self, field_name: typing_extensions.Literal['advanced_extension', b'advanced_extension']) -> builtins.bool:
+        def HasField(self, field_name: typing.Literal['advanced_extension', b'advanced_extension']) -> builtins.bool:
             ...
 
-        def ClearField(self, field_name: typing_extensions.Literal['advanced_extension', b'advanced_extension', 'names', b'names']) -> None:
+        def ClearField(self, field_name: typing.Literal['advanced_extension', b'advanced_extension', 'names', b'names']) -> None:
             ...
 
-    @typing_extensions.final
+    @typing.final
     class IcebergTable(google.protobuf.message.Message):
         """Read an Iceberg Table"""
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-        @typing_extensions.final
+        @typing.final
         class MetadataFileRead(google.protobuf.message.Message):
             """Read an Iceberg table using a metadata file. Implicit assumption: required credentials are already known by plan consumer."""
             DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -312,13 +328,13 @@ class ReadRel(google.protobuf.message.Message):
             def __init__(self, *, metadata_uri: builtins.str=..., snapshot_id: builtins.str=..., snapshot_timestamp: builtins.int=...) -> None:
                 ...
 
-            def HasField(self, field_name: typing_extensions.Literal['snapshot', b'snapshot', 'snapshot_id', b'snapshot_id', 'snapshot_timestamp', b'snapshot_timestamp']) -> builtins.bool:
+            def HasField(self, field_name: typing.Literal['snapshot', b'snapshot', 'snapshot_id', b'snapshot_id', 'snapshot_timestamp', b'snapshot_timestamp']) -> builtins.bool:
                 ...
 
-            def ClearField(self, field_name: typing_extensions.Literal['metadata_uri', b'metadata_uri', 'snapshot', b'snapshot', 'snapshot_id', b'snapshot_id', 'snapshot_timestamp', b'snapshot_timestamp']) -> None:
+            def ClearField(self, field_name: typing.Literal['metadata_uri', b'metadata_uri', 'snapshot', b'snapshot', 'snapshot_id', b'snapshot_id', 'snapshot_timestamp', b'snapshot_timestamp']) -> None:
                 ...
 
-            def WhichOneof(self, oneof_group: typing_extensions.Literal['snapshot', b'snapshot']) -> typing_extensions.Literal['snapshot_id', 'snapshot_timestamp'] | None:
+            def WhichOneof(self, oneof_group: typing.Literal['snapshot', b'snapshot']) -> typing.Literal['snapshot_id', 'snapshot_timestamp'] | None:
                 ...
         DIRECT_FIELD_NUMBER: builtins.int
 
@@ -329,16 +345,16 @@ class ReadRel(google.protobuf.message.Message):
         def __init__(self, *, direct: global___ReadRel.IcebergTable.MetadataFileRead | None=...) -> None:
             ...
 
-        def HasField(self, field_name: typing_extensions.Literal['direct', b'direct', 'table_type', b'table_type']) -> builtins.bool:
+        def HasField(self, field_name: typing.Literal['direct', b'direct', 'table_type', b'table_type']) -> builtins.bool:
             ...
 
-        def ClearField(self, field_name: typing_extensions.Literal['direct', b'direct', 'table_type', b'table_type']) -> None:
+        def ClearField(self, field_name: typing.Literal['direct', b'direct', 'table_type', b'table_type']) -> None:
             ...
 
-        def WhichOneof(self, oneof_group: typing_extensions.Literal['table_type', b'table_type']) -> typing_extensions.Literal['direct'] | None:
+        def WhichOneof(self, oneof_group: typing.Literal['table_type', b'table_type']) -> typing.Literal['direct'] | None:
             ...
 
-    @typing_extensions.final
+    @typing.final
     class VirtualTable(google.protobuf.message.Message):
         """A table composed of expressions."""
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -356,10 +372,10 @@ class ReadRel(google.protobuf.message.Message):
         def __init__(self, *, values: collections.abc.Iterable[global___Expression.Literal.Struct] | None=..., expressions: collections.abc.Iterable[global___Expression.Nested.Struct] | None=...) -> None:
             ...
 
-        def ClearField(self, field_name: typing_extensions.Literal['expressions', b'expressions', 'values', b'values']) -> None:
+        def ClearField(self, field_name: typing.Literal['expressions', b'expressions', 'values', b'values']) -> None:
             ...
 
-    @typing_extensions.final
+    @typing.final
     class ExtensionTable(google.protobuf.message.Message):
         """A stub type that can be used to extend/introduce new table types outside
         the specification.
@@ -374,18 +390,18 @@ class ReadRel(google.protobuf.message.Message):
         def __init__(self, *, detail: google.protobuf.any_pb2.Any | None=...) -> None:
             ...
 
-        def HasField(self, field_name: typing_extensions.Literal['detail', b'detail']) -> builtins.bool:
+        def HasField(self, field_name: typing.Literal['detail', b'detail']) -> builtins.bool:
             ...
 
-        def ClearField(self, field_name: typing_extensions.Literal['detail', b'detail']) -> None:
+        def ClearField(self, field_name: typing.Literal['detail', b'detail']) -> None:
             ...
 
-    @typing_extensions.final
+    @typing.final
     class LocalFiles(google.protobuf.message.Message):
         """Represents a list of files in input of a scan operation"""
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-        @typing_extensions.final
+        @typing.final
         class FileOrFiles(google.protobuf.message.Message):
             """Many files consist of indivisible chunks (e.g. parquet row groups
             or CSV rows).  If a slice partially selects an indivisible chunk
@@ -395,35 +411,35 @@ class ReadRel(google.protobuf.message.Message):
             """
             DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-            @typing_extensions.final
+            @typing.final
             class ParquetReadOptions(google.protobuf.message.Message):
                 DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
                 def __init__(self) -> None:
                     ...
 
-            @typing_extensions.final
+            @typing.final
             class ArrowReadOptions(google.protobuf.message.Message):
                 DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
                 def __init__(self) -> None:
                     ...
 
-            @typing_extensions.final
+            @typing.final
             class OrcReadOptions(google.protobuf.message.Message):
                 DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
                 def __init__(self) -> None:
                     ...
 
-            @typing_extensions.final
+            @typing.final
             class DwrfReadOptions(google.protobuf.message.Message):
                 DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
                 def __init__(self) -> None:
                     ...
 
-            @typing_extensions.final
+            @typing.final
             class DelimiterSeparatedTextReadOptions(google.protobuf.message.Message):
                 """Delimiter separated files may be compressed.  The reader should
                 autodetect this and decompress as needed.
@@ -451,13 +467,13 @@ class ReadRel(google.protobuf.message.Message):
                 def __init__(self, *, field_delimiter: builtins.str=..., max_line_size: builtins.int=..., quote: builtins.str=..., header_lines_to_skip: builtins.int=..., escape: builtins.str=..., value_treated_as_null: builtins.str | None=...) -> None:
                     ...
 
-                def HasField(self, field_name: typing_extensions.Literal['_value_treated_as_null', b'_value_treated_as_null', 'value_treated_as_null', b'value_treated_as_null']) -> builtins.bool:
+                def HasField(self, field_name: typing.Literal['_value_treated_as_null', b'_value_treated_as_null', 'value_treated_as_null', b'value_treated_as_null']) -> builtins.bool:
                     ...
 
-                def ClearField(self, field_name: typing_extensions.Literal['_value_treated_as_null', b'_value_treated_as_null', 'escape', b'escape', 'field_delimiter', b'field_delimiter', 'header_lines_to_skip', b'header_lines_to_skip', 'max_line_size', b'max_line_size', 'quote', b'quote', 'value_treated_as_null', b'value_treated_as_null']) -> None:
+                def ClearField(self, field_name: typing.Literal['_value_treated_as_null', b'_value_treated_as_null', 'escape', b'escape', 'field_delimiter', b'field_delimiter', 'header_lines_to_skip', b'header_lines_to_skip', 'max_line_size', b'max_line_size', 'quote', b'quote', 'value_treated_as_null', b'value_treated_as_null']) -> None:
                     ...
 
-                def WhichOneof(self, oneof_group: typing_extensions.Literal['_value_treated_as_null', b'_value_treated_as_null']) -> typing_extensions.Literal['value_treated_as_null'] | None:
+                def WhichOneof(self, oneof_group: typing.Literal['_value_treated_as_null', b'_value_treated_as_null']) -> typing.Literal['value_treated_as_null'] | None:
                     ...
             URI_PATH_FIELD_NUMBER: builtins.int
             URI_PATH_GLOB_FIELD_NUMBER: builtins.int
@@ -514,18 +530,18 @@ class ReadRel(google.protobuf.message.Message):
             def __init__(self, *, uri_path: builtins.str=..., uri_path_glob: builtins.str=..., uri_file: builtins.str=..., uri_folder: builtins.str=..., partition_index: builtins.int=..., start: builtins.int=..., length: builtins.int=..., parquet: global___ReadRel.LocalFiles.FileOrFiles.ParquetReadOptions | None=..., arrow: global___ReadRel.LocalFiles.FileOrFiles.ArrowReadOptions | None=..., orc: global___ReadRel.LocalFiles.FileOrFiles.OrcReadOptions | None=..., extension: google.protobuf.any_pb2.Any | None=..., dwrf: global___ReadRel.LocalFiles.FileOrFiles.DwrfReadOptions | None=..., text: global___ReadRel.LocalFiles.FileOrFiles.DelimiterSeparatedTextReadOptions | None=...) -> None:
                 ...
 
-            def HasField(self, field_name: typing_extensions.Literal['arrow', b'arrow', 'dwrf', b'dwrf', 'extension', b'extension', 'file_format', b'file_format', 'orc', b'orc', 'parquet', b'parquet', 'path_type', b'path_type', 'text', b'text', 'uri_file', b'uri_file', 'uri_folder', b'uri_folder', 'uri_path', b'uri_path', 'uri_path_glob', b'uri_path_glob']) -> builtins.bool:
+            def HasField(self, field_name: typing.Literal['arrow', b'arrow', 'dwrf', b'dwrf', 'extension', b'extension', 'file_format', b'file_format', 'orc', b'orc', 'parquet', b'parquet', 'path_type', b'path_type', 'text', b'text', 'uri_file', b'uri_file', 'uri_folder', b'uri_folder', 'uri_path', b'uri_path', 'uri_path_glob', b'uri_path_glob']) -> builtins.bool:
                 ...
 
-            def ClearField(self, field_name: typing_extensions.Literal['arrow', b'arrow', 'dwrf', b'dwrf', 'extension', b'extension', 'file_format', b'file_format', 'length', b'length', 'orc', b'orc', 'parquet', b'parquet', 'partition_index', b'partition_index', 'path_type', b'path_type', 'start', b'start', 'text', b'text', 'uri_file', b'uri_file', 'uri_folder', b'uri_folder', 'uri_path', b'uri_path', 'uri_path_glob', b'uri_path_glob']) -> None:
-                ...
-
-            @typing.overload
-            def WhichOneof(self, oneof_group: typing_extensions.Literal['file_format', b'file_format']) -> typing_extensions.Literal['parquet', 'arrow', 'orc', 'extension', 'dwrf', 'text'] | None:
+            def ClearField(self, field_name: typing.Literal['arrow', b'arrow', 'dwrf', b'dwrf', 'extension', b'extension', 'file_format', b'file_format', 'length', b'length', 'orc', b'orc', 'parquet', b'parquet', 'partition_index', b'partition_index', 'path_type', b'path_type', 'start', b'start', 'text', b'text', 'uri_file', b'uri_file', 'uri_folder', b'uri_folder', 'uri_path', b'uri_path', 'uri_path_glob', b'uri_path_glob']) -> None:
                 ...
 
             @typing.overload
-            def WhichOneof(self, oneof_group: typing_extensions.Literal['path_type', b'path_type']) -> typing_extensions.Literal['uri_path', 'uri_path_glob', 'uri_file', 'uri_folder'] | None:
+            def WhichOneof(self, oneof_group: typing.Literal['file_format', b'file_format']) -> typing.Literal['parquet', 'arrow', 'orc', 'extension', 'dwrf', 'text'] | None:
+                ...
+
+            @typing.overload
+            def WhichOneof(self, oneof_group: typing.Literal['path_type', b'path_type']) -> typing.Literal['uri_path', 'uri_path_glob', 'uri_file', 'uri_folder'] | None:
                 ...
         ITEMS_FIELD_NUMBER: builtins.int
         ADVANCED_EXTENSION_FIELD_NUMBER: builtins.int
@@ -541,10 +557,10 @@ class ReadRel(google.protobuf.message.Message):
         def __init__(self, *, items: collections.abc.Iterable[global___ReadRel.LocalFiles.FileOrFiles] | None=..., advanced_extension: proto.extensions.extensions_pb2.AdvancedExtension | None=...) -> None:
             ...
 
-        def HasField(self, field_name: typing_extensions.Literal['advanced_extension', b'advanced_extension']) -> builtins.bool:
+        def HasField(self, field_name: typing.Literal['advanced_extension', b'advanced_extension']) -> builtins.bool:
             ...
 
-        def ClearField(self, field_name: typing_extensions.Literal['advanced_extension', b'advanced_extension', 'items', b'items']) -> None:
+        def ClearField(self, field_name: typing.Literal['advanced_extension', b'advanced_extension', 'items', b'items']) -> None:
             ...
     COMMON_FIELD_NUMBER: builtins.int
     BASE_SCHEMA_FIELD_NUMBER: builtins.int
@@ -605,17 +621,17 @@ class ReadRel(google.protobuf.message.Message):
     def __init__(self, *, common: global___RelCommon | None=..., base_schema: proto.type_pb2.NamedStruct | None=..., filter: global___Expression | None=..., best_effort_filter: global___Expression | None=..., projection: global___Expression.MaskExpression | None=..., advanced_extension: proto.extensions.extensions_pb2.AdvancedExtension | None=..., virtual_table: global___ReadRel.VirtualTable | None=..., local_files: global___ReadRel.LocalFiles | None=..., named_table: global___ReadRel.NamedTable | None=..., extension_table: global___ReadRel.ExtensionTable | None=..., iceberg_table: global___ReadRel.IcebergTable | None=...) -> None:
         ...
 
-    def HasField(self, field_name: typing_extensions.Literal['advanced_extension', b'advanced_extension', 'base_schema', b'base_schema', 'best_effort_filter', b'best_effort_filter', 'common', b'common', 'extension_table', b'extension_table', 'filter', b'filter', 'iceberg_table', b'iceberg_table', 'local_files', b'local_files', 'named_table', b'named_table', 'projection', b'projection', 'read_type', b'read_type', 'virtual_table', b'virtual_table']) -> builtins.bool:
+    def HasField(self, field_name: typing.Literal['advanced_extension', b'advanced_extension', 'base_schema', b'base_schema', 'best_effort_filter', b'best_effort_filter', 'common', b'common', 'extension_table', b'extension_table', 'filter', b'filter', 'iceberg_table', b'iceberg_table', 'local_files', b'local_files', 'named_table', b'named_table', 'projection', b'projection', 'read_type', b'read_type', 'virtual_table', b'virtual_table']) -> builtins.bool:
         ...
 
-    def ClearField(self, field_name: typing_extensions.Literal['advanced_extension', b'advanced_extension', 'base_schema', b'base_schema', 'best_effort_filter', b'best_effort_filter', 'common', b'common', 'extension_table', b'extension_table', 'filter', b'filter', 'iceberg_table', b'iceberg_table', 'local_files', b'local_files', 'named_table', b'named_table', 'projection', b'projection', 'read_type', b'read_type', 'virtual_table', b'virtual_table']) -> None:
+    def ClearField(self, field_name: typing.Literal['advanced_extension', b'advanced_extension', 'base_schema', b'base_schema', 'best_effort_filter', b'best_effort_filter', 'common', b'common', 'extension_table', b'extension_table', 'filter', b'filter', 'iceberg_table', b'iceberg_table', 'local_files', b'local_files', 'named_table', b'named_table', 'projection', b'projection', 'read_type', b'read_type', 'virtual_table', b'virtual_table']) -> None:
         ...
 
-    def WhichOneof(self, oneof_group: typing_extensions.Literal['read_type', b'read_type']) -> typing_extensions.Literal['virtual_table', 'local_files', 'named_table', 'extension_table', 'iceberg_table'] | None:
+    def WhichOneof(self, oneof_group: typing.Literal['read_type', b'read_type']) -> typing.Literal['virtual_table', 'local_files', 'named_table', 'extension_table', 'iceberg_table'] | None:
         ...
 global___ReadRel = ReadRel
 
-@typing_extensions.final
+@typing.final
 class ProjectRel(google.protobuf.message.Message):
     """This operator allows to represent calculated expressions of fields (e.g., a+b). Direct/Emit are used to represent classical relational projections"""
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -643,14 +659,14 @@ class ProjectRel(google.protobuf.message.Message):
     def __init__(self, *, common: global___RelCommon | None=..., input: global___Rel | None=..., expressions: collections.abc.Iterable[global___Expression] | None=..., advanced_extension: proto.extensions.extensions_pb2.AdvancedExtension | None=...) -> None:
         ...
 
-    def HasField(self, field_name: typing_extensions.Literal['advanced_extension', b'advanced_extension', 'common', b'common', 'input', b'input']) -> builtins.bool:
+    def HasField(self, field_name: typing.Literal['advanced_extension', b'advanced_extension', 'common', b'common', 'input', b'input']) -> builtins.bool:
         ...
 
-    def ClearField(self, field_name: typing_extensions.Literal['advanced_extension', b'advanced_extension', 'common', b'common', 'expressions', b'expressions', 'input', b'input']) -> None:
+    def ClearField(self, field_name: typing.Literal['advanced_extension', b'advanced_extension', 'common', b'common', 'expressions', b'expressions', 'input', b'input']) -> None:
         ...
 global___ProjectRel = ProjectRel
 
-@typing_extensions.final
+@typing.final
 class JoinRel(google.protobuf.message.Message):
     """The binary JOIN relational operator left-join-right, including various join types, a join condition and post_join_filter expression"""
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -697,6 +713,7 @@ class JoinRel(google.protobuf.message.Message):
     POST_JOIN_FILTER_FIELD_NUMBER: builtins.int
     TYPE_FIELD_NUMBER: builtins.int
     ADVANCED_EXTENSION_FIELD_NUMBER: builtins.int
+    type: global___JoinRel.JoinType.ValueType
 
     @property
     def common(self) -> global___RelCommon:
@@ -717,7 +734,6 @@ class JoinRel(google.protobuf.message.Message):
     @property
     def post_join_filter(self) -> global___Expression:
         ...
-    type: global___JoinRel.JoinType.ValueType
 
     @property
     def advanced_extension(self) -> proto.extensions.extensions_pb2.AdvancedExtension:
@@ -726,14 +742,14 @@ class JoinRel(google.protobuf.message.Message):
     def __init__(self, *, common: global___RelCommon | None=..., left: global___Rel | None=..., right: global___Rel | None=..., expression: global___Expression | None=..., post_join_filter: global___Expression | None=..., type: global___JoinRel.JoinType.ValueType=..., advanced_extension: proto.extensions.extensions_pb2.AdvancedExtension | None=...) -> None:
         ...
 
-    def HasField(self, field_name: typing_extensions.Literal['advanced_extension', b'advanced_extension', 'common', b'common', 'expression', b'expression', 'left', b'left', 'post_join_filter', b'post_join_filter', 'right', b'right']) -> builtins.bool:
+    def HasField(self, field_name: typing.Literal['advanced_extension', b'advanced_extension', 'common', b'common', 'expression', b'expression', 'left', b'left', 'post_join_filter', b'post_join_filter', 'right', b'right']) -> builtins.bool:
         ...
 
-    def ClearField(self, field_name: typing_extensions.Literal['advanced_extension', b'advanced_extension', 'common', b'common', 'expression', b'expression', 'left', b'left', 'post_join_filter', b'post_join_filter', 'right', b'right', 'type', b'type']) -> None:
+    def ClearField(self, field_name: typing.Literal['advanced_extension', b'advanced_extension', 'common', b'common', 'expression', b'expression', 'left', b'left', 'post_join_filter', b'post_join_filter', 'right', b'right', 'type', b'type']) -> None:
         ...
 global___JoinRel = JoinRel
 
-@typing_extensions.final
+@typing.final
 class CrossRel(google.protobuf.message.Message):
     """Cartesian product relational operator of two tables (left and right)"""
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -761,14 +777,14 @@ class CrossRel(google.protobuf.message.Message):
     def __init__(self, *, common: global___RelCommon | None=..., left: global___Rel | None=..., right: global___Rel | None=..., advanced_extension: proto.extensions.extensions_pb2.AdvancedExtension | None=...) -> None:
         ...
 
-    def HasField(self, field_name: typing_extensions.Literal['advanced_extension', b'advanced_extension', 'common', b'common', 'left', b'left', 'right', b'right']) -> builtins.bool:
+    def HasField(self, field_name: typing.Literal['advanced_extension', b'advanced_extension', 'common', b'common', 'left', b'left', 'right', b'right']) -> builtins.bool:
         ...
 
-    def ClearField(self, field_name: typing_extensions.Literal['advanced_extension', b'advanced_extension', 'common', b'common', 'left', b'left', 'right', b'right']) -> None:
+    def ClearField(self, field_name: typing.Literal['advanced_extension', b'advanced_extension', 'common', b'common', 'left', b'left', 'right', b'right']) -> None:
         ...
 global___CrossRel = CrossRel
 
-@typing_extensions.final
+@typing.final
 class FetchRel(google.protobuf.message.Message):
     """The relational operator representing LIMIT/OFFSET or TOP type semantics."""
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -779,6 +795,10 @@ class FetchRel(google.protobuf.message.Message):
     COUNT_FIELD_NUMBER: builtins.int
     COUNT_EXPR_FIELD_NUMBER: builtins.int
     ADVANCED_EXTENSION_FIELD_NUMBER: builtins.int
+    offset: builtins.int
+    'the offset expressed in number of records\n    Deprecated: use `offset_expr` instead\n    '
+    count: builtins.int
+    'the amount of records to return\n    use -1 to signal that ALL records should be returned\n    Deprecated: use `count_expr` instead\n    '
 
     @property
     def common(self) -> global___RelCommon:
@@ -787,8 +807,6 @@ class FetchRel(google.protobuf.message.Message):
     @property
     def input(self) -> global___Rel:
         ...
-    offset: builtins.int
-    'the offset expressed in number of records\n    Deprecated: use `offset_expr` instead\n    '
 
     @property
     def offset_expr(self) -> global___Expression:
@@ -797,8 +815,6 @@ class FetchRel(google.protobuf.message.Message):
         Evaluating to a negative integer should result in an error.
         Recommended type for offset is int64.
         """
-    count: builtins.int
-    'the amount of records to return\n    use -1 to signal that ALL records should be returned\n    Deprecated: use `count_expr` instead\n    '
 
     @property
     def count_expr(self) -> global___Expression:
@@ -816,27 +832,27 @@ class FetchRel(google.protobuf.message.Message):
     def __init__(self, *, common: global___RelCommon | None=..., input: global___Rel | None=..., offset: builtins.int=..., offset_expr: global___Expression | None=..., count: builtins.int=..., count_expr: global___Expression | None=..., advanced_extension: proto.extensions.extensions_pb2.AdvancedExtension | None=...) -> None:
         ...
 
-    def HasField(self, field_name: typing_extensions.Literal['advanced_extension', b'advanced_extension', 'common', b'common', 'count', b'count', 'count_expr', b'count_expr', 'count_mode', b'count_mode', 'input', b'input', 'offset', b'offset', 'offset_expr', b'offset_expr', 'offset_mode', b'offset_mode']) -> builtins.bool:
+    def HasField(self, field_name: typing.Literal['advanced_extension', b'advanced_extension', 'common', b'common', 'count', b'count', 'count_expr', b'count_expr', 'count_mode', b'count_mode', 'input', b'input', 'offset', b'offset', 'offset_expr', b'offset_expr', 'offset_mode', b'offset_mode']) -> builtins.bool:
         ...
 
-    def ClearField(self, field_name: typing_extensions.Literal['advanced_extension', b'advanced_extension', 'common', b'common', 'count', b'count', 'count_expr', b'count_expr', 'count_mode', b'count_mode', 'input', b'input', 'offset', b'offset', 'offset_expr', b'offset_expr', 'offset_mode', b'offset_mode']) -> None:
-        ...
-
-    @typing.overload
-    def WhichOneof(self, oneof_group: typing_extensions.Literal['count_mode', b'count_mode']) -> typing_extensions.Literal['count', 'count_expr'] | None:
+    def ClearField(self, field_name: typing.Literal['advanced_extension', b'advanced_extension', 'common', b'common', 'count', b'count', 'count_expr', b'count_expr', 'count_mode', b'count_mode', 'input', b'input', 'offset', b'offset', 'offset_expr', b'offset_expr', 'offset_mode', b'offset_mode']) -> None:
         ...
 
     @typing.overload
-    def WhichOneof(self, oneof_group: typing_extensions.Literal['offset_mode', b'offset_mode']) -> typing_extensions.Literal['offset', 'offset_expr'] | None:
+    def WhichOneof(self, oneof_group: typing.Literal['count_mode', b'count_mode']) -> typing.Literal['count', 'count_expr'] | None:
+        ...
+
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal['offset_mode', b'offset_mode']) -> typing.Literal['offset', 'offset_expr'] | None:
         ...
 global___FetchRel = FetchRel
 
-@typing_extensions.final
+@typing.final
 class AggregateRel(google.protobuf.message.Message):
     """The relational operator representing a GROUP BY Aggregate"""
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    @typing_extensions.final
+    @typing.final
     class Grouping(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
         GROUPING_EXPRESSIONS_FIELD_NUMBER: builtins.int
@@ -855,10 +871,10 @@ class AggregateRel(google.protobuf.message.Message):
         def __init__(self, *, grouping_expressions: collections.abc.Iterable[global___Expression] | None=..., expression_references: collections.abc.Iterable[builtins.int] | None=...) -> None:
             ...
 
-        def ClearField(self, field_name: typing_extensions.Literal['expression_references', b'expression_references', 'grouping_expressions', b'grouping_expressions']) -> None:
+        def ClearField(self, field_name: typing.Literal['expression_references', b'expression_references', 'grouping_expressions', b'grouping_expressions']) -> None:
             ...
 
-    @typing_extensions.final
+    @typing.final
     class Measure(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
         MEASURE_FIELD_NUMBER: builtins.int
@@ -879,10 +895,10 @@ class AggregateRel(google.protobuf.message.Message):
         def __init__(self, *, measure: global___AggregateFunction | None=..., filter: global___Expression | None=...) -> None:
             ...
 
-        def HasField(self, field_name: typing_extensions.Literal['filter', b'filter', 'measure', b'measure']) -> builtins.bool:
+        def HasField(self, field_name: typing.Literal['filter', b'filter', 'measure', b'measure']) -> builtins.bool:
             ...
 
-        def ClearField(self, field_name: typing_extensions.Literal['filter', b'filter', 'measure', b'measure']) -> None:
+        def ClearField(self, field_name: typing.Literal['filter', b'filter', 'measure', b'measure']) -> None:
             ...
     COMMON_FIELD_NUMBER: builtins.int
     INPUT_FIELD_NUMBER: builtins.int
@@ -927,14 +943,14 @@ class AggregateRel(google.protobuf.message.Message):
     def __init__(self, *, common: global___RelCommon | None=..., input: global___Rel | None=..., groupings: collections.abc.Iterable[global___AggregateRel.Grouping] | None=..., measures: collections.abc.Iterable[global___AggregateRel.Measure] | None=..., grouping_expressions: collections.abc.Iterable[global___Expression] | None=..., advanced_extension: proto.extensions.extensions_pb2.AdvancedExtension | None=...) -> None:
         ...
 
-    def HasField(self, field_name: typing_extensions.Literal['advanced_extension', b'advanced_extension', 'common', b'common', 'input', b'input']) -> builtins.bool:
+    def HasField(self, field_name: typing.Literal['advanced_extension', b'advanced_extension', 'common', b'common', 'input', b'input']) -> builtins.bool:
         ...
 
-    def ClearField(self, field_name: typing_extensions.Literal['advanced_extension', b'advanced_extension', 'common', b'common', 'grouping_expressions', b'grouping_expressions', 'groupings', b'groupings', 'input', b'input', 'measures', b'measures']) -> None:
+    def ClearField(self, field_name: typing.Literal['advanced_extension', b'advanced_extension', 'common', b'common', 'grouping_expressions', b'grouping_expressions', 'groupings', b'groupings', 'input', b'input', 'measures', b'measures']) -> None:
         ...
 global___AggregateRel = AggregateRel
 
-@typing_extensions.final
+@typing.final
 class ConsistentPartitionWindowRel(google.protobuf.message.Message):
     """ConsistentPartitionWindowRel provides the ability to perform calculations across sets of rows
     that are related to the current query row. It can be used to execute window functions where
@@ -942,7 +958,7 @@ class ConsistentPartitionWindowRel(google.protobuf.message.Message):
     """
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    @typing_extensions.final
+    @typing.final
     class WindowRelFunction(google.protobuf.message.Message):
         """This message mirrors the `WindowFunction` message but removes the fields defining the partition,
         sorts, and bounds, since those must be consistent across the various functions in this rel.  Refer
@@ -959,6 +975,9 @@ class ConsistentPartitionWindowRel(google.protobuf.message.Message):
         UPPER_BOUND_FIELD_NUMBER: builtins.int
         BOUNDS_TYPE_FIELD_NUMBER: builtins.int
         function_reference: builtins.int
+        phase: global___AggregationPhase.ValueType
+        invocation: global___AggregateFunction.AggregationInvocation.ValueType
+        bounds_type: global___Expression.WindowFunction.BoundsType.ValueType
 
         @property
         def arguments(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___FunctionArgument]:
@@ -971,8 +990,6 @@ class ConsistentPartitionWindowRel(google.protobuf.message.Message):
         @property
         def output_type(self) -> proto.type_pb2.Type:
             ...
-        phase: global___AggregationPhase.ValueType
-        invocation: global___AggregateFunction.AggregationInvocation.ValueType
 
         @property
         def lower_bound(self) -> global___Expression.WindowFunction.Bound:
@@ -981,15 +998,14 @@ class ConsistentPartitionWindowRel(google.protobuf.message.Message):
         @property
         def upper_bound(self) -> global___Expression.WindowFunction.Bound:
             ...
-        bounds_type: global___Expression.WindowFunction.BoundsType.ValueType
 
         def __init__(self, *, function_reference: builtins.int=..., arguments: collections.abc.Iterable[global___FunctionArgument] | None=..., options: collections.abc.Iterable[global___FunctionOption] | None=..., output_type: proto.type_pb2.Type | None=..., phase: global___AggregationPhase.ValueType=..., invocation: global___AggregateFunction.AggregationInvocation.ValueType=..., lower_bound: global___Expression.WindowFunction.Bound | None=..., upper_bound: global___Expression.WindowFunction.Bound | None=..., bounds_type: global___Expression.WindowFunction.BoundsType.ValueType=...) -> None:
             ...
 
-        def HasField(self, field_name: typing_extensions.Literal['lower_bound', b'lower_bound', 'output_type', b'output_type', 'upper_bound', b'upper_bound']) -> builtins.bool:
+        def HasField(self, field_name: typing.Literal['lower_bound', b'lower_bound', 'output_type', b'output_type', 'upper_bound', b'upper_bound']) -> builtins.bool:
             ...
 
-        def ClearField(self, field_name: typing_extensions.Literal['arguments', b'arguments', 'bounds_type', b'bounds_type', 'function_reference', b'function_reference', 'invocation', b'invocation', 'lower_bound', b'lower_bound', 'options', b'options', 'output_type', b'output_type', 'phase', b'phase', 'upper_bound', b'upper_bound']) -> None:
+        def ClearField(self, field_name: typing.Literal['arguments', b'arguments', 'bounds_type', b'bounds_type', 'function_reference', b'function_reference', 'invocation', b'invocation', 'lower_bound', b'lower_bound', 'options', b'options', 'output_type', b'output_type', 'phase', b'phase', 'upper_bound', b'upper_bound']) -> None:
             ...
     COMMON_FIELD_NUMBER: builtins.int
     INPUT_FIELD_NUMBER: builtins.int
@@ -1025,14 +1041,14 @@ class ConsistentPartitionWindowRel(google.protobuf.message.Message):
     def __init__(self, *, common: global___RelCommon | None=..., input: global___Rel | None=..., window_functions: collections.abc.Iterable[global___ConsistentPartitionWindowRel.WindowRelFunction] | None=..., partition_expressions: collections.abc.Iterable[global___Expression] | None=..., sorts: collections.abc.Iterable[global___SortField] | None=..., advanced_extension: proto.extensions.extensions_pb2.AdvancedExtension | None=...) -> None:
         ...
 
-    def HasField(self, field_name: typing_extensions.Literal['advanced_extension', b'advanced_extension', 'common', b'common', 'input', b'input']) -> builtins.bool:
+    def HasField(self, field_name: typing.Literal['advanced_extension', b'advanced_extension', 'common', b'common', 'input', b'input']) -> builtins.bool:
         ...
 
-    def ClearField(self, field_name: typing_extensions.Literal['advanced_extension', b'advanced_extension', 'common', b'common', 'input', b'input', 'partition_expressions', b'partition_expressions', 'sorts', b'sorts', 'window_functions', b'window_functions']) -> None:
+    def ClearField(self, field_name: typing.Literal['advanced_extension', b'advanced_extension', 'common', b'common', 'input', b'input', 'partition_expressions', b'partition_expressions', 'sorts', b'sorts', 'window_functions', b'window_functions']) -> None:
         ...
 global___ConsistentPartitionWindowRel = ConsistentPartitionWindowRel
 
-@typing_extensions.final
+@typing.final
 class SortRel(google.protobuf.message.Message):
     """The ORDERY BY (or sorting) relational operator. Beside describing a base relation, it includes a list of fields to sort on"""
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -1060,14 +1076,14 @@ class SortRel(google.protobuf.message.Message):
     def __init__(self, *, common: global___RelCommon | None=..., input: global___Rel | None=..., sorts: collections.abc.Iterable[global___SortField] | None=..., advanced_extension: proto.extensions.extensions_pb2.AdvancedExtension | None=...) -> None:
         ...
 
-    def HasField(self, field_name: typing_extensions.Literal['advanced_extension', b'advanced_extension', 'common', b'common', 'input', b'input']) -> builtins.bool:
+    def HasField(self, field_name: typing.Literal['advanced_extension', b'advanced_extension', 'common', b'common', 'input', b'input']) -> builtins.bool:
         ...
 
-    def ClearField(self, field_name: typing_extensions.Literal['advanced_extension', b'advanced_extension', 'common', b'common', 'input', b'input', 'sorts', b'sorts']) -> None:
+    def ClearField(self, field_name: typing.Literal['advanced_extension', b'advanced_extension', 'common', b'common', 'input', b'input', 'sorts', b'sorts']) -> None:
         ...
 global___SortRel = SortRel
 
-@typing_extensions.final
+@typing.final
 class FilterRel(google.protobuf.message.Message):
     """The relational operator capturing simple FILTERs (as in the WHERE clause of SQL)"""
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -1095,14 +1111,14 @@ class FilterRel(google.protobuf.message.Message):
     def __init__(self, *, common: global___RelCommon | None=..., input: global___Rel | None=..., condition: global___Expression | None=..., advanced_extension: proto.extensions.extensions_pb2.AdvancedExtension | None=...) -> None:
         ...
 
-    def HasField(self, field_name: typing_extensions.Literal['advanced_extension', b'advanced_extension', 'common', b'common', 'condition', b'condition', 'input', b'input']) -> builtins.bool:
+    def HasField(self, field_name: typing.Literal['advanced_extension', b'advanced_extension', 'common', b'common', 'condition', b'condition', 'input', b'input']) -> builtins.bool:
         ...
 
-    def ClearField(self, field_name: typing_extensions.Literal['advanced_extension', b'advanced_extension', 'common', b'common', 'condition', b'condition', 'input', b'input']) -> None:
+    def ClearField(self, field_name: typing.Literal['advanced_extension', b'advanced_extension', 'common', b'common', 'condition', b'condition', 'input', b'input']) -> None:
         ...
 global___FilterRel = FilterRel
 
-@typing_extensions.final
+@typing.final
 class SetRel(google.protobuf.message.Message):
     """The relational set operators (intersection/union/etc..)"""
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -1138,6 +1154,7 @@ class SetRel(google.protobuf.message.Message):
     INPUTS_FIELD_NUMBER: builtins.int
     OP_FIELD_NUMBER: builtins.int
     ADVANCED_EXTENSION_FIELD_NUMBER: builtins.int
+    op: global___SetRel.SetOp.ValueType
 
     @property
     def common(self) -> global___RelCommon:
@@ -1148,7 +1165,6 @@ class SetRel(google.protobuf.message.Message):
         """The first input is the primary input, the remaining are secondary
         inputs.  There must be at least two inputs.
         """
-    op: global___SetRel.SetOp.ValueType
 
     @property
     def advanced_extension(self) -> proto.extensions.extensions_pb2.AdvancedExtension:
@@ -1157,14 +1173,14 @@ class SetRel(google.protobuf.message.Message):
     def __init__(self, *, common: global___RelCommon | None=..., inputs: collections.abc.Iterable[global___Rel] | None=..., op: global___SetRel.SetOp.ValueType=..., advanced_extension: proto.extensions.extensions_pb2.AdvancedExtension | None=...) -> None:
         ...
 
-    def HasField(self, field_name: typing_extensions.Literal['advanced_extension', b'advanced_extension', 'common', b'common']) -> builtins.bool:
+    def HasField(self, field_name: typing.Literal['advanced_extension', b'advanced_extension', 'common', b'common']) -> builtins.bool:
         ...
 
-    def ClearField(self, field_name: typing_extensions.Literal['advanced_extension', b'advanced_extension', 'common', b'common', 'inputs', b'inputs', 'op', b'op']) -> None:
+    def ClearField(self, field_name: typing.Literal['advanced_extension', b'advanced_extension', 'common', b'common', 'inputs', b'inputs', 'op', b'op']) -> None:
         ...
 global___SetRel = SetRel
 
-@typing_extensions.final
+@typing.final
 class ExtensionSingleRel(google.protobuf.message.Message):
     """Stub to support extension with a single input"""
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -1187,14 +1203,14 @@ class ExtensionSingleRel(google.protobuf.message.Message):
     def __init__(self, *, common: global___RelCommon | None=..., input: global___Rel | None=..., detail: google.protobuf.any_pb2.Any | None=...) -> None:
         ...
 
-    def HasField(self, field_name: typing_extensions.Literal['common', b'common', 'detail', b'detail', 'input', b'input']) -> builtins.bool:
+    def HasField(self, field_name: typing.Literal['common', b'common', 'detail', b'detail', 'input', b'input']) -> builtins.bool:
         ...
 
-    def ClearField(self, field_name: typing_extensions.Literal['common', b'common', 'detail', b'detail', 'input', b'input']) -> None:
+    def ClearField(self, field_name: typing.Literal['common', b'common', 'detail', b'detail', 'input', b'input']) -> None:
         ...
 global___ExtensionSingleRel = ExtensionSingleRel
 
-@typing_extensions.final
+@typing.final
 class ExtensionLeafRel(google.protobuf.message.Message):
     """Stub to support extension with a zero inputs"""
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -1212,14 +1228,14 @@ class ExtensionLeafRel(google.protobuf.message.Message):
     def __init__(self, *, common: global___RelCommon | None=..., detail: google.protobuf.any_pb2.Any | None=...) -> None:
         ...
 
-    def HasField(self, field_name: typing_extensions.Literal['common', b'common', 'detail', b'detail']) -> builtins.bool:
+    def HasField(self, field_name: typing.Literal['common', b'common', 'detail', b'detail']) -> builtins.bool:
         ...
 
-    def ClearField(self, field_name: typing_extensions.Literal['common', b'common', 'detail', b'detail']) -> None:
+    def ClearField(self, field_name: typing.Literal['common', b'common', 'detail', b'detail']) -> None:
         ...
 global___ExtensionLeafRel = ExtensionLeafRel
 
-@typing_extensions.final
+@typing.final
 class ExtensionMultiRel(google.protobuf.message.Message):
     """Stub to support extension with multiple inputs"""
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -1242,19 +1258,19 @@ class ExtensionMultiRel(google.protobuf.message.Message):
     def __init__(self, *, common: global___RelCommon | None=..., inputs: collections.abc.Iterable[global___Rel] | None=..., detail: google.protobuf.any_pb2.Any | None=...) -> None:
         ...
 
-    def HasField(self, field_name: typing_extensions.Literal['common', b'common', 'detail', b'detail']) -> builtins.bool:
+    def HasField(self, field_name: typing.Literal['common', b'common', 'detail', b'detail']) -> builtins.bool:
         ...
 
-    def ClearField(self, field_name: typing_extensions.Literal['common', b'common', 'detail', b'detail', 'inputs', b'inputs']) -> None:
+    def ClearField(self, field_name: typing.Literal['common', b'common', 'detail', b'detail', 'inputs', b'inputs']) -> None:
         ...
 global___ExtensionMultiRel = ExtensionMultiRel
 
-@typing_extensions.final
+@typing.final
 class ExchangeRel(google.protobuf.message.Message):
     """A redistribution operation"""
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    @typing_extensions.final
+    @typing.final
     class ScatterFields(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
         FIELDS_FIELD_NUMBER: builtins.int
@@ -1266,10 +1282,10 @@ class ExchangeRel(google.protobuf.message.Message):
         def __init__(self, *, fields: collections.abc.Iterable[global___Expression.FieldReference] | None=...) -> None:
             ...
 
-        def ClearField(self, field_name: typing_extensions.Literal['fields', b'fields']) -> None:
+        def ClearField(self, field_name: typing.Literal['fields', b'fields']) -> None:
             ...
 
-    @typing_extensions.final
+    @typing.final
     class SingleBucketExpression(google.protobuf.message.Message):
         """Returns a single bucket number per record."""
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -1282,34 +1298,34 @@ class ExchangeRel(google.protobuf.message.Message):
         def __init__(self, *, expression: global___Expression | None=...) -> None:
             ...
 
-        def HasField(self, field_name: typing_extensions.Literal['expression', b'expression']) -> builtins.bool:
+        def HasField(self, field_name: typing.Literal['expression', b'expression']) -> builtins.bool:
             ...
 
-        def ClearField(self, field_name: typing_extensions.Literal['expression', b'expression']) -> None:
+        def ClearField(self, field_name: typing.Literal['expression', b'expression']) -> None:
             ...
 
-    @typing_extensions.final
+    @typing.final
     class MultiBucketExpression(google.protobuf.message.Message):
         """Returns zero or more bucket numbers per record"""
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
         EXPRESSION_FIELD_NUMBER: builtins.int
         CONSTRAINED_TO_COUNT_FIELD_NUMBER: builtins.int
+        constrained_to_count: builtins.bool
 
         @property
         def expression(self) -> global___Expression:
             ...
-        constrained_to_count: builtins.bool
 
         def __init__(self, *, expression: global___Expression | None=..., constrained_to_count: builtins.bool=...) -> None:
             ...
 
-        def HasField(self, field_name: typing_extensions.Literal['expression', b'expression']) -> builtins.bool:
+        def HasField(self, field_name: typing.Literal['expression', b'expression']) -> builtins.bool:
             ...
 
-        def ClearField(self, field_name: typing_extensions.Literal['constrained_to_count', b'constrained_to_count', 'expression', b'expression']) -> None:
+        def ClearField(self, field_name: typing.Literal['constrained_to_count', b'constrained_to_count', 'expression', b'expression']) -> None:
             ...
 
-    @typing_extensions.final
+    @typing.final
     class Broadcast(google.protobuf.message.Message):
         """Send all data to every target."""
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -1317,7 +1333,7 @@ class ExchangeRel(google.protobuf.message.Message):
         def __init__(self) -> None:
             ...
 
-    @typing_extensions.final
+    @typing.final
     class RoundRobin(google.protobuf.message.Message):
         """Route approximately"""
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -1328,23 +1344,23 @@ class ExchangeRel(google.protobuf.message.Message):
         def __init__(self, *, exact: builtins.bool=...) -> None:
             ...
 
-        def ClearField(self, field_name: typing_extensions.Literal['exact', b'exact']) -> None:
+        def ClearField(self, field_name: typing.Literal['exact', b'exact']) -> None:
             ...
 
-    @typing_extensions.final
+    @typing.final
     class ExchangeTarget(google.protobuf.message.Message):
         """The message to describe partition targets of an exchange"""
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
         PARTITION_ID_FIELD_NUMBER: builtins.int
         URI_FIELD_NUMBER: builtins.int
         EXTENDED_FIELD_NUMBER: builtins.int
+        uri: builtins.str
 
         @property
         def partition_id(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.int]:
             """Describes the partition id(s) to send. If this is empty, all data is sent
             to this target.
             """
-        uri: builtins.str
 
         @property
         def extended(self) -> google.protobuf.any_pb2.Any:
@@ -1353,13 +1369,13 @@ class ExchangeRel(google.protobuf.message.Message):
         def __init__(self, *, partition_id: collections.abc.Iterable[builtins.int] | None=..., uri: builtins.str=..., extended: google.protobuf.any_pb2.Any | None=...) -> None:
             ...
 
-        def HasField(self, field_name: typing_extensions.Literal['extended', b'extended', 'target_type', b'target_type', 'uri', b'uri']) -> builtins.bool:
+        def HasField(self, field_name: typing.Literal['extended', b'extended', 'target_type', b'target_type', 'uri', b'uri']) -> builtins.bool:
             ...
 
-        def ClearField(self, field_name: typing_extensions.Literal['extended', b'extended', 'partition_id', b'partition_id', 'target_type', b'target_type', 'uri', b'uri']) -> None:
+        def ClearField(self, field_name: typing.Literal['extended', b'extended', 'partition_id', b'partition_id', 'target_type', b'target_type', 'uri', b'uri']) -> None:
             ...
 
-        def WhichOneof(self, oneof_group: typing_extensions.Literal['target_type', b'target_type']) -> typing_extensions.Literal['uri', 'extended'] | None:
+        def WhichOneof(self, oneof_group: typing.Literal['target_type', b'target_type']) -> typing.Literal['uri', 'extended'] | None:
             ...
     COMMON_FIELD_NUMBER: builtins.int
     INPUT_FIELD_NUMBER: builtins.int
@@ -1371,6 +1387,7 @@ class ExchangeRel(google.protobuf.message.Message):
     ROUND_ROBIN_FIELD_NUMBER: builtins.int
     BROADCAST_FIELD_NUMBER: builtins.int
     ADVANCED_EXTENSION_FIELD_NUMBER: builtins.int
+    partition_count: builtins.int
 
     @property
     def common(self) -> global___RelCommon:
@@ -1379,7 +1396,6 @@ class ExchangeRel(google.protobuf.message.Message):
     @property
     def input(self) -> global___Rel:
         ...
-    partition_count: builtins.int
 
     @property
     def targets(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___ExchangeRel.ExchangeTarget]:
@@ -1412,17 +1428,17 @@ class ExchangeRel(google.protobuf.message.Message):
     def __init__(self, *, common: global___RelCommon | None=..., input: global___Rel | None=..., partition_count: builtins.int=..., targets: collections.abc.Iterable[global___ExchangeRel.ExchangeTarget] | None=..., scatter_by_fields: global___ExchangeRel.ScatterFields | None=..., single_target: global___ExchangeRel.SingleBucketExpression | None=..., multi_target: global___ExchangeRel.MultiBucketExpression | None=..., round_robin: global___ExchangeRel.RoundRobin | None=..., broadcast: global___ExchangeRel.Broadcast | None=..., advanced_extension: proto.extensions.extensions_pb2.AdvancedExtension | None=...) -> None:
         ...
 
-    def HasField(self, field_name: typing_extensions.Literal['advanced_extension', b'advanced_extension', 'broadcast', b'broadcast', 'common', b'common', 'exchange_kind', b'exchange_kind', 'input', b'input', 'multi_target', b'multi_target', 'round_robin', b'round_robin', 'scatter_by_fields', b'scatter_by_fields', 'single_target', b'single_target']) -> builtins.bool:
+    def HasField(self, field_name: typing.Literal['advanced_extension', b'advanced_extension', 'broadcast', b'broadcast', 'common', b'common', 'exchange_kind', b'exchange_kind', 'input', b'input', 'multi_target', b'multi_target', 'round_robin', b'round_robin', 'scatter_by_fields', b'scatter_by_fields', 'single_target', b'single_target']) -> builtins.bool:
         ...
 
-    def ClearField(self, field_name: typing_extensions.Literal['advanced_extension', b'advanced_extension', 'broadcast', b'broadcast', 'common', b'common', 'exchange_kind', b'exchange_kind', 'input', b'input', 'multi_target', b'multi_target', 'partition_count', b'partition_count', 'round_robin', b'round_robin', 'scatter_by_fields', b'scatter_by_fields', 'single_target', b'single_target', 'targets', b'targets']) -> None:
+    def ClearField(self, field_name: typing.Literal['advanced_extension', b'advanced_extension', 'broadcast', b'broadcast', 'common', b'common', 'exchange_kind', b'exchange_kind', 'input', b'input', 'multi_target', b'multi_target', 'partition_count', b'partition_count', 'round_robin', b'round_robin', 'scatter_by_fields', b'scatter_by_fields', 'single_target', b'single_target', 'targets', b'targets']) -> None:
         ...
 
-    def WhichOneof(self, oneof_group: typing_extensions.Literal['exchange_kind', b'exchange_kind']) -> typing_extensions.Literal['scatter_by_fields', 'single_target', 'multi_target', 'round_robin', 'broadcast'] | None:
+    def WhichOneof(self, oneof_group: typing.Literal['exchange_kind', b'exchange_kind']) -> typing.Literal['scatter_by_fields', 'single_target', 'multi_target', 'round_robin', 'broadcast'] | None:
         ...
 global___ExchangeRel = ExchangeRel
 
-@typing_extensions.final
+@typing.final
 class ExpandRel(google.protobuf.message.Message):
     """Duplicates records by emitting one or more rows per input row.  The number of rows emitted per
     input row is the same for all input rows.
@@ -1432,7 +1448,7 @@ class ExpandRel(google.protobuf.message.Message):
     """
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    @typing_extensions.final
+    @typing.final
     class ExpandField(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
         SWITCHING_FIELD_FIELD_NUMBER: builtins.int
@@ -1455,16 +1471,16 @@ class ExpandRel(google.protobuf.message.Message):
         def __init__(self, *, switching_field: global___ExpandRel.SwitchingField | None=..., consistent_field: global___Expression | None=...) -> None:
             ...
 
-        def HasField(self, field_name: typing_extensions.Literal['consistent_field', b'consistent_field', 'field_type', b'field_type', 'switching_field', b'switching_field']) -> builtins.bool:
+        def HasField(self, field_name: typing.Literal['consistent_field', b'consistent_field', 'field_type', b'field_type', 'switching_field', b'switching_field']) -> builtins.bool:
             ...
 
-        def ClearField(self, field_name: typing_extensions.Literal['consistent_field', b'consistent_field', 'field_type', b'field_type', 'switching_field', b'switching_field']) -> None:
+        def ClearField(self, field_name: typing.Literal['consistent_field', b'consistent_field', 'field_type', b'field_type', 'switching_field', b'switching_field']) -> None:
             ...
 
-        def WhichOneof(self, oneof_group: typing_extensions.Literal['field_type', b'field_type']) -> typing_extensions.Literal['switching_field', 'consistent_field'] | None:
+        def WhichOneof(self, oneof_group: typing.Literal['field_type', b'field_type']) -> typing.Literal['switching_field', 'consistent_field'] | None:
             ...
 
-    @typing_extensions.final
+    @typing.final
     class SwitchingField(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
         DUPLICATES_FIELD_NUMBER: builtins.int
@@ -1478,7 +1494,7 @@ class ExpandRel(google.protobuf.message.Message):
         def __init__(self, *, duplicates: collections.abc.Iterable[global___Expression] | None=...) -> None:
             ...
 
-        def ClearField(self, field_name: typing_extensions.Literal['duplicates', b'duplicates']) -> None:
+        def ClearField(self, field_name: typing.Literal['duplicates', b'duplicates']) -> None:
             ...
     COMMON_FIELD_NUMBER: builtins.int
     INPUT_FIELD_NUMBER: builtins.int
@@ -1502,14 +1518,14 @@ class ExpandRel(google.protobuf.message.Message):
     def __init__(self, *, common: global___RelCommon | None=..., input: global___Rel | None=..., fields: collections.abc.Iterable[global___ExpandRel.ExpandField] | None=...) -> None:
         ...
 
-    def HasField(self, field_name: typing_extensions.Literal['common', b'common', 'input', b'input']) -> builtins.bool:
+    def HasField(self, field_name: typing.Literal['common', b'common', 'input', b'input']) -> builtins.bool:
         ...
 
-    def ClearField(self, field_name: typing_extensions.Literal['common', b'common', 'fields', b'fields', 'input', b'input']) -> None:
+    def ClearField(self, field_name: typing.Literal['common', b'common', 'fields', b'fields', 'input', b'input']) -> None:
         ...
 global___ExpandRel = ExpandRel
 
-@typing_extensions.final
+@typing.final
 class RelRoot(google.protobuf.message.Message):
     """A relation with output field names.
 
@@ -1530,14 +1546,14 @@ class RelRoot(google.protobuf.message.Message):
     def __init__(self, *, input: global___Rel | None=..., names: collections.abc.Iterable[builtins.str] | None=...) -> None:
         ...
 
-    def HasField(self, field_name: typing_extensions.Literal['input', b'input']) -> builtins.bool:
+    def HasField(self, field_name: typing.Literal['input', b'input']) -> builtins.bool:
         ...
 
-    def ClearField(self, field_name: typing_extensions.Literal['input', b'input', 'names', b'names']) -> None:
+    def ClearField(self, field_name: typing.Literal['input', b'input', 'names', b'names']) -> None:
         ...
 global___RelRoot = RelRoot
 
-@typing_extensions.final
+@typing.final
 class Rel(google.protobuf.message.Message):
     """A relation (used internally in a plan)"""
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -1655,17 +1671,17 @@ class Rel(google.protobuf.message.Message):
     def __init__(self, *, read: global___ReadRel | None=..., filter: global___FilterRel | None=..., fetch: global___FetchRel | None=..., aggregate: global___AggregateRel | None=..., sort: global___SortRel | None=..., join: global___JoinRel | None=..., project: global___ProjectRel | None=..., set: global___SetRel | None=..., extension_single: global___ExtensionSingleRel | None=..., extension_multi: global___ExtensionMultiRel | None=..., extension_leaf: global___ExtensionLeafRel | None=..., cross: global___CrossRel | None=..., reference: global___ReferenceRel | None=..., write: global___WriteRel | None=..., ddl: global___DdlRel | None=..., update: global___UpdateRel | None=..., hash_join: global___HashJoinRel | None=..., merge_join: global___MergeJoinRel | None=..., nested_loop_join: global___NestedLoopJoinRel | None=..., window: global___ConsistentPartitionWindowRel | None=..., exchange: global___ExchangeRel | None=..., expand: global___ExpandRel | None=...) -> None:
         ...
 
-    def HasField(self, field_name: typing_extensions.Literal['aggregate', b'aggregate', 'cross', b'cross', 'ddl', b'ddl', 'exchange', b'exchange', 'expand', b'expand', 'extension_leaf', b'extension_leaf', 'extension_multi', b'extension_multi', 'extension_single', b'extension_single', 'fetch', b'fetch', 'filter', b'filter', 'hash_join', b'hash_join', 'join', b'join', 'merge_join', b'merge_join', 'nested_loop_join', b'nested_loop_join', 'project', b'project', 'read', b'read', 'reference', b'reference', 'rel_type', b'rel_type', 'set', b'set', 'sort', b'sort', 'update', b'update', 'window', b'window', 'write', b'write']) -> builtins.bool:
+    def HasField(self, field_name: typing.Literal['aggregate', b'aggregate', 'cross', b'cross', 'ddl', b'ddl', 'exchange', b'exchange', 'expand', b'expand', 'extension_leaf', b'extension_leaf', 'extension_multi', b'extension_multi', 'extension_single', b'extension_single', 'fetch', b'fetch', 'filter', b'filter', 'hash_join', b'hash_join', 'join', b'join', 'merge_join', b'merge_join', 'nested_loop_join', b'nested_loop_join', 'project', b'project', 'read', b'read', 'reference', b'reference', 'rel_type', b'rel_type', 'set', b'set', 'sort', b'sort', 'update', b'update', 'window', b'window', 'write', b'write']) -> builtins.bool:
         ...
 
-    def ClearField(self, field_name: typing_extensions.Literal['aggregate', b'aggregate', 'cross', b'cross', 'ddl', b'ddl', 'exchange', b'exchange', 'expand', b'expand', 'extension_leaf', b'extension_leaf', 'extension_multi', b'extension_multi', 'extension_single', b'extension_single', 'fetch', b'fetch', 'filter', b'filter', 'hash_join', b'hash_join', 'join', b'join', 'merge_join', b'merge_join', 'nested_loop_join', b'nested_loop_join', 'project', b'project', 'read', b'read', 'reference', b'reference', 'rel_type', b'rel_type', 'set', b'set', 'sort', b'sort', 'update', b'update', 'window', b'window', 'write', b'write']) -> None:
+    def ClearField(self, field_name: typing.Literal['aggregate', b'aggregate', 'cross', b'cross', 'ddl', b'ddl', 'exchange', b'exchange', 'expand', b'expand', 'extension_leaf', b'extension_leaf', 'extension_multi', b'extension_multi', 'extension_single', b'extension_single', 'fetch', b'fetch', 'filter', b'filter', 'hash_join', b'hash_join', 'join', b'join', 'merge_join', b'merge_join', 'nested_loop_join', b'nested_loop_join', 'project', b'project', 'read', b'read', 'reference', b'reference', 'rel_type', b'rel_type', 'set', b'set', 'sort', b'sort', 'update', b'update', 'window', b'window', 'write', b'write']) -> None:
         ...
 
-    def WhichOneof(self, oneof_group: typing_extensions.Literal['rel_type', b'rel_type']) -> typing_extensions.Literal['read', 'filter', 'fetch', 'aggregate', 'sort', 'join', 'project', 'set', 'extension_single', 'extension_multi', 'extension_leaf', 'cross', 'reference', 'write', 'ddl', 'update', 'hash_join', 'merge_join', 'nested_loop_join', 'window', 'exchange', 'expand'] | None:
+    def WhichOneof(self, oneof_group: typing.Literal['rel_type', b'rel_type']) -> typing.Literal['read', 'filter', 'fetch', 'aggregate', 'sort', 'join', 'project', 'set', 'extension_single', 'extension_multi', 'extension_leaf', 'cross', 'reference', 'write', 'ddl', 'update', 'hash_join', 'merge_join', 'nested_loop_join', 'window', 'exchange', 'expand'] | None:
         ...
 global___Rel = Rel
 
-@typing_extensions.final
+@typing.final
 class NamedObjectWrite(google.protobuf.message.Message):
     """A base object for writing (e.g., a table or a view)."""
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -1685,14 +1701,14 @@ class NamedObjectWrite(google.protobuf.message.Message):
     def __init__(self, *, names: collections.abc.Iterable[builtins.str] | None=..., advanced_extension: proto.extensions.extensions_pb2.AdvancedExtension | None=...) -> None:
         ...
 
-    def HasField(self, field_name: typing_extensions.Literal['advanced_extension', b'advanced_extension']) -> builtins.bool:
+    def HasField(self, field_name: typing.Literal['advanced_extension', b'advanced_extension']) -> builtins.bool:
         ...
 
-    def ClearField(self, field_name: typing_extensions.Literal['advanced_extension', b'advanced_extension', 'names', b'names']) -> None:
+    def ClearField(self, field_name: typing.Literal['advanced_extension', b'advanced_extension', 'names', b'names']) -> None:
         ...
 global___NamedObjectWrite = NamedObjectWrite
 
-@typing_extensions.final
+@typing.final
 class ExtensionObject(google.protobuf.message.Message):
     """A stub type that can be used to extend/introduce new table types outside
     the specification.
@@ -1707,14 +1723,14 @@ class ExtensionObject(google.protobuf.message.Message):
     def __init__(self, *, detail: google.protobuf.any_pb2.Any | None=...) -> None:
         ...
 
-    def HasField(self, field_name: typing_extensions.Literal['detail', b'detail']) -> builtins.bool:
+    def HasField(self, field_name: typing.Literal['detail', b'detail']) -> builtins.bool:
         ...
 
-    def ClearField(self, field_name: typing_extensions.Literal['detail', b'detail']) -> None:
+    def ClearField(self, field_name: typing.Literal['detail', b'detail']) -> None:
         ...
 global___ExtensionObject = ExtensionObject
 
-@typing_extensions.final
+@typing.final
 class DdlRel(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1778,6 +1794,10 @@ class DdlRel(google.protobuf.message.Message):
     VIEW_DEFINITION_FIELD_NUMBER: builtins.int
     COMMON_FIELD_NUMBER: builtins.int
     ADVANCED_EXTENSION_FIELD_NUMBER: builtins.int
+    object: global___DdlRel.DdlObject.ValueType
+    'Which type of object we operate on'
+    op: global___DdlRel.DdlOp.ValueType
+    'The type of operation to perform'
 
     @property
     def named_object(self) -> global___NamedObjectWrite:
@@ -1798,10 +1818,6 @@ class DdlRel(google.protobuf.message.Message):
         the table_defaults Struct to report a full list of default values reflecting the result of applying
         the ALTER TABLE operator successfully
         """
-    object: global___DdlRel.DdlObject.ValueType
-    'Which type of object we operate on'
-    op: global___DdlRel.DdlOp.ValueType
-    'The type of operation to perform'
 
     @property
     def view_definition(self) -> global___Rel:
@@ -1818,17 +1834,17 @@ class DdlRel(google.protobuf.message.Message):
     def __init__(self, *, named_object: global___NamedObjectWrite | None=..., extension_object: global___ExtensionObject | None=..., table_schema: proto.type_pb2.NamedStruct | None=..., table_defaults: global___Expression.Literal.Struct | None=..., object: global___DdlRel.DdlObject.ValueType=..., op: global___DdlRel.DdlOp.ValueType=..., view_definition: global___Rel | None=..., common: global___RelCommon | None=..., advanced_extension: proto.extensions.extensions_pb2.AdvancedExtension | None=...) -> None:
         ...
 
-    def HasField(self, field_name: typing_extensions.Literal['advanced_extension', b'advanced_extension', 'common', b'common', 'extension_object', b'extension_object', 'named_object', b'named_object', 'table_defaults', b'table_defaults', 'table_schema', b'table_schema', 'view_definition', b'view_definition', 'write_type', b'write_type']) -> builtins.bool:
+    def HasField(self, field_name: typing.Literal['advanced_extension', b'advanced_extension', 'common', b'common', 'extension_object', b'extension_object', 'named_object', b'named_object', 'table_defaults', b'table_defaults', 'table_schema', b'table_schema', 'view_definition', b'view_definition', 'write_type', b'write_type']) -> builtins.bool:
         ...
 
-    def ClearField(self, field_name: typing_extensions.Literal['advanced_extension', b'advanced_extension', 'common', b'common', 'extension_object', b'extension_object', 'named_object', b'named_object', 'object', b'object', 'op', b'op', 'table_defaults', b'table_defaults', 'table_schema', b'table_schema', 'view_definition', b'view_definition', 'write_type', b'write_type']) -> None:
+    def ClearField(self, field_name: typing.Literal['advanced_extension', b'advanced_extension', 'common', b'common', 'extension_object', b'extension_object', 'named_object', b'named_object', 'object', b'object', 'op', b'op', 'table_defaults', b'table_defaults', 'table_schema', b'table_schema', 'view_definition', b'view_definition', 'write_type', b'write_type']) -> None:
         ...
 
-    def WhichOneof(self, oneof_group: typing_extensions.Literal['write_type', b'write_type']) -> typing_extensions.Literal['named_object', 'extension_object'] | None:
+    def WhichOneof(self, oneof_group: typing.Literal['write_type', b'write_type']) -> typing.Literal['named_object', 'extension_object'] | None:
         ...
 global___DdlRel = DdlRel
 
-@typing_extensions.final
+@typing.final
 class WriteRel(google.protobuf.message.Message):
     """The operator that modifies the content of a database (operates on 1 table at a time, but record-selection/source can be
     based on joining of multiple tables).
@@ -1919,6 +1935,12 @@ class WriteRel(google.protobuf.message.Message):
     OUTPUT_FIELD_NUMBER: builtins.int
     COMMON_FIELD_NUMBER: builtins.int
     ADVANCED_EXTENSION_FIELD_NUMBER: builtins.int
+    op: global___WriteRel.WriteOp.ValueType
+    'The type of operation to perform'
+    create_mode: global___WriteRel.CreateMode.ValueType
+    'Used with CTAS to determine what to do if the table already exists'
+    output: global___WriteRel.OutputMode.ValueType
+    'Output mode determines what is the output of executing this rel'
 
     @property
     def named_table(self) -> global___NamedObjectWrite:
@@ -1931,8 +1953,6 @@ class WriteRel(google.protobuf.message.Message):
     @property
     def table_schema(self) -> proto.type_pb2.NamedStruct:
         """The schema of the table (must align with Rel input (e.g., number of leaf fields must match))"""
-    op: global___WriteRel.WriteOp.ValueType
-    'The type of operation to perform'
 
     @property
     def input(self) -> global___Rel:
@@ -1941,10 +1961,6 @@ class WriteRel(google.protobuf.message.Message):
         in a ProjectRel at the top of the input. The match must also
         occur in case of DELETE to ensure multi-engine plans are unequivocal.
         """
-    create_mode: global___WriteRel.CreateMode.ValueType
-    'Used with CTAS to determine what to do if the table already exists'
-    output: global___WriteRel.OutputMode.ValueType
-    'Output mode determines what is the output of executing this rel'
 
     @property
     def common(self) -> global___RelCommon:
@@ -1957,40 +1973,40 @@ class WriteRel(google.protobuf.message.Message):
     def __init__(self, *, named_table: global___NamedObjectWrite | None=..., extension_table: global___ExtensionObject | None=..., table_schema: proto.type_pb2.NamedStruct | None=..., op: global___WriteRel.WriteOp.ValueType=..., input: global___Rel | None=..., create_mode: global___WriteRel.CreateMode.ValueType=..., output: global___WriteRel.OutputMode.ValueType=..., common: global___RelCommon | None=..., advanced_extension: proto.extensions.extensions_pb2.AdvancedExtension | None=...) -> None:
         ...
 
-    def HasField(self, field_name: typing_extensions.Literal['advanced_extension', b'advanced_extension', 'common', b'common', 'extension_table', b'extension_table', 'input', b'input', 'named_table', b'named_table', 'table_schema', b'table_schema', 'write_type', b'write_type']) -> builtins.bool:
+    def HasField(self, field_name: typing.Literal['advanced_extension', b'advanced_extension', 'common', b'common', 'extension_table', b'extension_table', 'input', b'input', 'named_table', b'named_table', 'table_schema', b'table_schema', 'write_type', b'write_type']) -> builtins.bool:
         ...
 
-    def ClearField(self, field_name: typing_extensions.Literal['advanced_extension', b'advanced_extension', 'common', b'common', 'create_mode', b'create_mode', 'extension_table', b'extension_table', 'input', b'input', 'named_table', b'named_table', 'op', b'op', 'output', b'output', 'table_schema', b'table_schema', 'write_type', b'write_type']) -> None:
+    def ClearField(self, field_name: typing.Literal['advanced_extension', b'advanced_extension', 'common', b'common', 'create_mode', b'create_mode', 'extension_table', b'extension_table', 'input', b'input', 'named_table', b'named_table', 'op', b'op', 'output', b'output', 'table_schema', b'table_schema', 'write_type', b'write_type']) -> None:
         ...
 
-    def WhichOneof(self, oneof_group: typing_extensions.Literal['write_type', b'write_type']) -> typing_extensions.Literal['named_table', 'extension_table'] | None:
+    def WhichOneof(self, oneof_group: typing.Literal['write_type', b'write_type']) -> typing.Literal['named_table', 'extension_table'] | None:
         ...
 global___WriteRel = WriteRel
 
-@typing_extensions.final
+@typing.final
 class UpdateRel(google.protobuf.message.Message):
     """The operator that modifies the columns of a table"""
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    @typing_extensions.final
+    @typing.final
     class TransformExpression(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
         TRANSFORMATION_FIELD_NUMBER: builtins.int
         COLUMN_TARGET_FIELD_NUMBER: builtins.int
+        column_target: builtins.int
+        'index of the column to apply the transformation to'
 
         @property
         def transformation(self) -> global___Expression:
             """the transformation to apply"""
-        column_target: builtins.int
-        'index of the column to apply the transformation to'
 
         def __init__(self, *, transformation: global___Expression | None=..., column_target: builtins.int=...) -> None:
             ...
 
-        def HasField(self, field_name: typing_extensions.Literal['transformation', b'transformation']) -> builtins.bool:
+        def HasField(self, field_name: typing.Literal['transformation', b'transformation']) -> builtins.bool:
             ...
 
-        def ClearField(self, field_name: typing_extensions.Literal['column_target', b'column_target', 'transformation', b'transformation']) -> None:
+        def ClearField(self, field_name: typing.Literal['column_target', b'column_target', 'transformation', b'transformation']) -> None:
             ...
     NAMED_TABLE_FIELD_NUMBER: builtins.int
     TABLE_SCHEMA_FIELD_NUMBER: builtins.int
@@ -2021,17 +2037,17 @@ class UpdateRel(google.protobuf.message.Message):
     def __init__(self, *, named_table: global___NamedTable | None=..., table_schema: proto.type_pb2.NamedStruct | None=..., condition: global___Expression | None=..., transformations: collections.abc.Iterable[global___UpdateRel.TransformExpression] | None=..., advanced_extension: proto.extensions.extensions_pb2.AdvancedExtension | None=...) -> None:
         ...
 
-    def HasField(self, field_name: typing_extensions.Literal['advanced_extension', b'advanced_extension', 'condition', b'condition', 'named_table', b'named_table', 'table_schema', b'table_schema', 'update_type', b'update_type']) -> builtins.bool:
+    def HasField(self, field_name: typing.Literal['advanced_extension', b'advanced_extension', 'condition', b'condition', 'named_table', b'named_table', 'table_schema', b'table_schema', 'update_type', b'update_type']) -> builtins.bool:
         ...
 
-    def ClearField(self, field_name: typing_extensions.Literal['advanced_extension', b'advanced_extension', 'condition', b'condition', 'named_table', b'named_table', 'table_schema', b'table_schema', 'transformations', b'transformations', 'update_type', b'update_type']) -> None:
+    def ClearField(self, field_name: typing.Literal['advanced_extension', b'advanced_extension', 'condition', b'condition', 'named_table', b'named_table', 'table_schema', b'table_schema', 'transformations', b'transformations', 'update_type', b'update_type']) -> None:
         ...
 
-    def WhichOneof(self, oneof_group: typing_extensions.Literal['update_type', b'update_type']) -> typing_extensions.Literal['named_table'] | None:
+    def WhichOneof(self, oneof_group: typing.Literal['update_type', b'update_type']) -> typing.Literal['named_table'] | None:
         ...
 global___UpdateRel = UpdateRel
 
-@typing_extensions.final
+@typing.final
 class NamedTable(google.protobuf.message.Message):
     """A base table. The list of string is used to represent namespacing (e.g., mydb.mytable).
     This assumes shared catalog between systems exchanging a message.
@@ -2051,14 +2067,14 @@ class NamedTable(google.protobuf.message.Message):
     def __init__(self, *, names: collections.abc.Iterable[builtins.str] | None=..., advanced_extension: proto.extensions.extensions_pb2.AdvancedExtension | None=...) -> None:
         ...
 
-    def HasField(self, field_name: typing_extensions.Literal['advanced_extension', b'advanced_extension']) -> builtins.bool:
+    def HasField(self, field_name: typing.Literal['advanced_extension', b'advanced_extension']) -> builtins.bool:
         ...
 
-    def ClearField(self, field_name: typing_extensions.Literal['advanced_extension', b'advanced_extension', 'names', b'names']) -> None:
+    def ClearField(self, field_name: typing.Literal['advanced_extension', b'advanced_extension', 'names', b'names']) -> None:
         ...
 global___NamedTable = NamedTable
 
-@typing_extensions.final
+@typing.final
 class ComparisonJoinKey(google.protobuf.message.Message):
     """Hash joins and merge joins are a specialization of the general join where the join
     expression is an series of comparisons between fields that are ANDed together.  The
@@ -2092,7 +2108,7 @@ class ComparisonJoinKey(google.protobuf.message.Message):
     SIMPLE_COMPARISON_TYPE_MIGHT_EQUAL: ComparisonJoinKey.SimpleComparisonType.ValueType
     'Returns true if both values are equal and not null\n    Returns true if either value is null\n\n    This can be expressed as a = b OR isnull(a = b)\n    '
 
-    @typing_extensions.final
+    @typing.final
     class ComparisonType(google.protobuf.message.Message):
         """Describes how the relation should consider if two rows are a match"""
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -2106,13 +2122,13 @@ class ComparisonJoinKey(google.protobuf.message.Message):
         def __init__(self, *, simple: global___ComparisonJoinKey.SimpleComparisonType.ValueType=..., custom_function_reference: builtins.int=...) -> None:
             ...
 
-        def HasField(self, field_name: typing_extensions.Literal['custom_function_reference', b'custom_function_reference', 'inner_type', b'inner_type', 'simple', b'simple']) -> builtins.bool:
+        def HasField(self, field_name: typing.Literal['custom_function_reference', b'custom_function_reference', 'inner_type', b'inner_type', 'simple', b'simple']) -> builtins.bool:
             ...
 
-        def ClearField(self, field_name: typing_extensions.Literal['custom_function_reference', b'custom_function_reference', 'inner_type', b'inner_type', 'simple', b'simple']) -> None:
+        def ClearField(self, field_name: typing.Literal['custom_function_reference', b'custom_function_reference', 'inner_type', b'inner_type', 'simple', b'simple']) -> None:
             ...
 
-        def WhichOneof(self, oneof_group: typing_extensions.Literal['inner_type', b'inner_type']) -> typing_extensions.Literal['simple', 'custom_function_reference'] | None:
+        def WhichOneof(self, oneof_group: typing.Literal['inner_type', b'inner_type']) -> typing.Literal['simple', 'custom_function_reference'] | None:
             ...
     LEFT_FIELD_NUMBER: builtins.int
     RIGHT_FIELD_NUMBER: builtins.int
@@ -2133,14 +2149,14 @@ class ComparisonJoinKey(google.protobuf.message.Message):
     def __init__(self, *, left: global___Expression.FieldReference | None=..., right: global___Expression.FieldReference | None=..., comparison: global___ComparisonJoinKey.ComparisonType | None=...) -> None:
         ...
 
-    def HasField(self, field_name: typing_extensions.Literal['comparison', b'comparison', 'left', b'left', 'right', b'right']) -> builtins.bool:
+    def HasField(self, field_name: typing.Literal['comparison', b'comparison', 'left', b'left', 'right', b'right']) -> builtins.bool:
         ...
 
-    def ClearField(self, field_name: typing_extensions.Literal['comparison', b'comparison', 'left', b'left', 'right', b'right']) -> None:
+    def ClearField(self, field_name: typing.Literal['comparison', b'comparison', 'left', b'left', 'right', b'right']) -> None:
         ...
 global___ComparisonJoinKey = ComparisonJoinKey
 
-@typing_extensions.final
+@typing.final
 class HashJoinRel(google.protobuf.message.Message):
     """The hash equijoin operator will build a hash table out of one input (default `right`) based on a set of join keys.
     It will then probe that hash table for the other input (default `left`), finding matches.
@@ -2210,6 +2226,9 @@ class HashJoinRel(google.protobuf.message.Message):
     TYPE_FIELD_NUMBER: builtins.int
     BUILD_INPUT_FIELD_NUMBER: builtins.int
     ADVANCED_EXTENSION_FIELD_NUMBER: builtins.int
+    type: global___HashJoinRel.JoinType.ValueType
+    build_input: global___HashJoinRel.BuildInput.ValueType
+    'Specifies which side of input to build the hash table for this hash join. Default is `BUILD_INPUT_RIGHT`.'
 
     @property
     def common(self) -> global___RelCommon:
@@ -2254,9 +2273,6 @@ class HashJoinRel(google.protobuf.message.Message):
     @property
     def post_join_filter(self) -> global___Expression:
         ...
-    type: global___HashJoinRel.JoinType.ValueType
-    build_input: global___HashJoinRel.BuildInput.ValueType
-    'Specifies which side of input to build the hash table for this hash join. Default is `BUILD_INPUT_RIGHT`.'
 
     @property
     def advanced_extension(self) -> proto.extensions.extensions_pb2.AdvancedExtension:
@@ -2265,14 +2281,14 @@ class HashJoinRel(google.protobuf.message.Message):
     def __init__(self, *, common: global___RelCommon | None=..., left: global___Rel | None=..., right: global___Rel | None=..., left_keys: collections.abc.Iterable[global___Expression.FieldReference] | None=..., right_keys: collections.abc.Iterable[global___Expression.FieldReference] | None=..., keys: collections.abc.Iterable[global___ComparisonJoinKey] | None=..., post_join_filter: global___Expression | None=..., type: global___HashJoinRel.JoinType.ValueType=..., build_input: global___HashJoinRel.BuildInput.ValueType=..., advanced_extension: proto.extensions.extensions_pb2.AdvancedExtension | None=...) -> None:
         ...
 
-    def HasField(self, field_name: typing_extensions.Literal['advanced_extension', b'advanced_extension', 'common', b'common', 'left', b'left', 'post_join_filter', b'post_join_filter', 'right', b'right']) -> builtins.bool:
+    def HasField(self, field_name: typing.Literal['advanced_extension', b'advanced_extension', 'common', b'common', 'left', b'left', 'post_join_filter', b'post_join_filter', 'right', b'right']) -> builtins.bool:
         ...
 
-    def ClearField(self, field_name: typing_extensions.Literal['advanced_extension', b'advanced_extension', 'build_input', b'build_input', 'common', b'common', 'keys', b'keys', 'left', b'left', 'left_keys', b'left_keys', 'post_join_filter', b'post_join_filter', 'right', b'right', 'right_keys', b'right_keys', 'type', b'type']) -> None:
+    def ClearField(self, field_name: typing.Literal['advanced_extension', b'advanced_extension', 'build_input', b'build_input', 'common', b'common', 'keys', b'keys', 'left', b'left', 'left_keys', b'left_keys', 'post_join_filter', b'post_join_filter', 'right', b'right', 'right_keys', b'right_keys', 'type', b'type']) -> None:
         ...
 global___HashJoinRel = HashJoinRel
 
-@typing_extensions.final
+@typing.final
 class MergeJoinRel(google.protobuf.message.Message):
     """The merge equijoin does a join by taking advantage of two sets that are sorted on the join keys.
     This allows the join operation to be done in a streaming fashion.
@@ -2323,6 +2339,7 @@ class MergeJoinRel(google.protobuf.message.Message):
     POST_JOIN_FILTER_FIELD_NUMBER: builtins.int
     TYPE_FIELD_NUMBER: builtins.int
     ADVANCED_EXTENSION_FIELD_NUMBER: builtins.int
+    type: global___MergeJoinRel.JoinType.ValueType
 
     @property
     def common(self) -> global___RelCommon:
@@ -2369,7 +2386,6 @@ class MergeJoinRel(google.protobuf.message.Message):
     @property
     def post_join_filter(self) -> global___Expression:
         ...
-    type: global___MergeJoinRel.JoinType.ValueType
 
     @property
     def advanced_extension(self) -> proto.extensions.extensions_pb2.AdvancedExtension:
@@ -2378,14 +2394,14 @@ class MergeJoinRel(google.protobuf.message.Message):
     def __init__(self, *, common: global___RelCommon | None=..., left: global___Rel | None=..., right: global___Rel | None=..., left_keys: collections.abc.Iterable[global___Expression.FieldReference] | None=..., right_keys: collections.abc.Iterable[global___Expression.FieldReference] | None=..., keys: collections.abc.Iterable[global___ComparisonJoinKey] | None=..., post_join_filter: global___Expression | None=..., type: global___MergeJoinRel.JoinType.ValueType=..., advanced_extension: proto.extensions.extensions_pb2.AdvancedExtension | None=...) -> None:
         ...
 
-    def HasField(self, field_name: typing_extensions.Literal['advanced_extension', b'advanced_extension', 'common', b'common', 'left', b'left', 'post_join_filter', b'post_join_filter', 'right', b'right']) -> builtins.bool:
+    def HasField(self, field_name: typing.Literal['advanced_extension', b'advanced_extension', 'common', b'common', 'left', b'left', 'post_join_filter', b'post_join_filter', 'right', b'right']) -> builtins.bool:
         ...
 
-    def ClearField(self, field_name: typing_extensions.Literal['advanced_extension', b'advanced_extension', 'common', b'common', 'keys', b'keys', 'left', b'left', 'left_keys', b'left_keys', 'post_join_filter', b'post_join_filter', 'right', b'right', 'right_keys', b'right_keys', 'type', b'type']) -> None:
+    def ClearField(self, field_name: typing.Literal['advanced_extension', b'advanced_extension', 'common', b'common', 'keys', b'keys', 'left', b'left', 'left_keys', b'left_keys', 'post_join_filter', b'post_join_filter', 'right', b'right', 'right_keys', b'right_keys', 'type', b'type']) -> None:
         ...
 global___MergeJoinRel = MergeJoinRel
 
-@typing_extensions.final
+@typing.final
 class NestedLoopJoinRel(google.protobuf.message.Message):
     """The nested loop join (NLJ) operator will hold the entire right input and iterate over it using the
     left input, evaluating the join expression on the Cartesian product of all rows.
@@ -2433,6 +2449,7 @@ class NestedLoopJoinRel(google.protobuf.message.Message):
     EXPRESSION_FIELD_NUMBER: builtins.int
     TYPE_FIELD_NUMBER: builtins.int
     ADVANCED_EXTENSION_FIELD_NUMBER: builtins.int
+    type: global___NestedLoopJoinRel.JoinType.ValueType
 
     @property
     def common(self) -> global___RelCommon:
@@ -2449,7 +2466,6 @@ class NestedLoopJoinRel(google.protobuf.message.Message):
     @property
     def expression(self) -> global___Expression:
         """optional, defaults to true (a cartesian join)"""
-    type: global___NestedLoopJoinRel.JoinType.ValueType
 
     @property
     def advanced_extension(self) -> proto.extensions.extensions_pb2.AdvancedExtension:
@@ -2458,14 +2474,14 @@ class NestedLoopJoinRel(google.protobuf.message.Message):
     def __init__(self, *, common: global___RelCommon | None=..., left: global___Rel | None=..., right: global___Rel | None=..., expression: global___Expression | None=..., type: global___NestedLoopJoinRel.JoinType.ValueType=..., advanced_extension: proto.extensions.extensions_pb2.AdvancedExtension | None=...) -> None:
         ...
 
-    def HasField(self, field_name: typing_extensions.Literal['advanced_extension', b'advanced_extension', 'common', b'common', 'expression', b'expression', 'left', b'left', 'right', b'right']) -> builtins.bool:
+    def HasField(self, field_name: typing.Literal['advanced_extension', b'advanced_extension', 'common', b'common', 'expression', b'expression', 'left', b'left', 'right', b'right']) -> builtins.bool:
         ...
 
-    def ClearField(self, field_name: typing_extensions.Literal['advanced_extension', b'advanced_extension', 'common', b'common', 'expression', b'expression', 'left', b'left', 'right', b'right', 'type', b'type']) -> None:
+    def ClearField(self, field_name: typing.Literal['advanced_extension', b'advanced_extension', 'common', b'common', 'expression', b'expression', 'left', b'left', 'right', b'right', 'type', b'type']) -> None:
         ...
 global___NestedLoopJoinRel = NestedLoopJoinRel
 
-@typing_extensions.final
+@typing.final
 class FunctionArgument(google.protobuf.message.Message):
     """The argument of a function"""
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -2485,17 +2501,17 @@ class FunctionArgument(google.protobuf.message.Message):
     def __init__(self, *, enum: builtins.str=..., type: proto.type_pb2.Type | None=..., value: global___Expression | None=...) -> None:
         ...
 
-    def HasField(self, field_name: typing_extensions.Literal['arg_type', b'arg_type', 'enum', b'enum', 'type', b'type', 'value', b'value']) -> builtins.bool:
+    def HasField(self, field_name: typing.Literal['arg_type', b'arg_type', 'enum', b'enum', 'type', b'type', 'value', b'value']) -> builtins.bool:
         ...
 
-    def ClearField(self, field_name: typing_extensions.Literal['arg_type', b'arg_type', 'enum', b'enum', 'type', b'type', 'value', b'value']) -> None:
+    def ClearField(self, field_name: typing.Literal['arg_type', b'arg_type', 'enum', b'enum', 'type', b'type', 'value', b'value']) -> None:
         ...
 
-    def WhichOneof(self, oneof_group: typing_extensions.Literal['arg_type', b'arg_type']) -> typing_extensions.Literal['enum', 'type', 'value'] | None:
+    def WhichOneof(self, oneof_group: typing.Literal['arg_type', b'arg_type']) -> typing.Literal['enum', 'type', 'value'] | None:
         ...
 global___FunctionArgument = FunctionArgument
 
-@typing_extensions.final
+@typing.final
 class FunctionOption(google.protobuf.message.Message):
     """An optional function argument.  Typically used for specifying behavior in
     invalid or corner cases.
@@ -2519,19 +2535,19 @@ class FunctionOption(google.protobuf.message.Message):
     def __init__(self, *, name: builtins.str=..., preference: collections.abc.Iterable[builtins.str] | None=...) -> None:
         ...
 
-    def ClearField(self, field_name: typing_extensions.Literal['name', b'name', 'preference', b'preference']) -> None:
+    def ClearField(self, field_name: typing.Literal['name', b'name', 'preference', b'preference']) -> None:
         ...
 global___FunctionOption = FunctionOption
 
-@typing_extensions.final
+@typing.final
 class Expression(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    @typing_extensions.final
+    @typing.final
     class Enum(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-        @typing_extensions.final
+        @typing.final
         class Empty(google.protobuf.message.Message):
             DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -2548,20 +2564,20 @@ class Expression(google.protobuf.message.Message):
         def __init__(self, *, specified: builtins.str=..., unspecified: global___Expression.Enum.Empty | None=...) -> None:
             ...
 
-        def HasField(self, field_name: typing_extensions.Literal['enum_kind', b'enum_kind', 'specified', b'specified', 'unspecified', b'unspecified']) -> builtins.bool:
+        def HasField(self, field_name: typing.Literal['enum_kind', b'enum_kind', 'specified', b'specified', 'unspecified', b'unspecified']) -> builtins.bool:
             ...
 
-        def ClearField(self, field_name: typing_extensions.Literal['enum_kind', b'enum_kind', 'specified', b'specified', 'unspecified', b'unspecified']) -> None:
+        def ClearField(self, field_name: typing.Literal['enum_kind', b'enum_kind', 'specified', b'specified', 'unspecified', b'unspecified']) -> None:
             ...
 
-        def WhichOneof(self, oneof_group: typing_extensions.Literal['enum_kind', b'enum_kind']) -> typing_extensions.Literal['specified', 'unspecified'] | None:
+        def WhichOneof(self, oneof_group: typing.Literal['enum_kind', b'enum_kind']) -> typing.Literal['specified', 'unspecified'] | None:
             ...
 
-    @typing_extensions.final
+    @typing.final
     class Literal(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-        @typing_extensions.final
+        @typing.final
         class VarChar(google.protobuf.message.Message):
             DESCRIPTOR: google.protobuf.descriptor.Descriptor
             VALUE_FIELD_NUMBER: builtins.int
@@ -2572,10 +2588,10 @@ class Expression(google.protobuf.message.Message):
             def __init__(self, *, value: builtins.str=..., length: builtins.int=...) -> None:
                 ...
 
-            def ClearField(self, field_name: typing_extensions.Literal['length', b'length', 'value', b'value']) -> None:
+            def ClearField(self, field_name: typing.Literal['length', b'length', 'value', b'value']) -> None:
                 ...
 
-        @typing_extensions.final
+        @typing.final
         class Decimal(google.protobuf.message.Message):
             DESCRIPTOR: google.protobuf.descriptor.Descriptor
             VALUE_FIELD_NUMBER: builtins.int
@@ -2591,10 +2607,10 @@ class Expression(google.protobuf.message.Message):
             def __init__(self, *, value: builtins.bytes=..., precision: builtins.int=..., scale: builtins.int=...) -> None:
                 ...
 
-            def ClearField(self, field_name: typing_extensions.Literal['precision', b'precision', 'scale', b'scale', 'value', b'value']) -> None:
+            def ClearField(self, field_name: typing.Literal['precision', b'precision', 'scale', b'scale', 'value', b'value']) -> None:
                 ...
 
-        @typing_extensions.final
+        @typing.final
         class PrecisionTime(google.protobuf.message.Message):
             DESCRIPTOR: google.protobuf.descriptor.Descriptor
             PRECISION_FIELD_NUMBER: builtins.int
@@ -2607,10 +2623,10 @@ class Expression(google.protobuf.message.Message):
             def __init__(self, *, precision: builtins.int=..., value: builtins.int=...) -> None:
                 ...
 
-            def ClearField(self, field_name: typing_extensions.Literal['precision', b'precision', 'value', b'value']) -> None:
+            def ClearField(self, field_name: typing.Literal['precision', b'precision', 'value', b'value']) -> None:
                 ...
 
-        @typing_extensions.final
+        @typing.final
         class PrecisionTimestamp(google.protobuf.message.Message):
             DESCRIPTOR: google.protobuf.descriptor.Descriptor
             PRECISION_FIELD_NUMBER: builtins.int
@@ -2623,14 +2639,14 @@ class Expression(google.protobuf.message.Message):
             def __init__(self, *, precision: builtins.int=..., value: builtins.int=...) -> None:
                 ...
 
-            def ClearField(self, field_name: typing_extensions.Literal['precision', b'precision', 'value', b'value']) -> None:
+            def ClearField(self, field_name: typing.Literal['precision', b'precision', 'value', b'value']) -> None:
                 ...
 
-        @typing_extensions.final
+        @typing.final
         class Map(google.protobuf.message.Message):
             DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-            @typing_extensions.final
+            @typing.final
             class KeyValue(google.protobuf.message.Message):
                 DESCRIPTOR: google.protobuf.descriptor.Descriptor
                 KEY_FIELD_NUMBER: builtins.int
@@ -2647,10 +2663,10 @@ class Expression(google.protobuf.message.Message):
                 def __init__(self, *, key: global___Expression.Literal | None=..., value: global___Expression.Literal | None=...) -> None:
                     ...
 
-                def HasField(self, field_name: typing_extensions.Literal['key', b'key', 'value', b'value']) -> builtins.bool:
+                def HasField(self, field_name: typing.Literal['key', b'key', 'value', b'value']) -> builtins.bool:
                     ...
 
-                def ClearField(self, field_name: typing_extensions.Literal['key', b'key', 'value', b'value']) -> None:
+                def ClearField(self, field_name: typing.Literal['key', b'key', 'value', b'value']) -> None:
                     ...
             KEY_VALUES_FIELD_NUMBER: builtins.int
 
@@ -2661,10 +2677,10 @@ class Expression(google.protobuf.message.Message):
             def __init__(self, *, key_values: collections.abc.Iterable[global___Expression.Literal.Map.KeyValue] | None=...) -> None:
                 ...
 
-            def ClearField(self, field_name: typing_extensions.Literal['key_values', b'key_values']) -> None:
+            def ClearField(self, field_name: typing.Literal['key_values', b'key_values']) -> None:
                 ...
 
-        @typing_extensions.final
+        @typing.final
         class IntervalYearToMonth(google.protobuf.message.Message):
             DESCRIPTOR: google.protobuf.descriptor.Descriptor
             YEARS_FIELD_NUMBER: builtins.int
@@ -2675,10 +2691,10 @@ class Expression(google.protobuf.message.Message):
             def __init__(self, *, years: builtins.int=..., months: builtins.int=...) -> None:
                 ...
 
-            def ClearField(self, field_name: typing_extensions.Literal['months', b'months', 'years', b'years']) -> None:
+            def ClearField(self, field_name: typing.Literal['months', b'months', 'years', b'years']) -> None:
                 ...
 
-        @typing_extensions.final
+        @typing.final
         class IntervalDayToSecond(google.protobuf.message.Message):
             DESCRIPTOR: google.protobuf.descriptor.Descriptor
             DAYS_FIELD_NUMBER: builtins.int
@@ -2698,16 +2714,16 @@ class Expression(google.protobuf.message.Message):
             def __init__(self, *, days: builtins.int=..., seconds: builtins.int=..., microseconds: builtins.int=..., precision: builtins.int=..., subseconds: builtins.int=...) -> None:
                 ...
 
-            def HasField(self, field_name: typing_extensions.Literal['microseconds', b'microseconds', 'precision', b'precision', 'precision_mode', b'precision_mode']) -> builtins.bool:
+            def HasField(self, field_name: typing.Literal['microseconds', b'microseconds', 'precision', b'precision', 'precision_mode', b'precision_mode']) -> builtins.bool:
                 ...
 
-            def ClearField(self, field_name: typing_extensions.Literal['days', b'days', 'microseconds', b'microseconds', 'precision', b'precision', 'precision_mode', b'precision_mode', 'seconds', b'seconds', 'subseconds', b'subseconds']) -> None:
+            def ClearField(self, field_name: typing.Literal['days', b'days', 'microseconds', b'microseconds', 'precision', b'precision', 'precision_mode', b'precision_mode', 'seconds', b'seconds', 'subseconds', b'subseconds']) -> None:
                 ...
 
-            def WhichOneof(self, oneof_group: typing_extensions.Literal['precision_mode', b'precision_mode']) -> typing_extensions.Literal['microseconds', 'precision'] | None:
+            def WhichOneof(self, oneof_group: typing.Literal['precision_mode', b'precision_mode']) -> typing.Literal['microseconds', 'precision'] | None:
                 ...
 
-        @typing_extensions.final
+        @typing.final
         class IntervalCompound(google.protobuf.message.Message):
             DESCRIPTOR: google.protobuf.descriptor.Descriptor
             INTERVAL_YEAR_TO_MONTH_FIELD_NUMBER: builtins.int
@@ -2724,13 +2740,13 @@ class Expression(google.protobuf.message.Message):
             def __init__(self, *, interval_year_to_month: global___Expression.Literal.IntervalYearToMonth | None=..., interval_day_to_second: global___Expression.Literal.IntervalDayToSecond | None=...) -> None:
                 ...
 
-            def HasField(self, field_name: typing_extensions.Literal['interval_day_to_second', b'interval_day_to_second', 'interval_year_to_month', b'interval_year_to_month']) -> builtins.bool:
+            def HasField(self, field_name: typing.Literal['interval_day_to_second', b'interval_day_to_second', 'interval_year_to_month', b'interval_year_to_month']) -> builtins.bool:
                 ...
 
-            def ClearField(self, field_name: typing_extensions.Literal['interval_day_to_second', b'interval_day_to_second', 'interval_year_to_month', b'interval_year_to_month']) -> None:
+            def ClearField(self, field_name: typing.Literal['interval_day_to_second', b'interval_day_to_second', 'interval_year_to_month', b'interval_year_to_month']) -> None:
                 ...
 
-        @typing_extensions.final
+        @typing.final
         class Struct(google.protobuf.message.Message):
             DESCRIPTOR: google.protobuf.descriptor.Descriptor
             FIELDS_FIELD_NUMBER: builtins.int
@@ -2742,10 +2758,10 @@ class Expression(google.protobuf.message.Message):
             def __init__(self, *, fields: collections.abc.Iterable[global___Expression.Literal] | None=...) -> None:
                 ...
 
-            def ClearField(self, field_name: typing_extensions.Literal['fields', b'fields']) -> None:
+            def ClearField(self, field_name: typing.Literal['fields', b'fields']) -> None:
                 ...
 
-        @typing_extensions.final
+        @typing.final
         class List(google.protobuf.message.Message):
             DESCRIPTOR: google.protobuf.descriptor.Descriptor
             VALUES_FIELD_NUMBER: builtins.int
@@ -2757,10 +2773,10 @@ class Expression(google.protobuf.message.Message):
             def __init__(self, *, values: collections.abc.Iterable[global___Expression.Literal] | None=...) -> None:
                 ...
 
-            def ClearField(self, field_name: typing_extensions.Literal['values', b'values']) -> None:
+            def ClearField(self, field_name: typing.Literal['values', b'values']) -> None:
                 ...
 
-        @typing_extensions.final
+        @typing.final
         class UserDefined(google.protobuf.message.Message):
             DESCRIPTOR: google.protobuf.descriptor.Descriptor
             TYPE_REFERENCE_FIELD_NUMBER: builtins.int
@@ -2787,13 +2803,13 @@ class Expression(google.protobuf.message.Message):
             def __init__(self, *, type_reference: builtins.int=..., type_parameters: collections.abc.Iterable[proto.type_pb2.Type.Parameter] | None=..., value: google.protobuf.any_pb2.Any | None=..., struct: global___Expression.Literal.Struct | None=...) -> None:
                 ...
 
-            def HasField(self, field_name: typing_extensions.Literal['struct', b'struct', 'val', b'val', 'value', b'value']) -> builtins.bool:
+            def HasField(self, field_name: typing.Literal['struct', b'struct', 'val', b'val', 'value', b'value']) -> builtins.bool:
                 ...
 
-            def ClearField(self, field_name: typing_extensions.Literal['struct', b'struct', 'type_parameters', b'type_parameters', 'type_reference', b'type_reference', 'val', b'val', 'value', b'value']) -> None:
+            def ClearField(self, field_name: typing.Literal['struct', b'struct', 'type_parameters', b'type_parameters', 'type_reference', b'type_reference', 'val', b'val', 'value', b'value']) -> None:
                 ...
 
-            def WhichOneof(self, oneof_group: typing_extensions.Literal['val', b'val']) -> typing_extensions.Literal['value', 'struct'] | None:
+            def WhichOneof(self, oneof_group: typing.Literal['val', b'val']) -> typing.Literal['value', 'struct'] | None:
                 ...
         BOOLEAN_FIELD_NUMBER: builtins.int
         I8_FIELD_NUMBER: builtins.int
@@ -2843,6 +2859,15 @@ class Expression(google.protobuf.message.Message):
         'Date in units of days since the UNIX epoch.'
         time: builtins.int
         'Time in units of microseconds past midnight.\n        Deprecated in favor of `precision_time`.\n        '
+        fixed_char: builtins.str
+        fixed_binary: builtins.bytes
+        timestamp_tz: builtins.int
+        'Timestamp in units of microseconds since the UNIX epoch.\n        Deprecated in favor of `precision_timestamp_tz`\n        '
+        uuid: builtins.bytes
+        nullable: builtins.bool
+        'Whether the literal_type above should be treated as a nullable type.\n        Applies to all members of the literal_type oneof EXCEPT:\n         * Type null             (must be nullable by definition)\n         * Type.List empty_list  (use Type.List::nullability)\n         * Type.Map empty_map    (use Type.Map::nullability)\n        '
+        type_variation_reference: builtins.int
+        'optionally points to a type_variation_anchor defined in this plan.\n        Applies to all members of union other than the Typed null (which should\n        directly declare the type variation).\n        '
 
         @property
         def interval_year_to_month(self) -> global___Expression.Literal.IntervalYearToMonth:
@@ -2855,12 +2880,10 @@ class Expression(google.protobuf.message.Message):
         @property
         def interval_compound(self) -> global___Expression.Literal.IntervalCompound:
             ...
-        fixed_char: builtins.str
 
         @property
         def var_char(self) -> global___Expression.Literal.VarChar:
             ...
-        fixed_binary: builtins.bytes
 
         @property
         def decimal(self) -> global___Expression.Literal.Decimal:
@@ -2885,9 +2908,6 @@ class Expression(google.protobuf.message.Message):
         @property
         def map(self) -> global___Expression.Literal.Map:
             ...
-        timestamp_tz: builtins.int
-        'Timestamp in units of microseconds since the UNIX epoch.\n        Deprecated in favor of `precision_timestamp_tz`\n        '
-        uuid: builtins.bytes
 
         @property
         def null(self) -> proto.type_pb2.Type:
@@ -2908,33 +2928,29 @@ class Expression(google.protobuf.message.Message):
         @property
         def user_defined(self) -> global___Expression.Literal.UserDefined:
             ...
-        nullable: builtins.bool
-        'Whether the literal_type above should be treated as a nullable type.\n        Applies to all members of the literal_type oneof EXCEPT:\n         * Type null             (must be nullable by definition)\n         * Type.List empty_list  (use Type.List::nullability)\n         * Type.Map empty_map    (use Type.Map::nullability)\n        '
-        type_variation_reference: builtins.int
-        'optionally points to a type_variation_anchor defined in this plan.\n        Applies to all members of union other than the Typed null (which should\n        directly declare the type variation).\n        '
 
         def __init__(self, *, boolean: builtins.bool=..., i8: builtins.int=..., i16: builtins.int=..., i32: builtins.int=..., i64: builtins.int=..., fp32: builtins.float=..., fp64: builtins.float=..., string: builtins.str=..., binary: builtins.bytes=..., timestamp: builtins.int=..., date: builtins.int=..., time: builtins.int=..., interval_year_to_month: global___Expression.Literal.IntervalYearToMonth | None=..., interval_day_to_second: global___Expression.Literal.IntervalDayToSecond | None=..., interval_compound: global___Expression.Literal.IntervalCompound | None=..., fixed_char: builtins.str=..., var_char: global___Expression.Literal.VarChar | None=..., fixed_binary: builtins.bytes=..., decimal: global___Expression.Literal.Decimal | None=..., precision_time: global___Expression.Literal.PrecisionTime | None=..., precision_timestamp: global___Expression.Literal.PrecisionTimestamp | None=..., precision_timestamp_tz: global___Expression.Literal.PrecisionTimestamp | None=..., struct: global___Expression.Literal.Struct | None=..., map: global___Expression.Literal.Map | None=..., timestamp_tz: builtins.int=..., uuid: builtins.bytes=..., null: proto.type_pb2.Type | None=..., list: global___Expression.Literal.List | None=..., empty_list: proto.type_pb2.Type.List | None=..., empty_map: proto.type_pb2.Type.Map | None=..., user_defined: global___Expression.Literal.UserDefined | None=..., nullable: builtins.bool=..., type_variation_reference: builtins.int=...) -> None:
             ...
 
-        def HasField(self, field_name: typing_extensions.Literal['binary', b'binary', 'boolean', b'boolean', 'date', b'date', 'decimal', b'decimal', 'empty_list', b'empty_list', 'empty_map', b'empty_map', 'fixed_binary', b'fixed_binary', 'fixed_char', b'fixed_char', 'fp32', b'fp32', 'fp64', b'fp64', 'i16', b'i16', 'i32', b'i32', 'i64', b'i64', 'i8', b'i8', 'interval_compound', b'interval_compound', 'interval_day_to_second', b'interval_day_to_second', 'interval_year_to_month', b'interval_year_to_month', 'list', b'list', 'literal_type', b'literal_type', 'map', b'map', 'null', b'null', 'precision_time', b'precision_time', 'precision_timestamp', b'precision_timestamp', 'precision_timestamp_tz', b'precision_timestamp_tz', 'string', b'string', 'struct', b'struct', 'time', b'time', 'timestamp', b'timestamp', 'timestamp_tz', b'timestamp_tz', 'user_defined', b'user_defined', 'uuid', b'uuid', 'var_char', b'var_char']) -> builtins.bool:
+        def HasField(self, field_name: typing.Literal['binary', b'binary', 'boolean', b'boolean', 'date', b'date', 'decimal', b'decimal', 'empty_list', b'empty_list', 'empty_map', b'empty_map', 'fixed_binary', b'fixed_binary', 'fixed_char', b'fixed_char', 'fp32', b'fp32', 'fp64', b'fp64', 'i16', b'i16', 'i32', b'i32', 'i64', b'i64', 'i8', b'i8', 'interval_compound', b'interval_compound', 'interval_day_to_second', b'interval_day_to_second', 'interval_year_to_month', b'interval_year_to_month', 'list', b'list', 'literal_type', b'literal_type', 'map', b'map', 'null', b'null', 'precision_time', b'precision_time', 'precision_timestamp', b'precision_timestamp', 'precision_timestamp_tz', b'precision_timestamp_tz', 'string', b'string', 'struct', b'struct', 'time', b'time', 'timestamp', b'timestamp', 'timestamp_tz', b'timestamp_tz', 'user_defined', b'user_defined', 'uuid', b'uuid', 'var_char', b'var_char']) -> builtins.bool:
             ...
 
-        def ClearField(self, field_name: typing_extensions.Literal['binary', b'binary', 'boolean', b'boolean', 'date', b'date', 'decimal', b'decimal', 'empty_list', b'empty_list', 'empty_map', b'empty_map', 'fixed_binary', b'fixed_binary', 'fixed_char', b'fixed_char', 'fp32', b'fp32', 'fp64', b'fp64', 'i16', b'i16', 'i32', b'i32', 'i64', b'i64', 'i8', b'i8', 'interval_compound', b'interval_compound', 'interval_day_to_second', b'interval_day_to_second', 'interval_year_to_month', b'interval_year_to_month', 'list', b'list', 'literal_type', b'literal_type', 'map', b'map', 'null', b'null', 'nullable', b'nullable', 'precision_time', b'precision_time', 'precision_timestamp', b'precision_timestamp', 'precision_timestamp_tz', b'precision_timestamp_tz', 'string', b'string', 'struct', b'struct', 'time', b'time', 'timestamp', b'timestamp', 'timestamp_tz', b'timestamp_tz', 'type_variation_reference', b'type_variation_reference', 'user_defined', b'user_defined', 'uuid', b'uuid', 'var_char', b'var_char']) -> None:
+        def ClearField(self, field_name: typing.Literal['binary', b'binary', 'boolean', b'boolean', 'date', b'date', 'decimal', b'decimal', 'empty_list', b'empty_list', 'empty_map', b'empty_map', 'fixed_binary', b'fixed_binary', 'fixed_char', b'fixed_char', 'fp32', b'fp32', 'fp64', b'fp64', 'i16', b'i16', 'i32', b'i32', 'i64', b'i64', 'i8', b'i8', 'interval_compound', b'interval_compound', 'interval_day_to_second', b'interval_day_to_second', 'interval_year_to_month', b'interval_year_to_month', 'list', b'list', 'literal_type', b'literal_type', 'map', b'map', 'null', b'null', 'nullable', b'nullable', 'precision_time', b'precision_time', 'precision_timestamp', b'precision_timestamp', 'precision_timestamp_tz', b'precision_timestamp_tz', 'string', b'string', 'struct', b'struct', 'time', b'time', 'timestamp', b'timestamp', 'timestamp_tz', b'timestamp_tz', 'type_variation_reference', b'type_variation_reference', 'user_defined', b'user_defined', 'uuid', b'uuid', 'var_char', b'var_char']) -> None:
             ...
 
-        def WhichOneof(self, oneof_group: typing_extensions.Literal['literal_type', b'literal_type']) -> typing_extensions.Literal['boolean', 'i8', 'i16', 'i32', 'i64', 'fp32', 'fp64', 'string', 'binary', 'timestamp', 'date', 'time', 'interval_year_to_month', 'interval_day_to_second', 'interval_compound', 'fixed_char', 'var_char', 'fixed_binary', 'decimal', 'precision_time', 'precision_timestamp', 'precision_timestamp_tz', 'struct', 'map', 'timestamp_tz', 'uuid', 'null', 'list', 'empty_list', 'empty_map', 'user_defined'] | None:
+        def WhichOneof(self, oneof_group: typing.Literal['literal_type', b'literal_type']) -> typing.Literal['boolean', 'i8', 'i16', 'i32', 'i64', 'fp32', 'fp64', 'string', 'binary', 'timestamp', 'date', 'time', 'interval_year_to_month', 'interval_day_to_second', 'interval_compound', 'fixed_char', 'var_char', 'fixed_binary', 'decimal', 'precision_time', 'precision_timestamp', 'precision_timestamp_tz', 'struct', 'map', 'timestamp_tz', 'uuid', 'null', 'list', 'empty_list', 'empty_map', 'user_defined'] | None:
             ...
 
-    @typing_extensions.final
+    @typing.final
     class Nested(google.protobuf.message.Message):
         """Expression to dynamically construct nested types."""
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-        @typing_extensions.final
+        @typing.final
         class Map(google.protobuf.message.Message):
             DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-            @typing_extensions.final
+            @typing.final
             class KeyValue(google.protobuf.message.Message):
                 DESCRIPTOR: google.protobuf.descriptor.Descriptor
                 KEY_FIELD_NUMBER: builtins.int
@@ -2951,10 +2967,10 @@ class Expression(google.protobuf.message.Message):
                 def __init__(self, *, key: global___Expression | None=..., value: global___Expression | None=...) -> None:
                     ...
 
-                def HasField(self, field_name: typing_extensions.Literal['key', b'key', 'value', b'value']) -> builtins.bool:
+                def HasField(self, field_name: typing.Literal['key', b'key', 'value', b'value']) -> builtins.bool:
                     ...
 
-                def ClearField(self, field_name: typing_extensions.Literal['key', b'key', 'value', b'value']) -> None:
+                def ClearField(self, field_name: typing.Literal['key', b'key', 'value', b'value']) -> None:
                     ...
             KEY_VALUES_FIELD_NUMBER: builtins.int
 
@@ -2967,10 +2983,10 @@ class Expression(google.protobuf.message.Message):
             def __init__(self, *, key_values: collections.abc.Iterable[global___Expression.Nested.Map.KeyValue] | None=...) -> None:
                 ...
 
-            def ClearField(self, field_name: typing_extensions.Literal['key_values', b'key_values']) -> None:
+            def ClearField(self, field_name: typing.Literal['key_values', b'key_values']) -> None:
                 ...
 
-        @typing_extensions.final
+        @typing.final
         class Struct(google.protobuf.message.Message):
             DESCRIPTOR: google.protobuf.descriptor.Descriptor
             FIELDS_FIELD_NUMBER: builtins.int
@@ -2984,10 +3000,10 @@ class Expression(google.protobuf.message.Message):
             def __init__(self, *, fields: collections.abc.Iterable[global___Expression] | None=...) -> None:
                 ...
 
-            def ClearField(self, field_name: typing_extensions.Literal['fields', b'fields']) -> None:
+            def ClearField(self, field_name: typing.Literal['fields', b'fields']) -> None:
                 ...
 
-        @typing_extensions.final
+        @typing.final
         class List(google.protobuf.message.Message):
             DESCRIPTOR: google.protobuf.descriptor.Descriptor
             VALUES_FIELD_NUMBER: builtins.int
@@ -3002,7 +3018,7 @@ class Expression(google.protobuf.message.Message):
             def __init__(self, *, values: collections.abc.Iterable[global___Expression] | None=...) -> None:
                 ...
 
-            def ClearField(self, field_name: typing_extensions.Literal['values', b'values']) -> None:
+            def ClearField(self, field_name: typing.Literal['values', b'values']) -> None:
                 ...
         NULLABLE_FIELD_NUMBER: builtins.int
         TYPE_VARIATION_REFERENCE_FIELD_NUMBER: builtins.int
@@ -3029,16 +3045,16 @@ class Expression(google.protobuf.message.Message):
         def __init__(self, *, nullable: builtins.bool=..., type_variation_reference: builtins.int=..., struct: global___Expression.Nested.Struct | None=..., list: global___Expression.Nested.List | None=..., map: global___Expression.Nested.Map | None=...) -> None:
             ...
 
-        def HasField(self, field_name: typing_extensions.Literal['list', b'list', 'map', b'map', 'nested_type', b'nested_type', 'struct', b'struct']) -> builtins.bool:
+        def HasField(self, field_name: typing.Literal['list', b'list', 'map', b'map', 'nested_type', b'nested_type', 'struct', b'struct']) -> builtins.bool:
             ...
 
-        def ClearField(self, field_name: typing_extensions.Literal['list', b'list', 'map', b'map', 'nested_type', b'nested_type', 'nullable', b'nullable', 'struct', b'struct', 'type_variation_reference', b'type_variation_reference']) -> None:
+        def ClearField(self, field_name: typing.Literal['list', b'list', 'map', b'map', 'nested_type', b'nested_type', 'nullable', b'nullable', 'struct', b'struct', 'type_variation_reference', b'type_variation_reference']) -> None:
             ...
 
-        def WhichOneof(self, oneof_group: typing_extensions.Literal['nested_type', b'nested_type']) -> typing_extensions.Literal['struct', 'list', 'map'] | None:
+        def WhichOneof(self, oneof_group: typing.Literal['nested_type', b'nested_type']) -> typing.Literal['struct', 'list', 'map'] | None:
             ...
 
-    @typing_extensions.final
+    @typing.final
     class ScalarFunction(google.protobuf.message.Message):
         """A scalar function call."""
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -3085,13 +3101,13 @@ class Expression(google.protobuf.message.Message):
         def __init__(self, *, function_reference: builtins.int=..., arguments: collections.abc.Iterable[global___FunctionArgument] | None=..., options: collections.abc.Iterable[global___FunctionOption] | None=..., output_type: proto.type_pb2.Type | None=..., args: collections.abc.Iterable[global___Expression] | None=...) -> None:
             ...
 
-        def HasField(self, field_name: typing_extensions.Literal['output_type', b'output_type']) -> builtins.bool:
+        def HasField(self, field_name: typing.Literal['output_type', b'output_type']) -> builtins.bool:
             ...
 
-        def ClearField(self, field_name: typing_extensions.Literal['args', b'args', 'arguments', b'arguments', 'function_reference', b'function_reference', 'options', b'options', 'output_type', b'output_type']) -> None:
+        def ClearField(self, field_name: typing.Literal['args', b'args', 'arguments', b'arguments', 'function_reference', b'function_reference', 'options', b'options', 'output_type', b'output_type']) -> None:
             ...
 
-    @typing_extensions.final
+    @typing.final
     class WindowFunction(google.protobuf.message.Message):
         """A window function call."""
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -3116,12 +3132,12 @@ class Expression(google.protobuf.message.Message):
         BOUNDS_TYPE_RANGE: Expression.WindowFunction.BoundsType.ValueType
         'The lower and upper bound describe a range of values.  The window should include all rows\n        where the value of the ordering column is greater than or equal to (current_value - lower bound)\n        and less than or equal to (current_value + upper bound).  This bounds type is only valid if there\n        is a single ordering column.\n        '
 
-        @typing_extensions.final
+        @typing.final
         class Bound(google.protobuf.message.Message):
             """Defines one of the two boundaries for the window of a window function."""
             DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-            @typing_extensions.final
+            @typing.final
             class Preceding(google.protobuf.message.Message):
                 """Defines that the bound extends this far back from the current record."""
                 DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -3132,10 +3148,10 @@ class Expression(google.protobuf.message.Message):
                 def __init__(self, *, offset: builtins.int=...) -> None:
                     ...
 
-                def ClearField(self, field_name: typing_extensions.Literal['offset', b'offset']) -> None:
+                def ClearField(self, field_name: typing.Literal['offset', b'offset']) -> None:
                     ...
 
-            @typing_extensions.final
+            @typing.final
             class Following(google.protobuf.message.Message):
                 """Defines that the bound extends this far ahead of the current record."""
                 DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -3146,10 +3162,10 @@ class Expression(google.protobuf.message.Message):
                 def __init__(self, *, offset: builtins.int=...) -> None:
                     ...
 
-                def ClearField(self, field_name: typing_extensions.Literal['offset', b'offset']) -> None:
+                def ClearField(self, field_name: typing.Literal['offset', b'offset']) -> None:
                     ...
 
-            @typing_extensions.final
+            @typing.final
             class CurrentRow(google.protobuf.message.Message):
                 """Defines that the bound extends to or from the current record."""
                 DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -3157,7 +3173,7 @@ class Expression(google.protobuf.message.Message):
                 def __init__(self) -> None:
                     ...
 
-            @typing_extensions.final
+            @typing.final
             class Unbounded(google.protobuf.message.Message):
                 """Defines an "unbounded bound": for lower bounds this means the start
                 of the partition, and for upper bounds this means the end of the
@@ -3196,13 +3212,13 @@ class Expression(google.protobuf.message.Message):
             def __init__(self, *, preceding: global___Expression.WindowFunction.Bound.Preceding | None=..., following: global___Expression.WindowFunction.Bound.Following | None=..., current_row: global___Expression.WindowFunction.Bound.CurrentRow | None=..., unbounded: global___Expression.WindowFunction.Bound.Unbounded | None=...) -> None:
                 ...
 
-            def HasField(self, field_name: typing_extensions.Literal['current_row', b'current_row', 'following', b'following', 'kind', b'kind', 'preceding', b'preceding', 'unbounded', b'unbounded']) -> builtins.bool:
+            def HasField(self, field_name: typing.Literal['current_row', b'current_row', 'following', b'following', 'kind', b'kind', 'preceding', b'preceding', 'unbounded', b'unbounded']) -> builtins.bool:
                 ...
 
-            def ClearField(self, field_name: typing_extensions.Literal['current_row', b'current_row', 'following', b'following', 'kind', b'kind', 'preceding', b'preceding', 'unbounded', b'unbounded']) -> None:
+            def ClearField(self, field_name: typing.Literal['current_row', b'current_row', 'following', b'following', 'kind', b'kind', 'preceding', b'preceding', 'unbounded', b'unbounded']) -> None:
                 ...
 
-            def WhichOneof(self, oneof_group: typing_extensions.Literal['kind', b'kind']) -> typing_extensions.Literal['preceding', 'following', 'current_row', 'unbounded'] | None:
+            def WhichOneof(self, oneof_group: typing.Literal['kind', b'kind']) -> typing.Literal['preceding', 'following', 'current_row', 'unbounded'] | None:
                 ...
         FUNCTION_REFERENCE_FIELD_NUMBER: builtins.int
         ARGUMENTS_FIELD_NUMBER: builtins.int
@@ -3218,6 +3234,12 @@ class Expression(google.protobuf.message.Message):
         ARGS_FIELD_NUMBER: builtins.int
         function_reference: builtins.int
         'Points to a function_anchor defined in this plan. The function must be:\n         - a window function\n         - an aggregate function\n\n        An aggregate function referenced here should be treated as a window\n        function with Window Type STREAMING\n\n        Required; 0 is considered to be a valid anchor/reference.\n        '
+        phase: global___AggregationPhase.ValueType
+        'Describes which part of the window function to perform within the\n        context of distributed algorithms. Required. Must be set to\n        INITIAL_TO_RESULT for window functions that are not decomposable.\n        '
+        invocation: global___AggregateFunction.AggregationInvocation.ValueType
+        'Specifies whether equivalent records are merged before being aggregated.\n        Optional, defaults to AGGREGATION_INVOCATION_ALL.\n        '
+        bounds_type: global___Expression.WindowFunction.BoundsType.ValueType
+        'Defines the bounds type: ROWS, RANGE'
 
         @property
         def arguments(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___FunctionArgument]:
@@ -3247,8 +3269,6 @@ class Expression(google.protobuf.message.Message):
             """Must be set to the return type of the function, exactly as derived
             using the declaration in the extension.
             """
-        phase: global___AggregationPhase.ValueType
-        'Describes which part of the window function to perform within the\n        context of distributed algorithms. Required. Must be set to\n        INITIAL_TO_RESULT for window functions that are not decomposable.\n        '
 
         @property
         def sorts(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___SortField]:
@@ -3259,8 +3279,6 @@ class Expression(google.protobuf.message.Message):
             is the next field queried. This field is optional, and is only allowed
             if the window function is defined to support sorting.
             """
-        invocation: global___AggregateFunction.AggregationInvocation.ValueType
-        'Specifies whether equivalent records are merged before being aggregated.\n        Optional, defaults to AGGREGATION_INVOCATION_ALL.\n        '
 
         @property
         def partitions(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___Expression]:
@@ -3270,8 +3288,6 @@ class Expression(google.protobuf.message.Message):
             function, only the subset of records within the bounds that are also in
             the same partition as the current record are aggregated.
             """
-        bounds_type: global___Expression.WindowFunction.BoundsType.ValueType
-        'Defines the bounds type: ROWS, RANGE'
 
         @property
         def lower_bound(self) -> global___Expression.WindowFunction.Bound:
@@ -3298,17 +3314,17 @@ class Expression(google.protobuf.message.Message):
         def __init__(self, *, function_reference: builtins.int=..., arguments: collections.abc.Iterable[global___FunctionArgument] | None=..., options: collections.abc.Iterable[global___FunctionOption] | None=..., output_type: proto.type_pb2.Type | None=..., phase: global___AggregationPhase.ValueType=..., sorts: collections.abc.Iterable[global___SortField] | None=..., invocation: global___AggregateFunction.AggregationInvocation.ValueType=..., partitions: collections.abc.Iterable[global___Expression] | None=..., bounds_type: global___Expression.WindowFunction.BoundsType.ValueType=..., lower_bound: global___Expression.WindowFunction.Bound | None=..., upper_bound: global___Expression.WindowFunction.Bound | None=..., args: collections.abc.Iterable[global___Expression] | None=...) -> None:
             ...
 
-        def HasField(self, field_name: typing_extensions.Literal['lower_bound', b'lower_bound', 'output_type', b'output_type', 'upper_bound', b'upper_bound']) -> builtins.bool:
+        def HasField(self, field_name: typing.Literal['lower_bound', b'lower_bound', 'output_type', b'output_type', 'upper_bound', b'upper_bound']) -> builtins.bool:
             ...
 
-        def ClearField(self, field_name: typing_extensions.Literal['args', b'args', 'arguments', b'arguments', 'bounds_type', b'bounds_type', 'function_reference', b'function_reference', 'invocation', b'invocation', 'lower_bound', b'lower_bound', 'options', b'options', 'output_type', b'output_type', 'partitions', b'partitions', 'phase', b'phase', 'sorts', b'sorts', 'upper_bound', b'upper_bound']) -> None:
+        def ClearField(self, field_name: typing.Literal['args', b'args', 'arguments', b'arguments', 'bounds_type', b'bounds_type', 'function_reference', b'function_reference', 'invocation', b'invocation', 'lower_bound', b'lower_bound', 'options', b'options', 'output_type', b'output_type', 'partitions', b'partitions', 'phase', b'phase', 'sorts', b'sorts', 'upper_bound', b'upper_bound']) -> None:
             ...
 
-    @typing_extensions.final
+    @typing.final
     class IfThen(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-        @typing_extensions.final
+        @typing.final
         class IfClause(google.protobuf.message.Message):
             DESCRIPTOR: google.protobuf.descriptor.Descriptor
             IF_FIELD_NUMBER: builtins.int
@@ -3321,10 +3337,10 @@ class Expression(google.protobuf.message.Message):
             def __init__(self, *, then: global___Expression | None=...) -> None:
                 ...
 
-            def HasField(self, field_name: typing_extensions.Literal['if', b'if', 'then', b'then']) -> builtins.bool:
+            def HasField(self, field_name: typing.Literal['if', b'if', 'then', b'then']) -> builtins.bool:
                 ...
 
-            def ClearField(self, field_name: typing_extensions.Literal['if', b'if', 'then', b'then']) -> None:
+            def ClearField(self, field_name: typing.Literal['if', b'if', 'then', b'then']) -> None:
                 ...
         IFS_FIELD_NUMBER: builtins.int
         ELSE_FIELD_NUMBER: builtins.int
@@ -3336,13 +3352,13 @@ class Expression(google.protobuf.message.Message):
         def __init__(self, *, ifs: collections.abc.Iterable[global___Expression.IfThen.IfClause] | None=...) -> None:
             ...
 
-        def HasField(self, field_name: typing_extensions.Literal['else', b'else']) -> builtins.bool:
+        def HasField(self, field_name: typing.Literal['else', b'else']) -> builtins.bool:
             ...
 
-        def ClearField(self, field_name: typing_extensions.Literal['else', b'else', 'ifs', b'ifs']) -> None:
+        def ClearField(self, field_name: typing.Literal['else', b'else', 'ifs', b'ifs']) -> None:
             ...
 
-    @typing_extensions.final
+    @typing.final
     class Cast(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -3364,6 +3380,7 @@ class Expression(google.protobuf.message.Message):
         TYPE_FIELD_NUMBER: builtins.int
         INPUT_FIELD_NUMBER: builtins.int
         FAILURE_BEHAVIOR_FIELD_NUMBER: builtins.int
+        failure_behavior: global___Expression.Cast.FailureBehavior.ValueType
 
         @property
         def type(self) -> proto.type_pb2.Type:
@@ -3372,22 +3389,21 @@ class Expression(google.protobuf.message.Message):
         @property
         def input(self) -> global___Expression:
             ...
-        failure_behavior: global___Expression.Cast.FailureBehavior.ValueType
 
         def __init__(self, *, type: proto.type_pb2.Type | None=..., input: global___Expression | None=..., failure_behavior: global___Expression.Cast.FailureBehavior.ValueType=...) -> None:
             ...
 
-        def HasField(self, field_name: typing_extensions.Literal['input', b'input', 'type', b'type']) -> builtins.bool:
+        def HasField(self, field_name: typing.Literal['input', b'input', 'type', b'type']) -> builtins.bool:
             ...
 
-        def ClearField(self, field_name: typing_extensions.Literal['failure_behavior', b'failure_behavior', 'input', b'input', 'type', b'type']) -> None:
+        def ClearField(self, field_name: typing.Literal['failure_behavior', b'failure_behavior', 'input', b'input', 'type', b'type']) -> None:
             ...
 
-    @typing_extensions.final
+    @typing.final
     class SwitchExpression(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-        @typing_extensions.final
+        @typing.final
         class IfValue(google.protobuf.message.Message):
             DESCRIPTOR: google.protobuf.descriptor.Descriptor
             IF_FIELD_NUMBER: builtins.int
@@ -3400,10 +3416,10 @@ class Expression(google.protobuf.message.Message):
             def __init__(self, *, then: global___Expression | None=...) -> None:
                 ...
 
-            def HasField(self, field_name: typing_extensions.Literal['if', b'if', 'then', b'then']) -> builtins.bool:
+            def HasField(self, field_name: typing.Literal['if', b'if', 'then', b'then']) -> builtins.bool:
                 ...
 
-            def ClearField(self, field_name: typing_extensions.Literal['if', b'if', 'then', b'then']) -> None:
+            def ClearField(self, field_name: typing.Literal['if', b'if', 'then', b'then']) -> None:
                 ...
         MATCH_FIELD_NUMBER: builtins.int
         IFS_FIELD_NUMBER: builtins.int
@@ -3420,13 +3436,13 @@ class Expression(google.protobuf.message.Message):
         def __init__(self, *, match: global___Expression | None=..., ifs: collections.abc.Iterable[global___Expression.SwitchExpression.IfValue] | None=...) -> None:
             ...
 
-        def HasField(self, field_name: typing_extensions.Literal['else', b'else', 'match', b'match']) -> builtins.bool:
+        def HasField(self, field_name: typing.Literal['else', b'else', 'match', b'match']) -> builtins.bool:
             ...
 
-        def ClearField(self, field_name: typing_extensions.Literal['else', b'else', 'ifs', b'ifs', 'match', b'match']) -> None:
+        def ClearField(self, field_name: typing.Literal['else', b'else', 'ifs', b'ifs', 'match', b'match']) -> None:
             ...
 
-    @typing_extensions.final
+    @typing.final
     class SingularOrList(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
         VALUE_FIELD_NUMBER: builtins.int
@@ -3443,17 +3459,17 @@ class Expression(google.protobuf.message.Message):
         def __init__(self, *, value: global___Expression | None=..., options: collections.abc.Iterable[global___Expression] | None=...) -> None:
             ...
 
-        def HasField(self, field_name: typing_extensions.Literal['value', b'value']) -> builtins.bool:
+        def HasField(self, field_name: typing.Literal['value', b'value']) -> builtins.bool:
             ...
 
-        def ClearField(self, field_name: typing_extensions.Literal['options', b'options', 'value', b'value']) -> None:
+        def ClearField(self, field_name: typing.Literal['options', b'options', 'value', b'value']) -> None:
             ...
 
-    @typing_extensions.final
+    @typing.final
     class MultiOrList(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-        @typing_extensions.final
+        @typing.final
         class Record(google.protobuf.message.Message):
             DESCRIPTOR: google.protobuf.descriptor.Descriptor
             FIELDS_FIELD_NUMBER: builtins.int
@@ -3465,7 +3481,7 @@ class Expression(google.protobuf.message.Message):
             def __init__(self, *, fields: collections.abc.Iterable[global___Expression] | None=...) -> None:
                 ...
 
-            def ClearField(self, field_name: typing_extensions.Literal['fields', b'fields']) -> None:
+            def ClearField(self, field_name: typing.Literal['fields', b'fields']) -> None:
                 ...
         VALUE_FIELD_NUMBER: builtins.int
         OPTIONS_FIELD_NUMBER: builtins.int
@@ -3481,14 +3497,14 @@ class Expression(google.protobuf.message.Message):
         def __init__(self, *, value: collections.abc.Iterable[global___Expression] | None=..., options: collections.abc.Iterable[global___Expression.MultiOrList.Record] | None=...) -> None:
             ...
 
-        def ClearField(self, field_name: typing_extensions.Literal['options', b'options', 'value', b'value']) -> None:
+        def ClearField(self, field_name: typing.Literal['options', b'options', 'value', b'value']) -> None:
             ...
 
-    @typing_extensions.final
+    @typing.final
     class EmbeddedFunction(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-        @typing_extensions.final
+        @typing.final
         class PythonPickleFunction(google.protobuf.message.Message):
             DESCRIPTOR: google.protobuf.descriptor.Descriptor
             FUNCTION_FIELD_NUMBER: builtins.int
@@ -3502,10 +3518,10 @@ class Expression(google.protobuf.message.Message):
             def __init__(self, *, function: builtins.bytes=..., prerequisite: collections.abc.Iterable[builtins.str] | None=...) -> None:
                 ...
 
-            def ClearField(self, field_name: typing_extensions.Literal['function', b'function', 'prerequisite', b'prerequisite']) -> None:
+            def ClearField(self, field_name: typing.Literal['function', b'function', 'prerequisite', b'prerequisite']) -> None:
                 ...
 
-        @typing_extensions.final
+        @typing.final
         class WebAssemblyFunction(google.protobuf.message.Message):
             DESCRIPTOR: google.protobuf.descriptor.Descriptor
             SCRIPT_FIELD_NUMBER: builtins.int
@@ -3519,7 +3535,7 @@ class Expression(google.protobuf.message.Message):
             def __init__(self, *, script: builtins.bytes=..., prerequisite: collections.abc.Iterable[builtins.str] | None=...) -> None:
                 ...
 
-            def ClearField(self, field_name: typing_extensions.Literal['prerequisite', b'prerequisite', 'script', b'script']) -> None:
+            def ClearField(self, field_name: typing.Literal['prerequisite', b'prerequisite', 'script', b'script']) -> None:
                 ...
         ARGUMENTS_FIELD_NUMBER: builtins.int
         OUTPUT_TYPE_FIELD_NUMBER: builtins.int
@@ -3545,16 +3561,16 @@ class Expression(google.protobuf.message.Message):
         def __init__(self, *, arguments: collections.abc.Iterable[global___Expression] | None=..., output_type: proto.type_pb2.Type | None=..., python_pickle_function: global___Expression.EmbeddedFunction.PythonPickleFunction | None=..., web_assembly_function: global___Expression.EmbeddedFunction.WebAssemblyFunction | None=...) -> None:
             ...
 
-        def HasField(self, field_name: typing_extensions.Literal['kind', b'kind', 'output_type', b'output_type', 'python_pickle_function', b'python_pickle_function', 'web_assembly_function', b'web_assembly_function']) -> builtins.bool:
+        def HasField(self, field_name: typing.Literal['kind', b'kind', 'output_type', b'output_type', 'python_pickle_function', b'python_pickle_function', 'web_assembly_function', b'web_assembly_function']) -> builtins.bool:
             ...
 
-        def ClearField(self, field_name: typing_extensions.Literal['arguments', b'arguments', 'kind', b'kind', 'output_type', b'output_type', 'python_pickle_function', b'python_pickle_function', 'web_assembly_function', b'web_assembly_function']) -> None:
+        def ClearField(self, field_name: typing.Literal['arguments', b'arguments', 'kind', b'kind', 'output_type', b'output_type', 'python_pickle_function', b'python_pickle_function', 'web_assembly_function', b'web_assembly_function']) -> None:
             ...
 
-        def WhichOneof(self, oneof_group: typing_extensions.Literal['kind', b'kind']) -> typing_extensions.Literal['python_pickle_function', 'web_assembly_function'] | None:
+        def WhichOneof(self, oneof_group: typing.Literal['kind', b'kind']) -> typing.Literal['python_pickle_function', 'web_assembly_function'] | None:
             ...
 
-    @typing_extensions.final
+    @typing.final
     class ReferenceSegment(google.protobuf.message.Message):
         """A way to reference the inner property of a complex record. Can reference
         either a map key by literal, a struct field by the ordinal position of
@@ -3566,7 +3582,7 @@ class Expression(google.protobuf.message.Message):
         """
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-        @typing_extensions.final
+        @typing.final
         class MapKey(google.protobuf.message.Message):
             DESCRIPTOR: google.protobuf.descriptor.Descriptor
             MAP_KEY_FIELD_NUMBER: builtins.int
@@ -3583,13 +3599,13 @@ class Expression(google.protobuf.message.Message):
             def __init__(self, *, map_key: global___Expression.Literal | None=..., child: global___Expression.ReferenceSegment | None=...) -> None:
                 ...
 
-            def HasField(self, field_name: typing_extensions.Literal['child', b'child', 'map_key', b'map_key']) -> builtins.bool:
+            def HasField(self, field_name: typing.Literal['child', b'child', 'map_key', b'map_key']) -> builtins.bool:
                 ...
 
-            def ClearField(self, field_name: typing_extensions.Literal['child', b'child', 'map_key', b'map_key']) -> None:
+            def ClearField(self, field_name: typing.Literal['child', b'child', 'map_key', b'map_key']) -> None:
                 ...
 
-        @typing_extensions.final
+        @typing.final
         class StructField(google.protobuf.message.Message):
             DESCRIPTOR: google.protobuf.descriptor.Descriptor
             FIELD_FIELD_NUMBER: builtins.int
@@ -3604,13 +3620,13 @@ class Expression(google.protobuf.message.Message):
             def __init__(self, *, field: builtins.int=..., child: global___Expression.ReferenceSegment | None=...) -> None:
                 ...
 
-            def HasField(self, field_name: typing_extensions.Literal['child', b'child']) -> builtins.bool:
+            def HasField(self, field_name: typing.Literal['child', b'child']) -> builtins.bool:
                 ...
 
-            def ClearField(self, field_name: typing_extensions.Literal['child', b'child', 'field', b'field']) -> None:
+            def ClearField(self, field_name: typing.Literal['child', b'child', 'field', b'field']) -> None:
                 ...
 
-        @typing_extensions.final
+        @typing.final
         class ListElement(google.protobuf.message.Message):
             DESCRIPTOR: google.protobuf.descriptor.Descriptor
             OFFSET_FIELD_NUMBER: builtins.int
@@ -3625,10 +3641,10 @@ class Expression(google.protobuf.message.Message):
             def __init__(self, *, offset: builtins.int=..., child: global___Expression.ReferenceSegment | None=...) -> None:
                 ...
 
-            def HasField(self, field_name: typing_extensions.Literal['child', b'child']) -> builtins.bool:
+            def HasField(self, field_name: typing.Literal['child', b'child']) -> builtins.bool:
                 ...
 
-            def ClearField(self, field_name: typing_extensions.Literal['child', b'child', 'offset', b'offset']) -> None:
+            def ClearField(self, field_name: typing.Literal['child', b'child', 'offset', b'offset']) -> None:
                 ...
         MAP_KEY_FIELD_NUMBER: builtins.int
         STRUCT_FIELD_FIELD_NUMBER: builtins.int
@@ -3649,16 +3665,16 @@ class Expression(google.protobuf.message.Message):
         def __init__(self, *, map_key: global___Expression.ReferenceSegment.MapKey | None=..., struct_field: global___Expression.ReferenceSegment.StructField | None=..., list_element: global___Expression.ReferenceSegment.ListElement | None=...) -> None:
             ...
 
-        def HasField(self, field_name: typing_extensions.Literal['list_element', b'list_element', 'map_key', b'map_key', 'reference_type', b'reference_type', 'struct_field', b'struct_field']) -> builtins.bool:
+        def HasField(self, field_name: typing.Literal['list_element', b'list_element', 'map_key', b'map_key', 'reference_type', b'reference_type', 'struct_field', b'struct_field']) -> builtins.bool:
             ...
 
-        def ClearField(self, field_name: typing_extensions.Literal['list_element', b'list_element', 'map_key', b'map_key', 'reference_type', b'reference_type', 'struct_field', b'struct_field']) -> None:
+        def ClearField(self, field_name: typing.Literal['list_element', b'list_element', 'map_key', b'map_key', 'reference_type', b'reference_type', 'struct_field', b'struct_field']) -> None:
             ...
 
-        def WhichOneof(self, oneof_group: typing_extensions.Literal['reference_type', b'reference_type']) -> typing_extensions.Literal['map_key', 'struct_field', 'list_element'] | None:
+        def WhichOneof(self, oneof_group: typing.Literal['reference_type', b'reference_type']) -> typing.Literal['map_key', 'struct_field', 'list_element'] | None:
             ...
 
-    @typing_extensions.final
+    @typing.final
     class MaskExpression(google.protobuf.message.Message):
         """A reference that takes an existing subtype and selectively removes fields
         from it. For example, one might initially have an inner struct with 100
@@ -3672,7 +3688,7 @@ class Expression(google.protobuf.message.Message):
         """
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-        @typing_extensions.final
+        @typing.final
         class Select(google.protobuf.message.Message):
             DESCRIPTOR: google.protobuf.descriptor.Descriptor
             STRUCT_FIELD_NUMBER: builtins.int
@@ -3694,16 +3710,16 @@ class Expression(google.protobuf.message.Message):
             def __init__(self, *, struct: global___Expression.MaskExpression.StructSelect | None=..., list: global___Expression.MaskExpression.ListSelect | None=..., map: global___Expression.MaskExpression.MapSelect | None=...) -> None:
                 ...
 
-            def HasField(self, field_name: typing_extensions.Literal['list', b'list', 'map', b'map', 'struct', b'struct', 'type', b'type']) -> builtins.bool:
+            def HasField(self, field_name: typing.Literal['list', b'list', 'map', b'map', 'struct', b'struct', 'type', b'type']) -> builtins.bool:
                 ...
 
-            def ClearField(self, field_name: typing_extensions.Literal['list', b'list', 'map', b'map', 'struct', b'struct', 'type', b'type']) -> None:
+            def ClearField(self, field_name: typing.Literal['list', b'list', 'map', b'map', 'struct', b'struct', 'type', b'type']) -> None:
                 ...
 
-            def WhichOneof(self, oneof_group: typing_extensions.Literal['type', b'type']) -> typing_extensions.Literal['struct', 'list', 'map'] | None:
+            def WhichOneof(self, oneof_group: typing.Literal['type', b'type']) -> typing.Literal['struct', 'list', 'map'] | None:
                 ...
 
-        @typing_extensions.final
+        @typing.final
         class StructSelect(google.protobuf.message.Message):
             DESCRIPTOR: google.protobuf.descriptor.Descriptor
             STRUCT_ITEMS_FIELD_NUMBER: builtins.int
@@ -3715,10 +3731,10 @@ class Expression(google.protobuf.message.Message):
             def __init__(self, *, struct_items: collections.abc.Iterable[global___Expression.MaskExpression.StructItem] | None=...) -> None:
                 ...
 
-            def ClearField(self, field_name: typing_extensions.Literal['struct_items', b'struct_items']) -> None:
+            def ClearField(self, field_name: typing.Literal['struct_items', b'struct_items']) -> None:
                 ...
 
-        @typing_extensions.final
+        @typing.final
         class StructItem(google.protobuf.message.Message):
             DESCRIPTOR: google.protobuf.descriptor.Descriptor
             FIELD_FIELD_NUMBER: builtins.int
@@ -3732,21 +3748,21 @@ class Expression(google.protobuf.message.Message):
             def __init__(self, *, field: builtins.int=..., child: global___Expression.MaskExpression.Select | None=...) -> None:
                 ...
 
-            def HasField(self, field_name: typing_extensions.Literal['child', b'child']) -> builtins.bool:
+            def HasField(self, field_name: typing.Literal['child', b'child']) -> builtins.bool:
                 ...
 
-            def ClearField(self, field_name: typing_extensions.Literal['child', b'child', 'field', b'field']) -> None:
+            def ClearField(self, field_name: typing.Literal['child', b'child', 'field', b'field']) -> None:
                 ...
 
-        @typing_extensions.final
+        @typing.final
         class ListSelect(google.protobuf.message.Message):
             DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-            @typing_extensions.final
+            @typing.final
             class ListSelectItem(google.protobuf.message.Message):
                 DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-                @typing_extensions.final
+                @typing.final
                 class ListElement(google.protobuf.message.Message):
                     DESCRIPTOR: google.protobuf.descriptor.Descriptor
                     FIELD_FIELD_NUMBER: builtins.int
@@ -3755,10 +3771,10 @@ class Expression(google.protobuf.message.Message):
                     def __init__(self, *, field: builtins.int=...) -> None:
                         ...
 
-                    def ClearField(self, field_name: typing_extensions.Literal['field', b'field']) -> None:
+                    def ClearField(self, field_name: typing.Literal['field', b'field']) -> None:
                         ...
 
-                @typing_extensions.final
+                @typing.final
                 class ListSlice(google.protobuf.message.Message):
                     DESCRIPTOR: google.protobuf.descriptor.Descriptor
                     START_FIELD_NUMBER: builtins.int
@@ -3769,7 +3785,7 @@ class Expression(google.protobuf.message.Message):
                     def __init__(self, *, start: builtins.int=..., end: builtins.int=...) -> None:
                         ...
 
-                    def ClearField(self, field_name: typing_extensions.Literal['end', b'end', 'start', b'start']) -> None:
+                    def ClearField(self, field_name: typing.Literal['end', b'end', 'start', b'start']) -> None:
                         ...
                 ITEM_FIELD_NUMBER: builtins.int
                 SLICE_FIELD_NUMBER: builtins.int
@@ -3785,13 +3801,13 @@ class Expression(google.protobuf.message.Message):
                 def __init__(self, *, item: global___Expression.MaskExpression.ListSelect.ListSelectItem.ListElement | None=..., slice: global___Expression.MaskExpression.ListSelect.ListSelectItem.ListSlice | None=...) -> None:
                     ...
 
-                def HasField(self, field_name: typing_extensions.Literal['item', b'item', 'slice', b'slice', 'type', b'type']) -> builtins.bool:
+                def HasField(self, field_name: typing.Literal['item', b'item', 'slice', b'slice', 'type', b'type']) -> builtins.bool:
                     ...
 
-                def ClearField(self, field_name: typing_extensions.Literal['item', b'item', 'slice', b'slice', 'type', b'type']) -> None:
+                def ClearField(self, field_name: typing.Literal['item', b'item', 'slice', b'slice', 'type', b'type']) -> None:
                     ...
 
-                def WhichOneof(self, oneof_group: typing_extensions.Literal['type', b'type']) -> typing_extensions.Literal['item', 'slice'] | None:
+                def WhichOneof(self, oneof_group: typing.Literal['type', b'type']) -> typing.Literal['item', 'slice'] | None:
                     ...
             SELECTION_FIELD_NUMBER: builtins.int
             CHILD_FIELD_NUMBER: builtins.int
@@ -3807,17 +3823,17 @@ class Expression(google.protobuf.message.Message):
             def __init__(self, *, selection: collections.abc.Iterable[global___Expression.MaskExpression.ListSelect.ListSelectItem] | None=..., child: global___Expression.MaskExpression.Select | None=...) -> None:
                 ...
 
-            def HasField(self, field_name: typing_extensions.Literal['child', b'child']) -> builtins.bool:
+            def HasField(self, field_name: typing.Literal['child', b'child']) -> builtins.bool:
                 ...
 
-            def ClearField(self, field_name: typing_extensions.Literal['child', b'child', 'selection', b'selection']) -> None:
+            def ClearField(self, field_name: typing.Literal['child', b'child', 'selection', b'selection']) -> None:
                 ...
 
-        @typing_extensions.final
+        @typing.final
         class MapSelect(google.protobuf.message.Message):
             DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-            @typing_extensions.final
+            @typing.final
             class MapKey(google.protobuf.message.Message):
                 DESCRIPTOR: google.protobuf.descriptor.Descriptor
                 MAP_KEY_FIELD_NUMBER: builtins.int
@@ -3826,10 +3842,10 @@ class Expression(google.protobuf.message.Message):
                 def __init__(self, *, map_key: builtins.str=...) -> None:
                     ...
 
-                def ClearField(self, field_name: typing_extensions.Literal['map_key', b'map_key']) -> None:
+                def ClearField(self, field_name: typing.Literal['map_key', b'map_key']) -> None:
                     ...
 
-            @typing_extensions.final
+            @typing.final
             class MapKeyExpression(google.protobuf.message.Message):
                 DESCRIPTOR: google.protobuf.descriptor.Descriptor
                 MAP_KEY_EXPRESSION_FIELD_NUMBER: builtins.int
@@ -3838,7 +3854,7 @@ class Expression(google.protobuf.message.Message):
                 def __init__(self, *, map_key_expression: builtins.str=...) -> None:
                     ...
 
-                def ClearField(self, field_name: typing_extensions.Literal['map_key_expression', b'map_key_expression']) -> None:
+                def ClearField(self, field_name: typing.Literal['map_key_expression', b'map_key_expression']) -> None:
                     ...
             KEY_FIELD_NUMBER: builtins.int
             EXPRESSION_FIELD_NUMBER: builtins.int
@@ -3859,39 +3875,39 @@ class Expression(google.protobuf.message.Message):
             def __init__(self, *, key: global___Expression.MaskExpression.MapSelect.MapKey | None=..., expression: global___Expression.MaskExpression.MapSelect.MapKeyExpression | None=..., child: global___Expression.MaskExpression.Select | None=...) -> None:
                 ...
 
-            def HasField(self, field_name: typing_extensions.Literal['child', b'child', 'expression', b'expression', 'key', b'key', 'select', b'select']) -> builtins.bool:
+            def HasField(self, field_name: typing.Literal['child', b'child', 'expression', b'expression', 'key', b'key', 'select', b'select']) -> builtins.bool:
                 ...
 
-            def ClearField(self, field_name: typing_extensions.Literal['child', b'child', 'expression', b'expression', 'key', b'key', 'select', b'select']) -> None:
+            def ClearField(self, field_name: typing.Literal['child', b'child', 'expression', b'expression', 'key', b'key', 'select', b'select']) -> None:
                 ...
 
-            def WhichOneof(self, oneof_group: typing_extensions.Literal['select', b'select']) -> typing_extensions.Literal['key', 'expression'] | None:
+            def WhichOneof(self, oneof_group: typing.Literal['select', b'select']) -> typing.Literal['key', 'expression'] | None:
                 ...
         SELECT_FIELD_NUMBER: builtins.int
         MAINTAIN_SINGULAR_STRUCT_FIELD_NUMBER: builtins.int
+        maintain_singular_struct: builtins.bool
 
         @property
         def select(self) -> global___Expression.MaskExpression.StructSelect:
             ...
-        maintain_singular_struct: builtins.bool
 
         def __init__(self, *, select: global___Expression.MaskExpression.StructSelect | None=..., maintain_singular_struct: builtins.bool=...) -> None:
             ...
 
-        def HasField(self, field_name: typing_extensions.Literal['select', b'select']) -> builtins.bool:
+        def HasField(self, field_name: typing.Literal['select', b'select']) -> builtins.bool:
             ...
 
-        def ClearField(self, field_name: typing_extensions.Literal['maintain_singular_struct', b'maintain_singular_struct', 'select', b'select']) -> None:
+        def ClearField(self, field_name: typing.Literal['maintain_singular_struct', b'maintain_singular_struct', 'select', b'select']) -> None:
             ...
 
-    @typing_extensions.final
+    @typing.final
     class FieldReference(google.protobuf.message.Message):
         """A reference to an inner part of a complex object. Can reference reference a
         single element or a masked version of elements
         """
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-        @typing_extensions.final
+        @typing.final
         class RootReference(google.protobuf.message.Message):
             """Singleton that expresses this FieldReference is rooted off the root
             incoming record type
@@ -3901,7 +3917,7 @@ class Expression(google.protobuf.message.Message):
             def __init__(self) -> None:
                 ...
 
-        @typing_extensions.final
+        @typing.final
         class OuterReference(google.protobuf.message.Message):
             """A root reference for the outer relation's subquery"""
             DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -3912,7 +3928,7 @@ class Expression(google.protobuf.message.Message):
             def __init__(self, *, steps_out: builtins.int=...) -> None:
                 ...
 
-            def ClearField(self, field_name: typing_extensions.Literal['steps_out', b'steps_out']) -> None:
+            def ClearField(self, field_name: typing.Literal['steps_out', b'steps_out']) -> None:
                 ...
         DIRECT_REFERENCE_FIELD_NUMBER: builtins.int
         MASKED_REFERENCE_FIELD_NUMBER: builtins.int
@@ -3943,26 +3959,26 @@ class Expression(google.protobuf.message.Message):
         def __init__(self, *, direct_reference: global___Expression.ReferenceSegment | None=..., masked_reference: global___Expression.MaskExpression | None=..., expression: global___Expression | None=..., root_reference: global___Expression.FieldReference.RootReference | None=..., outer_reference: global___Expression.FieldReference.OuterReference | None=...) -> None:
             ...
 
-        def HasField(self, field_name: typing_extensions.Literal['direct_reference', b'direct_reference', 'expression', b'expression', 'masked_reference', b'masked_reference', 'outer_reference', b'outer_reference', 'reference_type', b'reference_type', 'root_reference', b'root_reference', 'root_type', b'root_type']) -> builtins.bool:
+        def HasField(self, field_name: typing.Literal['direct_reference', b'direct_reference', 'expression', b'expression', 'masked_reference', b'masked_reference', 'outer_reference', b'outer_reference', 'reference_type', b'reference_type', 'root_reference', b'root_reference', 'root_type', b'root_type']) -> builtins.bool:
             ...
 
-        def ClearField(self, field_name: typing_extensions.Literal['direct_reference', b'direct_reference', 'expression', b'expression', 'masked_reference', b'masked_reference', 'outer_reference', b'outer_reference', 'reference_type', b'reference_type', 'root_reference', b'root_reference', 'root_type', b'root_type']) -> None:
-            ...
-
-        @typing.overload
-        def WhichOneof(self, oneof_group: typing_extensions.Literal['reference_type', b'reference_type']) -> typing_extensions.Literal['direct_reference', 'masked_reference'] | None:
+        def ClearField(self, field_name: typing.Literal['direct_reference', b'direct_reference', 'expression', b'expression', 'masked_reference', b'masked_reference', 'outer_reference', b'outer_reference', 'reference_type', b'reference_type', 'root_reference', b'root_reference', 'root_type', b'root_type']) -> None:
             ...
 
         @typing.overload
-        def WhichOneof(self, oneof_group: typing_extensions.Literal['root_type', b'root_type']) -> typing_extensions.Literal['expression', 'root_reference', 'outer_reference'] | None:
+        def WhichOneof(self, oneof_group: typing.Literal['reference_type', b'reference_type']) -> typing.Literal['direct_reference', 'masked_reference'] | None:
             ...
 
-    @typing_extensions.final
+        @typing.overload
+        def WhichOneof(self, oneof_group: typing.Literal['root_type', b'root_type']) -> typing.Literal['expression', 'root_reference', 'outer_reference'] | None:
+            ...
+
+    @typing.final
     class Subquery(google.protobuf.message.Message):
         """Subquery relation expression"""
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-        @typing_extensions.final
+        @typing.final
         class Scalar(google.protobuf.message.Message):
             """A subquery with one row and one column. This is often an aggregate
             though not required to be.
@@ -3977,13 +3993,13 @@ class Expression(google.protobuf.message.Message):
             def __init__(self, *, input: global___Rel | None=...) -> None:
                 ...
 
-            def HasField(self, field_name: typing_extensions.Literal['input', b'input']) -> builtins.bool:
+            def HasField(self, field_name: typing.Literal['input', b'input']) -> builtins.bool:
                 ...
 
-            def ClearField(self, field_name: typing_extensions.Literal['input', b'input']) -> None:
+            def ClearField(self, field_name: typing.Literal['input', b'input']) -> None:
                 ...
 
-        @typing_extensions.final
+        @typing.final
         class InPredicate(google.protobuf.message.Message):
             """Predicate checking that the left expression is contained in the right
             subquery
@@ -4008,13 +4024,13 @@ class Expression(google.protobuf.message.Message):
             def __init__(self, *, needles: collections.abc.Iterable[global___Expression] | None=..., haystack: global___Rel | None=...) -> None:
                 ...
 
-            def HasField(self, field_name: typing_extensions.Literal['haystack', b'haystack']) -> builtins.bool:
+            def HasField(self, field_name: typing.Literal['haystack', b'haystack']) -> builtins.bool:
                 ...
 
-            def ClearField(self, field_name: typing_extensions.Literal['haystack', b'haystack', 'needles', b'needles']) -> None:
+            def ClearField(self, field_name: typing.Literal['haystack', b'haystack', 'needles', b'needles']) -> None:
                 ...
 
-        @typing_extensions.final
+        @typing.final
         class SetPredicate(google.protobuf.message.Message):
             """A predicate over a set of rows in the form of a subquery
             EXISTS and UNIQUE are common SQL forms of this operation.
@@ -4048,13 +4064,13 @@ class Expression(google.protobuf.message.Message):
             def __init__(self, *, predicate_op: global___Expression.Subquery.SetPredicate.PredicateOp.ValueType=..., tuples: global___Rel | None=...) -> None:
                 ...
 
-            def HasField(self, field_name: typing_extensions.Literal['tuples', b'tuples']) -> builtins.bool:
+            def HasField(self, field_name: typing.Literal['tuples', b'tuples']) -> builtins.bool:
                 ...
 
-            def ClearField(self, field_name: typing_extensions.Literal['predicate_op', b'predicate_op', 'tuples', b'tuples']) -> None:
+            def ClearField(self, field_name: typing.Literal['predicate_op', b'predicate_op', 'tuples', b'tuples']) -> None:
                 ...
 
-        @typing_extensions.final
+        @typing.final
         class SetComparison(google.protobuf.message.Message):
             """A subquery comparison using ANY or ALL.
             Examples:
@@ -4124,10 +4140,10 @@ class Expression(google.protobuf.message.Message):
             def __init__(self, *, reduction_op: global___Expression.Subquery.SetComparison.ReductionOp.ValueType=..., comparison_op: global___Expression.Subquery.SetComparison.ComparisonOp.ValueType=..., left: global___Expression | None=..., right: global___Rel | None=...) -> None:
                 ...
 
-            def HasField(self, field_name: typing_extensions.Literal['left', b'left', 'right', b'right']) -> builtins.bool:
+            def HasField(self, field_name: typing.Literal['left', b'left', 'right', b'right']) -> builtins.bool:
                 ...
 
-            def ClearField(self, field_name: typing_extensions.Literal['comparison_op', b'comparison_op', 'left', b'left', 'reduction_op', b'reduction_op', 'right', b'right']) -> None:
+            def ClearField(self, field_name: typing.Literal['comparison_op', b'comparison_op', 'left', b'left', 'reduction_op', b'reduction_op', 'right', b'right']) -> None:
                 ...
         SCALAR_FIELD_NUMBER: builtins.int
         IN_PREDICATE_FIELD_NUMBER: builtins.int
@@ -4153,13 +4169,13 @@ class Expression(google.protobuf.message.Message):
         def __init__(self, *, scalar: global___Expression.Subquery.Scalar | None=..., in_predicate: global___Expression.Subquery.InPredicate | None=..., set_predicate: global___Expression.Subquery.SetPredicate | None=..., set_comparison: global___Expression.Subquery.SetComparison | None=...) -> None:
             ...
 
-        def HasField(self, field_name: typing_extensions.Literal['in_predicate', b'in_predicate', 'scalar', b'scalar', 'set_comparison', b'set_comparison', 'set_predicate', b'set_predicate', 'subquery_type', b'subquery_type']) -> builtins.bool:
+        def HasField(self, field_name: typing.Literal['in_predicate', b'in_predicate', 'scalar', b'scalar', 'set_comparison', b'set_comparison', 'set_predicate', b'set_predicate', 'subquery_type', b'subquery_type']) -> builtins.bool:
             ...
 
-        def ClearField(self, field_name: typing_extensions.Literal['in_predicate', b'in_predicate', 'scalar', b'scalar', 'set_comparison', b'set_comparison', 'set_predicate', b'set_predicate', 'subquery_type', b'subquery_type']) -> None:
+        def ClearField(self, field_name: typing.Literal['in_predicate', b'in_predicate', 'scalar', b'scalar', 'set_comparison', b'set_comparison', 'set_predicate', b'set_predicate', 'subquery_type', b'subquery_type']) -> None:
             ...
 
-        def WhichOneof(self, oneof_group: typing_extensions.Literal['subquery_type', b'subquery_type']) -> typing_extensions.Literal['scalar', 'in_predicate', 'set_predicate', 'set_comparison'] | None:
+        def WhichOneof(self, oneof_group: typing.Literal['subquery_type', b'subquery_type']) -> typing.Literal['scalar', 'in_predicate', 'set_predicate', 'set_comparison'] | None:
             ...
     LITERAL_FIELD_NUMBER: builtins.int
     SELECTION_FIELD_NUMBER: builtins.int
@@ -4233,17 +4249,17 @@ class Expression(google.protobuf.message.Message):
     def __init__(self, *, literal: global___Expression.Literal | None=..., selection: global___Expression.FieldReference | None=..., scalar_function: global___Expression.ScalarFunction | None=..., window_function: global___Expression.WindowFunction | None=..., if_then: global___Expression.IfThen | None=..., switch_expression: global___Expression.SwitchExpression | None=..., singular_or_list: global___Expression.SingularOrList | None=..., multi_or_list: global___Expression.MultiOrList | None=..., cast: global___Expression.Cast | None=..., subquery: global___Expression.Subquery | None=..., nested: global___Expression.Nested | None=..., dynamic_parameter: global___DynamicParameter | None=..., enum: global___Expression.Enum | None=...) -> None:
         ...
 
-    def HasField(self, field_name: typing_extensions.Literal['cast', b'cast', 'dynamic_parameter', b'dynamic_parameter', 'enum', b'enum', 'if_then', b'if_then', 'literal', b'literal', 'multi_or_list', b'multi_or_list', 'nested', b'nested', 'rex_type', b'rex_type', 'scalar_function', b'scalar_function', 'selection', b'selection', 'singular_or_list', b'singular_or_list', 'subquery', b'subquery', 'switch_expression', b'switch_expression', 'window_function', b'window_function']) -> builtins.bool:
+    def HasField(self, field_name: typing.Literal['cast', b'cast', 'dynamic_parameter', b'dynamic_parameter', 'enum', b'enum', 'if_then', b'if_then', 'literal', b'literal', 'multi_or_list', b'multi_or_list', 'nested', b'nested', 'rex_type', b'rex_type', 'scalar_function', b'scalar_function', 'selection', b'selection', 'singular_or_list', b'singular_or_list', 'subquery', b'subquery', 'switch_expression', b'switch_expression', 'window_function', b'window_function']) -> builtins.bool:
         ...
 
-    def ClearField(self, field_name: typing_extensions.Literal['cast', b'cast', 'dynamic_parameter', b'dynamic_parameter', 'enum', b'enum', 'if_then', b'if_then', 'literal', b'literal', 'multi_or_list', b'multi_or_list', 'nested', b'nested', 'rex_type', b'rex_type', 'scalar_function', b'scalar_function', 'selection', b'selection', 'singular_or_list', b'singular_or_list', 'subquery', b'subquery', 'switch_expression', b'switch_expression', 'window_function', b'window_function']) -> None:
+    def ClearField(self, field_name: typing.Literal['cast', b'cast', 'dynamic_parameter', b'dynamic_parameter', 'enum', b'enum', 'if_then', b'if_then', 'literal', b'literal', 'multi_or_list', b'multi_or_list', 'nested', b'nested', 'rex_type', b'rex_type', 'scalar_function', b'scalar_function', 'selection', b'selection', 'singular_or_list', b'singular_or_list', 'subquery', b'subquery', 'switch_expression', b'switch_expression', 'window_function', b'window_function']) -> None:
         ...
 
-    def WhichOneof(self, oneof_group: typing_extensions.Literal['rex_type', b'rex_type']) -> typing_extensions.Literal['literal', 'selection', 'scalar_function', 'window_function', 'if_then', 'switch_expression', 'singular_or_list', 'multi_or_list', 'cast', 'subquery', 'nested', 'dynamic_parameter', 'enum'] | None:
+    def WhichOneof(self, oneof_group: typing.Literal['rex_type', b'rex_type']) -> typing.Literal['literal', 'selection', 'scalar_function', 'window_function', 'if_then', 'switch_expression', 'singular_or_list', 'multi_or_list', 'cast', 'subquery', 'nested', 'dynamic_parameter', 'enum'] | None:
         ...
 global___Expression = Expression
 
-@typing_extensions.final
+@typing.final
 class DynamicParameter(google.protobuf.message.Message):
     """Expression that represents a dynamic parameter.
     Dynamic parameters are identified by a surrogate key within a plan.
@@ -4251,24 +4267,24 @@ class DynamicParameter(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
     TYPE_FIELD_NUMBER: builtins.int
     PARAMETER_REFERENCE_FIELD_NUMBER: builtins.int
+    parameter_reference: builtins.int
+    'The surrogate key used within a plan to reference a specific parameter binding.'
 
     @property
     def type(self) -> proto.type_pb2.Type:
         """The type of the dynamic parameter."""
-    parameter_reference: builtins.int
-    'The surrogate key used within a plan to reference a specific parameter binding.'
 
     def __init__(self, *, type: proto.type_pb2.Type | None=..., parameter_reference: builtins.int=...) -> None:
         ...
 
-    def HasField(self, field_name: typing_extensions.Literal['type', b'type']) -> builtins.bool:
+    def HasField(self, field_name: typing.Literal['type', b'type']) -> builtins.bool:
         ...
 
-    def ClearField(self, field_name: typing_extensions.Literal['parameter_reference', b'parameter_reference', 'type', b'type']) -> None:
+    def ClearField(self, field_name: typing.Literal['parameter_reference', b'parameter_reference', 'type', b'type']) -> None:
         ...
 global___DynamicParameter = DynamicParameter
 
-@typing_extensions.final
+@typing.final
 class SortField(google.protobuf.message.Message):
     """The description of a field to sort on (including the direction of sorting and null semantics)"""
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -4297,27 +4313,27 @@ class SortField(google.protobuf.message.Message):
     EXPR_FIELD_NUMBER: builtins.int
     DIRECTION_FIELD_NUMBER: builtins.int
     COMPARISON_FUNCTION_REFERENCE_FIELD_NUMBER: builtins.int
+    direction: global___SortField.SortDirection.ValueType
+    comparison_function_reference: builtins.int
 
     @property
     def expr(self) -> global___Expression:
         ...
-    direction: global___SortField.SortDirection.ValueType
-    comparison_function_reference: builtins.int
 
     def __init__(self, *, expr: global___Expression | None=..., direction: global___SortField.SortDirection.ValueType=..., comparison_function_reference: builtins.int=...) -> None:
         ...
 
-    def HasField(self, field_name: typing_extensions.Literal['comparison_function_reference', b'comparison_function_reference', 'direction', b'direction', 'expr', b'expr', 'sort_kind', b'sort_kind']) -> builtins.bool:
+    def HasField(self, field_name: typing.Literal['comparison_function_reference', b'comparison_function_reference', 'direction', b'direction', 'expr', b'expr', 'sort_kind', b'sort_kind']) -> builtins.bool:
         ...
 
-    def ClearField(self, field_name: typing_extensions.Literal['comparison_function_reference', b'comparison_function_reference', 'direction', b'direction', 'expr', b'expr', 'sort_kind', b'sort_kind']) -> None:
+    def ClearField(self, field_name: typing.Literal['comparison_function_reference', b'comparison_function_reference', 'direction', b'direction', 'expr', b'expr', 'sort_kind', b'sort_kind']) -> None:
         ...
 
-    def WhichOneof(self, oneof_group: typing_extensions.Literal['sort_kind', b'sort_kind']) -> typing_extensions.Literal['direction', 'comparison_function_reference'] | None:
+    def WhichOneof(self, oneof_group: typing.Literal['sort_kind', b'sort_kind']) -> typing.Literal['direction', 'comparison_function_reference'] | None:
         ...
 global___SortField = SortField
 
-@typing_extensions.final
+@typing.final
 class AggregateFunction(google.protobuf.message.Message):
     """An aggregate function."""
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -4353,6 +4369,10 @@ class AggregateFunction(google.protobuf.message.Message):
     ARGS_FIELD_NUMBER: builtins.int
     function_reference: builtins.int
     'Points to a function_anchor defined in this plan, which must refer\n    to an aggregate function in the associated YAML file. Required; 0 is\n    considered to be a valid anchor/reference.\n    '
+    phase: global___AggregationPhase.ValueType
+    'Describes which part of the aggregation to perform within the context of\n    distributed algorithms. Required. Must be set to INITIAL_TO_RESULT for\n    aggregate functions that are not decomposable.\n    '
+    invocation: global___AggregateFunction.AggregationInvocation.ValueType
+    'Specifies whether equivalent records are merged before being aggregated.\n    Optional, defaults to AGGREGATION_INVOCATION_ALL.\n    '
 
     @property
     def arguments(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___FunctionArgument]:
@@ -4385,8 +4405,6 @@ class AggregateFunction(google.protobuf.message.Message):
         """Must be set to the return type of the function, exactly as derived
         using the declaration in the extension.
         """
-    phase: global___AggregationPhase.ValueType
-    'Describes which part of the aggregation to perform within the context of\n    distributed algorithms. Required. Must be set to INITIAL_TO_RESULT for\n    aggregate functions that are not decomposable.\n    '
 
     @property
     def sorts(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___SortField]:
@@ -4395,8 +4413,6 @@ class AggregateFunction(google.protobuf.message.Message):
         priority; only if a sort field determines two records to be equivalent is
         the next field queried. This field is optional.
         """
-    invocation: global___AggregateFunction.AggregationInvocation.ValueType
-    'Specifies whether equivalent records are merged before being aggregated.\n    Optional, defaults to AGGREGATION_INVOCATION_ALL.\n    '
 
     @property
     def args(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___Expression]:
@@ -4405,14 +4421,14 @@ class AggregateFunction(google.protobuf.message.Message):
     def __init__(self, *, function_reference: builtins.int=..., arguments: collections.abc.Iterable[global___FunctionArgument] | None=..., options: collections.abc.Iterable[global___FunctionOption] | None=..., output_type: proto.type_pb2.Type | None=..., phase: global___AggregationPhase.ValueType=..., sorts: collections.abc.Iterable[global___SortField] | None=..., invocation: global___AggregateFunction.AggregationInvocation.ValueType=..., args: collections.abc.Iterable[global___Expression] | None=...) -> None:
         ...
 
-    def HasField(self, field_name: typing_extensions.Literal['output_type', b'output_type']) -> builtins.bool:
+    def HasField(self, field_name: typing.Literal['output_type', b'output_type']) -> builtins.bool:
         ...
 
-    def ClearField(self, field_name: typing_extensions.Literal['args', b'args', 'arguments', b'arguments', 'function_reference', b'function_reference', 'invocation', b'invocation', 'options', b'options', 'output_type', b'output_type', 'phase', b'phase', 'sorts', b'sorts']) -> None:
+    def ClearField(self, field_name: typing.Literal['args', b'args', 'arguments', b'arguments', 'function_reference', b'function_reference', 'invocation', b'invocation', 'options', b'options', 'output_type', b'output_type', 'phase', b'phase', 'sorts', b'sorts']) -> None:
         ...
 global___AggregateFunction = AggregateFunction
 
-@typing_extensions.final
+@typing.final
 class ReferenceRel(google.protobuf.message.Message):
     """This rel is used  to create references,
     in case we refer to a RelRoot field names will be ignored
@@ -4424,6 +4440,6 @@ class ReferenceRel(google.protobuf.message.Message):
     def __init__(self, *, subtree_ordinal: builtins.int=...) -> None:
         ...
 
-    def ClearField(self, field_name: typing_extensions.Literal['subtree_ordinal', b'subtree_ordinal']) -> None:
+    def ClearField(self, field_name: typing.Literal['subtree_ordinal', b'subtree_ordinal']) -> None:
         ...
 global___ReferenceRel = ReferenceRel

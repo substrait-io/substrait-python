@@ -9,10 +9,14 @@ codegen-extensions:
 		--input-file-type jsonschema \
 		--input third_party/substrait/text/simple_extensions_schema.yaml \
 		--output src/substrait/gen/json/simple_extensions.py \
-		--output-model-type dataclasses.dataclass
+		--output-model-type dataclasses.dataclass \
+		--disable-timestamp
 
 lint:
 	uvx ruff@0.11.11 check
+
+lint_fix:
+	uvx ruff@0.11.11 check --fix
 
 format:
 	uvx ruff@0.11.11 format

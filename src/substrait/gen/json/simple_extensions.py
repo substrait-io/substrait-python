@@ -7,13 +7,15 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Dict, List, Optional, Union
 
+from typing_extensions import TypeAlias
+
 
 class Functions(Enum):
     INHERITS = 'INHERITS'
     SEPARATE = 'SEPARATE'
 
 
-Type = Union[str, Dict[str, Any]]
+Type: TypeAlias = Union[str, Dict[str, Any]]
 
 
 class Type1(Enum):
@@ -24,7 +26,7 @@ class Type1(Enum):
     string = 'string'
 
 
-EnumOptions = List[str]
+EnumOptions: TypeAlias = List[str]
 
 
 @dataclass
@@ -49,7 +51,7 @@ class TypeArg:
     description: Optional[str] = None
 
 
-Arguments = List[Union[EnumerationArg, ValueArg, TypeArg]]
+Arguments: TypeAlias = List[Union[EnumerationArg, ValueArg, TypeArg]]
 
 
 @dataclass
@@ -58,7 +60,7 @@ class Options1:
     description: Optional[str] = None
 
 
-Options = Dict[str, Options1]
+Options: TypeAlias = Dict[str, Options1]
 
 
 class ParameterConsistency(Enum):
@@ -73,10 +75,10 @@ class VariadicBehavior:
     parameterConsistency: Optional[ParameterConsistency] = None
 
 
-Deterministic = bool
+Deterministic: TypeAlias = bool
 
 
-SessionDependent = bool
+SessionDependent: TypeAlias = bool
 
 
 class NullabilityHandling(Enum):
@@ -85,13 +87,13 @@ class NullabilityHandling(Enum):
     DISCRETE = 'DISCRETE'
 
 
-ReturnValue = Type
+ReturnValue: TypeAlias = Type
 
 
-Implementation = Dict[str, str]
+Implementation: TypeAlias = Dict[str, str]
 
 
-Intermediate = Type
+Intermediate: TypeAlias = Type
 
 
 class Decomposable(Enum):
@@ -100,10 +102,10 @@ class Decomposable(Enum):
     MANY = 'MANY'
 
 
-Maxset = float
+Maxset: TypeAlias = float
 
 
-Ordered = bool
+Ordered: TypeAlias = bool
 
 
 @dataclass
@@ -196,7 +198,7 @@ class TypeParamDef:
     optional: Optional[bool] = None
 
 
-TypeParamDefs = List[TypeParamDef]
+TypeParamDefs: TypeAlias = List[TypeParamDef]
 
 
 @dataclass

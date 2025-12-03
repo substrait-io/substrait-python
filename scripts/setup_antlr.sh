@@ -1,13 +1,20 @@
 #!/bin/bash
 # Setup ANTLR for Substrait Python
+# Usage: setup_antlr.sh [ANTLR_JAR_DIR]
+# If ANTLR_JAR_DIR is not provided, defaults to project root/lib
 
 set -e
 
 ANTLR_VERSION="4.13.2"
-# Get the project root (parent of scripts directory)
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(dirname "${SCRIPT_DIR}")"
-ANTLR_JAR_DIR="${PROJECT_ROOT}/lib"
+
+# Determine ANTLR_JAR_DIR
+if [ -n "$1" ]; then
+    # Use provided argument
+    ANTLR_JAR_DIR="$1"
+else
+    ANTLR_JAR_DIR="lib"
+fi
+
 ANTLR_JAR="${ANTLR_JAR_DIR}/antlr-complete.jar"
 ANTLR_URL="https://www.antlr.org/download/antlr-${ANTLR_VERSION}-complete.jar"
 VERSION_FILE="${ANTLR_JAR_DIR}/.antlr_version"

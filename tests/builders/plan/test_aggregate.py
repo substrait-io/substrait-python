@@ -3,7 +3,7 @@ import substrait.gen.proto.plan_pb2 as stp
 import substrait.gen.proto.algebra_pb2 as stalg
 import substrait.gen.proto.extensions.extensions_pb2 as ste
 from substrait.builders.type import boolean, i64
-from substrait.builders.plan import read_named_table, aggregate
+from substrait.builders.plan import read_named_table, aggregate, default_version
 from substrait.builders.extended_expression import column, aggregate_function
 from substrait.extension_registry import ExtensionRegistry
 from substrait.type_inference import infer_plan_schema
@@ -56,6 +56,7 @@ def test_aggregate():
     ns = infer_plan_schema(table(None))
 
     expected = stp.Plan(
+        version=default_version,
         extension_urns=[
             ste.SimpleExtensionURN(extension_urn_anchor=1, urn="extension:test:urn")
         ],

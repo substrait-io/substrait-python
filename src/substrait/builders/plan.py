@@ -6,6 +6,7 @@ See `examples/builder_example.py` for usage.
 """
 
 from typing import Iterable, Optional, Union, Callable
+import re
 
 import substrait.gen.proto.algebra_pb2 as stalg
 from substrait.gen.proto.extensions.extensions_pb2 import AdvancedExtension
@@ -23,10 +24,20 @@ from substrait.utils import (
     merge_extension_urns,
     merge_extension_uris,
 )
+from substrait.gen.version import substrait_version
 
 UnboundPlan = Callable[[ExtensionRegistry], stp.Plan]
 
 PlanOrUnbound = Union[stp.Plan, UnboundPlan]
+
+p = re.compile(r"(\d+)\.(\d+)\.(\d+)")
+m = p.match(substrait_version)
+major = int(m.group(1))
+minor = int(m.group(2))
+patch = int(m.group(3))
+default_version = stp.Version(
+    major_number=major, minor_number=minor, patch_number=patch
+)
 
 
 def _merge_extensions(*objs):
@@ -65,9 +76,10 @@ def read_named_table(
         )
 
         return stp.Plan(
+            version=default_version,
             relations=[
                 stp.PlanRel(root=stalg.RelRoot(input=rel, names=named_struct.names))
-            ]
+            ],
         )
 
     return resolve
@@ -107,6 +119,7 @@ def project(
         )
 
         return stp.Plan(
+            version=default_version,
             relations=[stp.PlanRel(root=stalg.RelRoot(input=rel, names=names))],
             **_merge_extensions(_plan, *bound_expressions),
         )
@@ -137,6 +150,7 @@ def filter(
         names = ns.names
 
         return stp.Plan(
+            version=default_version,
             relations=[stp.PlanRel(root=stalg.RelRoot(input=rel, names=names))],
             **_merge_extensions(bound_plan, bound_expression),
         )
@@ -183,6 +197,7 @@ def sort(
         )
 
         return stp.Plan(
+            version=default_version,
             relations=[stp.PlanRel(root=stalg.RelRoot(input=rel, names=ns.names))],
             **_merge_extensions(bound_plan, *[e[0] for e in bound_expressions]),
         )
@@ -200,6 +215,7 @@ def set(inputs: Iterable[PlanOrUnbound], op: stalg.SetRel.SetOp) -> UnboundPlan:
         )
 
         return stp.Plan(
+            version=default_version,
             relations=[
                 stp.PlanRel(
                     root=stalg.RelRoot(
@@ -238,6 +254,7 @@ def fetch(
         )
 
         return stp.Plan(
+            version=default_version,
             relations=[
                 stp.PlanRel(
                     root=stalg.RelRoot(
@@ -286,6 +303,7 @@ def join(
         )
 
         return stp.Plan(
+            version=default_version,
             relations=[stp.PlanRel(root=stalg.RelRoot(input=rel, names=ns.names))],
             **_merge_extensions(bound_left, bound_right, bound_expression),
         )
@@ -321,6 +339,7 @@ def cross(
         )
 
         return stp.Plan(
+            version=default_version,
             relations=[stp.PlanRel(root=stalg.RelRoot(input=rel, names=ns.names))],
             **_merge_extensions(bound_left, bound_right),
         )
@@ -372,6 +391,7 @@ def aggregate(
         ] + [e.referred_expr[0].output_names[0] for e in bound_measures]
 
         return stp.Plan(
+            version=default_version,
             relations=[stp.PlanRel(root=stalg.RelRoot(input=rel, names=names))],
             **_merge_extensions(
                 bound_input, *bound_grouping_expressions, *bound_measures

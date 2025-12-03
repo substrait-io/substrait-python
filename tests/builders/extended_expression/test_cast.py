@@ -1,6 +1,6 @@
 import substrait.gen.proto.algebra_pb2 as stalg
-import substrait.gen.proto.type_pb2 as stt
 import substrait.gen.proto.extended_expression_pb2 as stee
+import substrait.gen.proto.type_pb2 as stt
 from substrait.builders.extended_expression import cast, literal
 from substrait.builders.type import i8, i16
 from substrait.extension_registry import ExtensionRegistry
@@ -37,7 +37,7 @@ def test_cast():
                         failure_behavior=stalg.Expression.Cast.FAILURE_BEHAVIOR_RETURN_NULL,
                     )
                 ),
-                output_names=["cast"],
+                output_names=["cast(Literal(3))"],
             )
         ],
         base_schema=named_struct,
@@ -48,6 +48,7 @@ def test_cast():
 
 def test_cast_with_extension():
     import yaml
+
     import substrait.gen.proto.extensions.extensions_pb2 as ste
     from substrait.builders.extended_expression import scalar_function
 
@@ -134,7 +135,7 @@ scalar_functions:
                         failure_behavior=stalg.Expression.Cast.FAILURE_BEHAVIOR_RETURN_NULL,
                     )
                 ),
-                output_names=["cast"],
+                output_names=["cast(add(Literal(1),Literal(2)))"],
             )
         ],
         base_schema=named_struct,

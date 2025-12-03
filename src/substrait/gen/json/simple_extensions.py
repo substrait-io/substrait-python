@@ -5,9 +5,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, List, Optional, Union
-
-from typing_extensions import TypeAlias
+from typing import Any, Dict, List, Optional, TypeAlias, Union
 
 
 class Functions(Enum):

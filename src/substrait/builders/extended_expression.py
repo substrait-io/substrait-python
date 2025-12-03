@@ -552,16 +552,24 @@ def if_then(
             referred_expr=[
                 stee.ExpressionReference(
                     expression=stalg.Expression(
-                        if_then=stalg.Expression.IfThen(**{
-                            "ifs": [
-                                stalg.Expression.IfThen.IfClause(**{
-                                    "if": if_clause[0].referred_expr[0].expression,
-                                    "then": if_clause[1].referred_expr[0].expression,
-                                })
-                                for if_clause in bound_ifs
-                            ],
-                            "else": bound_else.referred_expr[0].expression,
-                        })
+                        if_then=stalg.Expression.IfThen(
+                            **{
+                                "ifs": [
+                                    stalg.Expression.IfThen.IfClause(
+                                        **{
+                                            "if": if_clause[0]
+                                            .referred_expr[0]
+                                            .expression,
+                                            "then": if_clause[1]
+                                            .referred_expr[0]
+                                            .expression,
+                                        }
+                                    )
+                                    for if_clause in bound_ifs
+                                ],
+                                "else": bound_else.referred_expr[0].expression,
+                            }
+                        )
                     ),
                     output_names=_alias_or_inferred(
                         alias,
@@ -632,10 +640,12 @@ def switch(
                         switch_expression=stalg.Expression.SwitchExpression(
                             match=bound_match.referred_expr[0].expression,
                             ifs=[
-                                stalg.Expression.SwitchExpression.IfValue(**{
-                                    "if": i.referred_expr[0].expression.literal,
-                                    "then": t.referred_expr[0].expression,
-                                })
+                                stalg.Expression.SwitchExpression.IfValue(
+                                    **{
+                                        "if": i.referred_expr[0].expression.literal,
+                                        "then": t.referred_expr[0].expression,
+                                    }
+                                )
                                 for i, t in bound_ifs
                             ],
                             **{"else": bound_else.referred_expr[0].expression},

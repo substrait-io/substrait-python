@@ -4,7 +4,10 @@
 set -e
 
 ANTLR_VERSION="4.13.2"
-ANTLR_JAR_DIR="lib"
+# Get the project root (parent of scripts directory)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(dirname "${SCRIPT_DIR}")"
+ANTLR_JAR_DIR="${PROJECT_ROOT}/lib"
 ANTLR_JAR="${ANTLR_JAR_DIR}/antlr-complete.jar"
 ANTLR_URL="https://www.antlr.org/download/antlr-${ANTLR_VERSION}-complete.jar"
 VERSION_FILE="${ANTLR_JAR_DIR}/.antlr_version"

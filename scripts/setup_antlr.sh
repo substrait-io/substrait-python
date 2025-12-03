@@ -6,7 +6,7 @@ set -e
 ANTLR_VERSION="4.13.2"
 ANTLR_JAR_DIR="lib"
 ANTLR_JAR="${ANTLR_JAR_DIR}/antlr-complete.jar"
-ANTLR_URL="http://www.antlr.org/download/antlr-${ANTLR_VERSION}-complete.jar"
+ANTLR_URL="https://www.antlr.org/download/antlr-${ANTLR_VERSION}-complete.jar"
 VERSION_FILE="${ANTLR_JAR_DIR}/.antlr_version"
 
 echo "Setting up ANTLR ${ANTLR_VERSION}..." >&2
@@ -25,7 +25,10 @@ if [ "${INSTALLED_VERSION}" = "${ANTLR_VERSION}" ] && [ -f "${ANTLR_JAR}" ]; the
 else
     echo "Downloading ANTLR ${ANTLR_VERSION}..." >&2
     rm -f "${ANTLR_JAR}"
-    curl -s -L -o "${ANTLR_JAR}" "${ANTLR_URL}"
+    if ! curl -s -L -f -o "${ANTLR_JAR}" "${ANTLR_URL}"; then
+        echo "Failed to download ANTLR from ${ANTLR_URL}" >&2
+        exit 1
+    fi
     echo "${ANTLR_VERSION}" > "${VERSION_FILE}"
     echo "ANTLR ${ANTLR_VERSION} downloaded successfully" >&2
 fi

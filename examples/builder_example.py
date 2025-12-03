@@ -1,6 +1,6 @@
 from substrait.builders.plan import (
     read_named_table,
-    project,
+    select,
     filter,
     sort,
     fetch,
@@ -34,7 +34,7 @@ def basic_example():
             expressions=[column("id"), literal(100, i64(nullable=False))],
         ),
     )
-    table = project(table, expressions=[column("id")])
+    table = select(table, expressions=[column("id")])
 
     print(table(registry))
     pretty_print_plan(table(registry), use_colors=True)
@@ -177,7 +177,7 @@ def advanced_example():
             expressions=[column("id"), literal(100, i64(nullable=False))],
         ),
     )
-    table = project(table, expressions=[column("id")])
+    table = select(table, expressions=[column("id")])
 
     print("Simple filtered table:")
     pretty_print_plan(table(registry), use_colors=True)
@@ -212,7 +212,7 @@ def advanced_example():
     )
 
     # Project with calculated fields
-    enriched_users = project(
+    enriched_users = select(
         adult_users,
         expressions=[
             column("user_id"),
@@ -322,7 +322,7 @@ def expression_only_example():
         struct=struct(types=[fp64(nullable=False)], nullable=False),
     )
     dummy_table = read_named_table("dummy", dummy_schema)
-    dummy_plan = project(dummy_table, expressions=[complex_expr])
+    dummy_plan = select(dummy_table, expressions=[complex_expr])
     pretty_print_plan(dummy_plan(registry), use_colors=True)
 
     print("\n" + "=" * 50 + "\n")

@@ -11,7 +11,7 @@ from substrait.builders.extended_expression import (
 )
 from substrait.builders.plan import (
     read_named_table,
-    project,
+    select,
     filter,
     sort,
     fetch,
@@ -309,7 +309,7 @@ def translate(ast: dict, schema_resolver: SchemaResolver, registry: ExtensionReg
         if having_predicate:
             relation = filter(relation, having_predicate)(registry)
 
-        return project(relation, expressions=projection)(registry)
+        return select(relation, expressions=projection)(registry)
     elif op == "Table":
         name = ast["name"][0]["Identifier"]["value"]
         return read_named_table(name, schema_resolver(name))

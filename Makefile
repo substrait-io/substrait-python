@@ -1,6 +1,9 @@
-antlr:
+setup-antlr:
+	@bash scripts/setup_antlr.sh > /dev/null
+
+antlr: setup-antlr
 	cd third_party/substrait/grammar \
-		&& java -jar ${ANTLR_JAR} -o ../../../src/substrait/gen/antlr -Dlanguage=Python3 SubstraitType.g4 \
+		&& java -jar ../../../lib/antlr-complete.jar -o ../../../src/substrait/gen/antlr -Dlanguage=Python3 SubstraitType.g4 \
 		&& rm ../../../src/substrait/gen/antlr/*.tokens \
 		&& rm ../../../src/substrait/gen/antlr/*.interp
 
@@ -21,3 +24,7 @@ lint_fix:
 
 format:
 	uvx ruff@0.11.11 format
+
+pre_push: format lint_fix antlr codegen-extensions
+	uv sync --extra test
+	uv run pytest

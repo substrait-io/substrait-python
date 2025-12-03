@@ -1,0 +1,47 @@
+#!/bin/bash
+# Setup ANTLR for Substrait Python
+# Usage: setup_antlr.sh [ANTLR_JAR_DIR]
+# If ANTLR_JAR_DIR is not provided, defaults to project root/lib
+
+set -e
+
+ANTLR_VERSION="4.13.2"
+
+# Determine ANTLR_JAR_DIR
+if [ -n "$1" ]; then
+    # Use provided argument
+    ANTLR_JAR_DIR="$1"
+else
+    ANTLR_JAR_DIR="lib"
+fi
+
+ANTLR_JAR="${ANTLR_JAR_DIR}/antlr-complete.jar"
+ANTLR_URL="https://www.antlr.org/download/antlr-${ANTLR_VERSION}-complete.jar"
+VERSION_FILE="${ANTLR_JAR_DIR}/.antlr_version"
+
+echo "Setting up ANTLR ${ANTLR_VERSION}..." >&2
+
+# Create directory if it doesn't exist
+mkdir -p "${ANTLR_JAR_DIR}"
+
+# Check if installed version matches required version
+INSTALLED_VERSION=""
+if [ -f "${VERSION_FILE}" ]; then
+    INSTALLED_VERSION=$(cat "${VERSION_FILE}")
+fi
+
+if [ "${INSTALLED_VERSION}" = "${ANTLR_VERSION}" ] && [ -f "${ANTLR_JAR}" ]; then
+    echo "ANTLR ${ANTLR_VERSION} is already installed" >&2
+else
+    echo "Downloading ANTLR ${ANTLR_VERSION}..." >&2
+    rm -f "${ANTLR_JAR}"
+    if ! curl -s -L -f -o "${ANTLR_JAR}" "${ANTLR_URL}"; then
+        echo "Failed to download ANTLR from ${ANTLR_URL}" >&2
+        exit 1
+    fi
+    echo "${ANTLR_VERSION}" > "${VERSION_FILE}"
+    echo "ANTLR ${ANTLR_VERSION} downloaded successfully" >&2
+fi
+
+# Output the path so it can be captured
+echo "${ANTLR_JAR}"

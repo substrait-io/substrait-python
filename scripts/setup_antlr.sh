@@ -5,7 +5,7 @@ set -e
 
 ANTLR_VERSION="4.13.2"
 ANTLR_JAR_DIR="lib"
-ANTLR_JAR="${ANTLR_JAR_DIR}/antlr-${ANTLR_VERSION}-complete.jar"
+ANTLR_JAR="${ANTLR_JAR_DIR}/antlr-complete.jar"
 ANTLR_URL="http://www.antlr.org/download/antlr-${ANTLR_VERSION}-complete.jar"
 VERSION_FILE="${ANTLR_JAR_DIR}/.antlr_version"
 

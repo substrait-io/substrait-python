@@ -28,7 +28,7 @@ Run the upgrade script to upgrade the submodule and regenerate the protobuf stub
 
 ```
 uv sync --extra gen_proto
-uv run ./update_proto.sh <version>
+uv run scripts/update_proto.sh <version>
 ```
 
 ## Antlr grammar

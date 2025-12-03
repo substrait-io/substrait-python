@@ -78,6 +78,19 @@ def project(
     expressions: Iterable[ExtendedExpressionOrUnbound],
     extension: Optional[AdvancedExtension] = None,
 ) -> UnboundPlan:
+    """
+    Builds an UnboundPlan with ProjectRel as the root node. Expressions are appended to the parent relation fields to produce an output.
+    Semantically similar to a withColumn transformation.
+    
+    :param plan: Parent plan
+    :type plan: PlanOrUnbound
+    :param expressions: Expressions to project
+    :type expressions: Iterable[ExtendedExpressionOrUnbound]
+    :param extension: Optional user-defined extension
+    :type extension: Optional[AdvancedExtension]
+    :return: UnboundPlan with ProjectRel as the root node
+    :rtype: UnboundPlan
+    """
     def resolve(registry: ExtensionRegistry) -> stp.Plan:
         _plan = plan if isinstance(plan, stp.Plan) else plan(registry)
         ns = infer_plan_schema(_plan)
@@ -112,6 +125,19 @@ def select(
     expressions: Iterable[ExtendedExpressionOrUnbound],
     extension: Optional[AdvancedExtension] = None,
 ) -> UnboundPlan:
+    """
+    Builds an UnboundPlan with ProjectRel as the root node. Expressions make up the fields of an output relation.
+    Semantically similar to a select transformation.
+    
+    :param plan: Parent plan
+    :type plan: PlanOrUnbound
+    :param expressions: Expressions to project
+    :type expressions: Iterable[ExtendedExpressionOrUnbound]
+    :param extension: Optional user-defined extension
+    :type extension: Optional[AdvancedExtension]
+    :return: UnboundPlan with ProjectRel as the root node
+    :rtype: UnboundPlan
+    """
     def resolve(registry: ExtensionRegistry) -> stp.Plan:
         _plan = plan if isinstance(plan, stp.Plan) else plan(registry)
         ns = infer_plan_schema(_plan)

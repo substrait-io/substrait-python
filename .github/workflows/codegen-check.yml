@@ -20,12 +20,12 @@ jobs:
         uses: devcontainers/ci@v0.3
         with:
           runCmd: |
+            # fetch submodule tags since actions/checkout does not
+            git submodule foreach 'git fetch --unshallow || true'
             # Ensure dependencies are installed
             uv sync --extra test --extra gen_proto
             # Run all code generation steps
-            make antlr
-            ./gen_proto.sh
-            make codegen-extensions
+            make codegen
 
       - name: Check for uncommitted changes
         run: |
@@ -36,9 +36,7 @@ jobs:
             git diff src/substrait/gen/
             echo ""
             echo "To fix this, run:"
-            echo "  make antlr"
-            echo "  ./gen_proto.sh"
-            echo "  make codegen-extensions"
+            echo "  make codegen"
             echo "Then commit the changes."
             exit 1
           fi

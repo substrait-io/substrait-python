@@ -33,7 +33,7 @@ uv run ./update_proto.sh <version>
 
 ## Antlr grammar
 
-Substrait uses antlr grammar to derive output types of extension functions. Make sure java is installed and ANTLR_JAR environment variable is set. Take a look at .devcontainer/Dockerfile for example setup.
+Substrait uses antlr grammar to derive output types of extension functions. Make sure java is installed and antlr, by using running `make setup-antlr`.
 
 ```
 make antlr
@@ -62,3 +62,22 @@ Run tests in the project's root dir.
 uv sync --extra test
 uv run pytest
 ```
+
+# Pre-Push Checklist
+
+Before pushing your changes, run the following command to ensure all requirements are met:
+
+```
+make pre_push
+```
+
+This command performs the following checks and updates:
+1. Sets up ANTLR dependencies (`setup-antlr`)
+2. Formats code with ruff (`format`)
+3. Fixes linting issues with ruff (`lint_fix`)
+4. Regenerates ANTLR grammar (`antlr`)
+5. Regenerates extension stubs (`codegen-extensions`)
+6. Syncs dependencies (`uv sync --extra test`)
+7. Runs tests (`uv run pytest`)
+
+This ensures your code is properly formatted, linted, all generated files are up-to-date, and all tests pass.

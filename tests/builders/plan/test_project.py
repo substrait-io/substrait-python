@@ -2,7 +2,7 @@ import substrait.gen.proto.type_pb2 as stt
 import substrait.gen.proto.plan_pb2 as stp
 import substrait.gen.proto.algebra_pb2 as stalg
 from substrait.builders.type import boolean, i64
-from substrait.builders.plan import read_named_table, project
+from substrait.builders.plan import read_named_table, project, default_version
 from substrait.builders.extended_expression import column
 from substrait.extension_registry import ExtensionRegistry
 
@@ -21,6 +21,7 @@ def test_project():
     actual = project(table, [column("id")])(registry)
 
     expected = stp.Plan(
+        version=default_version,
         relations=[
             stp.PlanRel(
                 root=stalg.RelRoot(
@@ -47,7 +48,7 @@ def test_project():
                     names=["id"],
                 )
             )
-        ]
+        ],
     )
 
     assert actual == expected

@@ -11,6 +11,6 @@ def col(name: str) -> Expression:
     """Column selection."""
     return Expression(column(name))
 
-# TODO
+# TODO handle str_as_lit argument
 def parse_into_expr(expr, str_as_lit: bool):
     return expr._to_compliant_expr(substrait.dataframe)

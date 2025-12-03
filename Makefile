@@ -10,6 +10,7 @@ codegen-extensions:
 		--input third_party/substrait/text/simple_extensions_schema.yaml \
 		--output src/substrait/gen/json/simple_extensions.py \
 		--output-model-type dataclasses.dataclass \
+		--target-python-version 3.10  \
 		--disable-timestamp
 
 lint:

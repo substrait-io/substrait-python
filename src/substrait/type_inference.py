@@ -1,7 +1,7 @@
 import substrait.gen.proto.algebra_pb2 as stalg
 import substrait.gen.proto.extended_expression_pb2 as stee
-import substrait.gen.proto.type_pb2 as stt
 import substrait.gen.proto.plan_pb2 as stp
+import substrait.gen.proto.type_pb2 as stt
 
 
 def infer_literal_type(literal: stalg.Expression.Literal) -> stt.Type:
@@ -127,7 +127,7 @@ def infer_literal_type(literal: stalg.Expression.Literal) -> stt.Type:
         raise Exception(f"Unknown literal_type {literal_type}")
 
 
-def infer_nested_type(nested: stalg.Expression.Nested) -> stt.Type:
+def infer_nested_type(nested: stalg.Expression.Nested, parent_schema) -> stt.Type:
     nested_type = nested.WhichOneof("nested_type")
 
     nullability = (
@@ -139,22 +139,27 @@ def infer_nested_type(nested: stalg.Expression.Nested) -> stt.Type:
     if nested_type == "struct":
         return stt.Type(
             struct=stt.Type.Struct(
-                types=[infer_expression_type(f) for f in nested.struct.fields],
+                types=[
+                    infer_expression_type(f, parent_schema)
+                    for f in nested.struct.fields
+                ],
                 nullability=nullability,
             )
         )
     elif nested_type == "list":
         return stt.Type(
             list=stt.Type.List(
-                type=infer_expression_type(nested.list.values[0]),
+                type=infer_expression_type(nested.list.values[0], parent_schema),
                 nullability=nullability,
             )
         )
     elif nested_type == "map":
         return stt.Type(
             map=stt.Type.Map(
-                key=infer_expression_type(nested.map.key_values[0].key),
-                value=infer_expression_type(nested.map.key_values[0].value),
+                key=infer_expression_type(nested.map.key_values[0].key, parent_schema),
+                value=infer_expression_type(
+                    nested.map.key_values[0].value, parent_schema
+                ),
                 nullability=nullability,
             )
         )
@@ -191,9 +196,11 @@ def infer_expression_type(
     elif rex_type == "window_function":
         return expression.window_function.output_type
     elif rex_type == "if_then":
-        return infer_expression_type(expression.if_then.ifs[0].then)
+        return infer_expression_type(expression.if_then.ifs[0].then, parent_schema)
     elif rex_type == "switch_expression":
-        return infer_expression_type(expression.switch_expression.ifs[0].then)
+        return infer_expression_type(
+            expression.switch_expression.ifs[0].then, parent_schema
+        )
     elif rex_type == "cast":
         return expression.cast.type
     elif rex_type == "singular_or_list" or rex_type == "multi_or_list":
@@ -201,7 +208,7 @@ def infer_expression_type(
             bool=stt.Type.Boolean(nullability=stt.Type.Nullability.NULLABILITY_NULLABLE)
         )
     elif rex_type == "nested":
-        return infer_nested_type(expression.nested)
+        return infer_nested_type(expression.nested, parent_schema)
     elif rex_type == "subquery":
         subquery_type = expression.subquery.WhichOneof("subquery_type")
 

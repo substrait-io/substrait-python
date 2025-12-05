@@ -1,5 +1,7 @@
 from typing import Optional
-from antlr4 import InputStream, CommonTokenStream
+
+from antlr4 import CommonTokenStream, InputStream
+
 from substrait.gen.antlr.SubstraitTypeLexer import SubstraitTypeLexer
 from substrait.gen.antlr.SubstraitTypeParser import SubstraitTypeParser
 from substrait.gen.proto.type_pb2 import Type
@@ -121,7 +123,9 @@ def _evaluate(x, values: dict):
                         nullability=nullability,
                     )
                 )
-            elif isinstance(parametrized_type, SubstraitTypeParser.PrecisionTimestampContext):
+            elif isinstance(
+                parametrized_type, SubstraitTypeParser.PrecisionTimestampContext
+            ):
                 precision = _evaluate(parametrized_type.precision, values)
                 return Type(
                     precision_timestamp=Type.PrecisionTimestamp(
@@ -129,7 +133,9 @@ def _evaluate(x, values: dict):
                         nullability=nullability,
                     )
                 )
-            elif isinstance(parametrized_type, SubstraitTypeParser.PrecisionTimestampTZContext):
+            elif isinstance(
+                parametrized_type, SubstraitTypeParser.PrecisionTimestampTZContext
+            ):
                 precision = _evaluate(parametrized_type.precision, values)
                 return Type(
                     precision_timestamp_tz=Type.PrecisionTimestampTZ(
@@ -144,7 +150,9 @@ def _evaluate(x, values: dict):
                     )
                 )
             elif isinstance(parametrized_type, SubstraitTypeParser.StructContext):
-                types = list(map(lambda x: _evaluate(x,values),parametrized_type.expr()))
+                types = list(
+                    map(lambda x: _evaluate(x, values), parametrized_type.expr())
+                )
                 return Type(
                     struct=Type.Struct(
                         types=types,
@@ -152,10 +160,10 @@ def _evaluate(x, values: dict):
                     )
                 )
             elif isinstance(parametrized_type, SubstraitTypeParser.ListContext):
-                type =  _evaluate(parametrized_type.expr(),values)
+                list_type = _evaluate(parametrized_type.expr(), values)
                 return Type(
                     list=Type.List(
-                        type=type,
+                        type=list_type,
                         nullability=nullability,
                     )
                 )
@@ -163,8 +171,8 @@ def _evaluate(x, values: dict):
             elif isinstance(parametrized_type, SubstraitTypeParser.MapContext):
                 return Type(
                     map=Type.Map(
-                        key=_evaluate(parametrized_type.key,values),
-                        value=_evaluate(parametrized_type.value,values),
+                        key=_evaluate(parametrized_type.key, values),
+                        value=_evaluate(parametrized_type.value, values),
                         nullability=nullability,
                     )
                 )

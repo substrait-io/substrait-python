@@ -221,6 +221,7 @@ def precision_timestamp_tz(precision: int, nullable=True) -> stt.Type:
         )
     )
 
+
 def timestamp(nullable=True) -> stt.Type:
     return stt.Type(
         timestamp=stt.Type.Timestamp(
@@ -229,6 +230,7 @@ def timestamp(nullable=True) -> stt.Type:
             else stt.Type.NULLABILITY_REQUIRED,
         )
     )
+
 
 def struct(types: Iterable[stt.Type], nullable=True) -> stt.Type:
     return stt.Type(

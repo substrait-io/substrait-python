@@ -129,11 +129,12 @@ registry.register_extension_dict(
 )
 
 
-
 def test_non_existing_urn():
     assert (
         registry.lookup_function(
-            urn="non_existent", function_name="add", signature=[i8(nullable=False), i8(nullable=False)]
+            urn="non_existent",
+            function_name="add",
+            signature=[i8(nullable=False), i8(nullable=False)],
         )
         is None
     )
@@ -142,8 +143,9 @@ def test_non_existing_urn():
 def test_non_existing_function():
     assert (
         registry.lookup_function(
-
-        urn="extension:test:functions", function_name="sub", signature=[i8(nullable=False), i8(nullable=False)]
+            urn="extension:test:functions",
+            function_name="sub",
+            signature=[i8(nullable=False), i8(nullable=False)],
         )
         is None
     )
@@ -152,7 +154,9 @@ def test_non_existing_function():
 def test_non_existing_function_signature():
     assert (
         registry.lookup_function(
-            urn="extension:test:functions", function_name="add", signature=[i8(nullable=False)]
+            urn="extension:test:functions",
+            function_name="add",
+            signature=[i8(nullable=False)],
         )
         is None
     )
@@ -160,7 +164,9 @@ def test_non_existing_function_signature():
 
 def test_exact_match():
     assert registry.lookup_function(
-        urn="extension:test:functions", function_name="add", signature=[i8(nullable=False), i8(nullable=False)]
+        urn="extension:test:functions",
+        function_name="add",
+        signature=[i8(nullable=False), i8(nullable=False)],
     )[1] == Type(i8=Type.I8(nullability=Type.NULLABILITY_REQUIRED))
 
 
@@ -184,43 +190,35 @@ def test_wildcard_match_fails_with_constraits():
 
 
 def test_wildcard_match_with_constraits():
-    assert (
-        registry.lookup_function(
-            urn="extension:test:functions",
-            function_name="add",
-            signature=[i16(nullable=False), i16(nullable=False), i8(nullable=False)],
-        )[1]
-        == i8(nullable=False)
-    )
+    assert registry.lookup_function(
+        urn="extension:test:functions",
+        function_name="add",
+        signature=[i16(nullable=False), i16(nullable=False), i8(nullable=False)],
+    )[1] == i8(nullable=False)
 
 
 def test_variadic():
-    assert (
-        registry.lookup_function(
-            urn="extension:test:functions",
-            function_name="test_fn",
-            signature=[i8(nullable=False), i8(nullable=False), i8(nullable=False)],
-        )[1]
-        == i8(nullable=False)
-    )
+    assert registry.lookup_function(
+        urn="extension:test:functions",
+        function_name="test_fn",
+        signature=[i8(nullable=False), i8(nullable=False), i8(nullable=False)],
+    )[1] == i8(nullable=False)
 
 
 def test_variadic_any():
-    assert (
-        registry.lookup_function(
-            urn="extension:test:functions",
-            function_name="test_fn_variadic_any",
-            signature=[i16(nullable=False), i16(nullable=False), i16(nullable=False)],
-        )[1]
-        == i16(nullable=False)
-    )
+    assert registry.lookup_function(
+        urn="extension:test:functions",
+        function_name="test_fn_variadic_any",
+        signature=[i16(nullable=False), i16(nullable=False), i16(nullable=False)],
+    )[1] == i16(nullable=False)
 
 
 def test_variadic_fails_min_constraint():
     assert (
         registry.lookup_function(
-
-            urn="extension:test:functions", function_name="test_fn", signature=[i8(nullable=False)]
+            urn="extension:test:functions",
+            function_name="test_fn",
+            signature=[i8(nullable=False)],
         )
         is None
     )
@@ -254,14 +252,11 @@ def test_decimal_happy_path_discrete():
 
 
 def test_enum_with_valid_option():
-    assert (
-        registry.lookup_function(
-            urn="extension:test:functions",
-            function_name="test_enum",
-            signature=["FLIP", i8(nullable=False)],
-        )[1]
-        == i8(nullable=False)
-    )
+    assert registry.lookup_function(
+        urn="extension:test:functions",
+        function_name="test_enum",
+        signature=["FLIP", i8(nullable=False)],
+    )[1] == i8(nullable=False)
 
 
 def test_enum_with_nonexistent_option():

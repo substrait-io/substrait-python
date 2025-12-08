@@ -2,7 +2,6 @@ from substrait.gen.proto.type_pb2 import NamedStruct, Type
 from substrait.derivation_expression import evaluate
 
 
-
 def test_simple_arithmetic():
     assert evaluate("1 + 1") == 2
 
@@ -142,7 +141,7 @@ def test_nstruct_simple():
                 Type(i32=Type.I32(nullability=Type.NULLABILITY_REQUIRED)),
             ],
             nullability=Type.NULLABILITY_REQUIRED,
-        )
+        ),
     )
     assert result == expected
 
@@ -167,6 +166,6 @@ def test_nstruct_nested():
                 ),
             ],
             nullability=Type.NULLABILITY_REQUIRED,
-        )
+        ),
     )
     assert result == expected

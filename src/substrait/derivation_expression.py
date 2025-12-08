@@ -1,7 +1,6 @@
 from typing import Optional
 
 from antlr4 import CommonTokenStream, InputStream
-from datafusion.functions import named_struct
 
 from substrait.gen.antlr.SubstraitTypeLexer import SubstraitTypeLexer
 from substrait.gen.antlr.SubstraitTypeParser import SubstraitTypeParser

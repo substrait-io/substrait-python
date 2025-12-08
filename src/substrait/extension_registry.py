@@ -347,12 +347,14 @@ class FunctionEntry:
         output_type = evaluate(self.impl.return_, parameters)
 
         if self.nullability == se.NullabilityHandling.MIRROR:
-            sig_contains_nullable = any([
-                p.__getattribute__(p.WhichOneof("kind")).nullability
-                == Type.NULLABILITY_NULLABLE
-                for p in signature
-                if isinstance(p, Type)
-            ])
+            sig_contains_nullable = any(
+                [
+                    p.__getattribute__(p.WhichOneof("kind")).nullability
+                    == Type.NULLABILITY_NULLABLE
+                    for p in signature
+                    if isinstance(p, Type)
+                ]
+            )
             output_type.__getattribute__(output_type.WhichOneof("kind")).nullability = (
                 Type.NULLABILITY_NULLABLE
                 if sig_contains_nullable

@@ -1,7 +1,7 @@
 import substrait.gen.proto.algebra_pb2 as stalg
 import substrait.gen.proto.plan_pb2 as stp
 import substrait.gen.proto.type_pb2 as stt
-from substrait.builders.plan import read_named_table, write_table
+from substrait.builders.plan import read_named_table, write_named_table
 from substrait.builders.type import boolean, i64
 
 struct = stt.Type.Struct(types=[i64(nullable=False), boolean()])
@@ -10,7 +10,7 @@ named_struct = stt.NamedStruct(names=["id", "is_applicable"], struct=struct)
 
 
 def test_write_rel():
-    actual = write_table(
+    actual = write_named_table(
         "example_table_write_test",
         read_named_table("example_table", named_struct),
     )(None)

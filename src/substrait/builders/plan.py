@@ -5,9 +5,8 @@ All builders return UnboundPlan objects that can be materialized to a Plan using
 See `examples/builder_example.py` for usage.
 """
 
-from typing import Iterable, Optional, Union, Callable
+from typing import Callable, Iterable, Optional, Union
 
-from substrait.gen.proto.extensions.extensions_pb2 import AdvancedExtension
 import substrait.gen.proto.algebra_pb2 as stalg
 import substrait.gen.proto.extended_expression_pb2 as stee
 import substrait.gen.proto.plan_pb2 as stp
@@ -17,11 +16,12 @@ from substrait.builders.extended_expression import (
     resolve_expression,
 )
 from substrait.extension_registry import ExtensionRegistry
+from substrait.gen.proto.extensions.extensions_pb2 import AdvancedExtension
 from substrait.type_inference import infer_plan_schema
 from substrait.utils import (
     merge_extension_declarations,
-    merge_extension_urns,
     merge_extension_uris,
+    merge_extension_urns,
 )
 
 UnboundPlan = Callable[[ExtensionRegistry], stp.Plan]
@@ -381,7 +381,7 @@ def aggregate(
     return resolve
 
 
-def write_table(
+def write_named_table(
     table_names: Union[str, Iterable[str]],
     input: PlanOrUnbound,
     create_mode: Union[stalg.WriteRel.CreateMode.ValueType, None] = None,

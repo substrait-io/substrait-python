@@ -193,20 +193,18 @@ def _cover_parametrize_type(
     if not _check_nullability(check_nullability, parameterized_type, covered, kind):
         return False
 
-    if (
-        isinstance(parameterized_type, SubstraitTypeParser.VarCharContext)
-        and kind == "varchar"
-    ):
+    if isinstance(parameterized_type, SubstraitTypeParser.VarCharContext):
+        if kind != "varchar":
+            return False
         if hasattr(
             parameterized_type, "length"
         ) and check_violates_integer_option_parameters(
             covered.varchar, parameterized_type, ["length"], parameters
         ):
             return False
-    elif (
-        isinstance(parameterized_type, SubstraitTypeParser.FixedCharContext)
-        and kind == "fixed_char"
-    ):
+    elif isinstance(parameterized_type, SubstraitTypeParser.FixedCharContext):
+        if kind != "fixed_char":
+            return False
         if hasattr(
             parameterized_type, "length"
         ) and check_violates_integer_option_parameters(
@@ -214,36 +212,34 @@ def _cover_parametrize_type(
         ):
             return False
 
-    elif (
-        isinstance(parameterized_type, SubstraitTypeParser.FixedBinaryContext)
-        and kind == "fixed_binary"
-    ):
+    elif isinstance(parameterized_type, SubstraitTypeParser.FixedBinaryContext):
+        if kind != "fixed_binary":
+            return False
         if hasattr(
             parameterized_type, "length"
         ) and check_violates_integer_option_parameters(
             covered.fixed_binary, parameterized_type, ["length"], parameters
         ):
             return False
-    elif (
-        isinstance(parameterized_type, SubstraitTypeParser.DecimalContext)
-        and kind == "decimal"
-    ):
+    elif isinstance(parameterized_type, SubstraitTypeParser.DecimalContext):
+        if kind != "decimal":
+            return False
         if not _check_nullability(check_nullability, parameterized_type, covered, kind):
             return False
         return not check_violates_integer_option_parameters(
             covered.decimal, parameterized_type, ["scale", "precision"], parameters
         )
-    elif (
-        isinstance(parameterized_type, SubstraitTypeParser.PrecisionTimestampContext)
-        and kind == "precision_timestamp"
-    ):
+    elif isinstance(parameterized_type, SubstraitTypeParser.PrecisionTimestampContext):
+        if kind != "precision_timestamp":
+            return False
         return not check_violates_integer_option_parameters(
             covered.precision_timestamp, parameterized_type, ["precision"], parameters
         )
-    elif (
-        isinstance(parameterized_type, SubstraitTypeParser.PrecisionTimestampTZContext)
-        and kind == "precision_timestamp_tz"
+    elif isinstance(
+        parameterized_type, SubstraitTypeParser.PrecisionTimestampTZContext
     ):
+        if kind != "precision_timestamp_tz":
+            return False
         return not check_violates_integer_option_parameters(
             covered.precision_timestamp_tz,
             parameterized_type,
@@ -251,19 +247,18 @@ def _cover_parametrize_type(
             parameters,
         )
 
-    elif (
-        isinstance(parameterized_type, SubstraitTypeParser.ListContext)
-        and kind == "list"
-    ):
+    elif isinstance(parameterized_type, SubstraitTypeParser.ListContext):
+        if kind != "list":
+            return False
         covered_element_type = covered.list.type
         param_element_ctx = parameterized_type.expr()
         return covers(
             covered_element_type, param_element_ctx, parameters, check_nullability
         )
 
-    elif (
-        isinstance(parameterized_type, SubstraitTypeParser.MapContext) and kind == "map"
-    ):
+    elif isinstance(parameterized_type, SubstraitTypeParser.MapContext):
+        if kind != "map":
+            return False
         covered_key_type = covered.map.key
         covered_value_type = covered.map.value
         param_key_ctx = parameterized_type.key
@@ -272,10 +267,9 @@ def _cover_parametrize_type(
             covered_key_type, param_key_ctx, parameters, check_nullability
         ) and covers(covered_value_type, param_value_ctx, parameters, check_nullability)
 
-    elif (
-        isinstance(parameterized_type, SubstraitTypeParser.StructContext)
-        and kind == "struct"
-    ):
+    elif isinstance(parameterized_type, SubstraitTypeParser.StructContext):
+        if kind != "struct":
+            return False
         covered_types = covered.struct.types
         param_types = parameterized_type.expr() or []
         if not isinstance(param_types, list):
@@ -288,8 +282,8 @@ def _cover_parametrize_type(
             ):  # type: ignore
                 return False
     else:
-        # Unsupported params type or type miss match
-        return False
+        raise Exception(f"Unhandled type {type(parameterized_type)}")
+
     return True
 
 

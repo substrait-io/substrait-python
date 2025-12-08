@@ -164,7 +164,7 @@ def covers(
 
     parameterized_type = covering.parameterizedType()
     if parameterized_type:
-        return _cover_parametrize_type(
+        return _cover_parametrized_type(
             covered, parameterized_type, parameters, check_nullability
         )
 
@@ -182,7 +182,7 @@ def check_violates_integer_option_parameters(
     return False
 
 
-def _cover_parametrize_type(
+def _cover_parametrized_type(
     covered: Type,
     parameterized_type: SubstraitTypeParser.ParameterizedTypeContext,
     parameters: dict,

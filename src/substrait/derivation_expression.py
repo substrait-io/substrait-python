@@ -1,10 +1,12 @@
+import pdb
 from typing import Optional
 
 from antlr4 import CommonTokenStream, InputStream
+from datafusion.functions import named_struct
 
 from substrait.gen.antlr.SubstraitTypeLexer import SubstraitTypeLexer
 from substrait.gen.antlr.SubstraitTypeParser import SubstraitTypeParser
-from substrait.gen.proto.type_pb2 import Type
+from substrait.gen.proto.type_pb2 import NamedStruct, Type
 
 
 def _evaluate(x, values: dict):
@@ -177,11 +179,17 @@ def _evaluate(x, values: dict):
                     )
                 )
             elif isinstance(parametrized_type, SubstraitTypeParser.NStructContext):
-                # it gives me a parser error i may have to update the parser
-                # string `evaluate("NSTRUCT<longitude: i32, latitude: i32>")` from the docs https://substrait.io/types/type_classes/
-                # line 1:17 extraneous input ':'
-                raise NotImplementedError("Named structure type not implemented yet")
-            # elif isinstance(parametrized_type, SubstraitTypeParser.UserDefinedContext):
+                names = list(map(lambda k: k.getText(), parametrized_type.Identifier()))
+                struct = Type.Struct(
+                    types=list(
+                        map(lambda k: _evaluate(k, values), parametrized_type.expr())
+                    ),
+                    nullability=nullability,
+                )
+                return NamedStruct(
+                    names=names,
+                    struct=struct,
+                )
 
             raise Exception(f"Unknown parametrized type {type(parametrized_type)}")
         elif any_type:

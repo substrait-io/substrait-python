@@ -1,14 +1,22 @@
 import pytest
 import yaml
 
-from substrait.gen.proto.type_pb2 import Type
-from substrait.extension_registry import ExtensionRegistry, covers
-from substrait.derivation_expression import _parse
 from substrait.builders.type import (
+    decimal,
     i8,
     i16,
-    decimal,
+    i32,
+    struct,
 )
+from substrait.builders.type import (
+    list as list_,
+)
+from substrait.builders.type import (
+    map as map_,
+)
+from substrait.derivation_expression import _parse
+from substrait.extension_registry import ExtensionRegistry, covers
+from substrait.gen.proto.type_pb2 import Type
 
 content = """%YAML 1.2
 ---
@@ -318,6 +326,11 @@ def test_covers_nullability():
 
 def test_covers_decimal(nullable=False):
     assert not covers(decimal(8, 10), _parse("decimal<11, A>"), {})
+    assert covers(decimal(8, 10), _parse("decimal<10, A>"), {})
+    assert covers(decimal(8, 10), _parse("decimal<10, 8>"), {})
+    assert not covers(decimal(8, 10), _parse("decimal<10, 9>"), {})
+    assert not covers(decimal(8, 10), _parse("decimal<11, 8>"), {})
+    assert not covers(decimal(8, 10), _parse("decimal<11, 9>"), {})
 
 
 def test_covers_decimal_happy_path():
@@ -568,3 +581,53 @@ scalar_functions: []
     # During migration, URI is required - this should fail with TypeError
     with pytest.raises(TypeError):
         registry.register_extension_dict(yaml.safe_load(content))
+
+
+def test_covers_list_of_i8():
+    """Test that a list of i8 covers list<i8>."""
+    covered = list_(i8(nullable=False), nullable=False)
+    param_ctx = _parse("list<i8>")
+    assert covers(covered, param_ctx, {})
+
+
+def test_covers_map_string_to_i8():
+    """Test that a map with string keys and i8 values covers map<string,i8>."""
+    covered = map_(
+        key=Type(string=Type.String(nullability=Type.NULLABILITY_REQUIRED)),
+        value=i8(nullable=False),
+        nullable=False,
+    )
+    param_ctx = _parse("map<string,i8>")
+    assert covers(covered, param_ctx, {})
+
+
+def test_covers_struct_with_two_fields():
+    """Test that a struct with two i8 fields covers struct<i8,i8>."""
+    covered = struct([i8(nullable=False), i8(nullable=False)], nullable=False)
+    param_ctx = _parse("struct<i8,i8>")
+    assert covers(covered, param_ctx, {})
+
+
+def test_covers_list_of_i16_fails_i8():
+    """Test that a list of i16 does not cover list<i8>."""
+    covered = list_(i16(nullable=False), nullable=False)
+    param_ctx = _parse("list<i8>")
+    assert not covers(covered, param_ctx, {})
+
+
+def test_covers_map_i8_to_i16_fails():
+    """Test that a map with i8 keys and i16 values does not cover map<i8,i8>."""
+    covered = map_(
+        key=i8(nullable=False),
+        value=i16(nullable=False),
+        nullable=False,
+    )
+    param_ctx = _parse("map<i8,i8>")
+    assert not covers(covered, param_ctx, {})
+
+
+def test_covers_struct_mismatched_types_fails():
+    """Test that a struct with mismatched field types does not cover struct<i8,i8>."""
+    covered = struct([i32(nullable=False), i8(nullable=False)], nullable=False)
+    param_ctx = _parse("struct<i8,i8>")
+    assert not covers(covered, param_ctx, {})

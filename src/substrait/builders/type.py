@@ -1,4 +1,5 @@
 from typing import Iterable
+
 import substrait.gen.proto.type_pb2 as stt
 
 
@@ -215,16 +216,6 @@ def precision_timestamp_tz(precision: int, nullable=True) -> stt.Type:
     return stt.Type(
         precision_timestamp_tz=stt.Type.PrecisionTimestampTZ(
             precision=precision,
-            nullability=stt.Type.NULLABILITY_NULLABLE
-            if nullable
-            else stt.Type.NULLABILITY_REQUIRED,
-        )
-    )
-
-
-def timestamp(nullable=True) -> stt.Type:
-    return stt.Type(
-        timestamp=stt.Type.Timestamp(
             nullability=stt.Type.NULLABILITY_NULLABLE
             if nullable
             else stt.Type.NULLABILITY_REQUIRED,

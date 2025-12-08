@@ -196,18 +196,14 @@ def _cover_parametrize_type(
     if isinstance(parameterized_type, SubstraitTypeParser.VarCharContext):
         if kind != "varchar":
             return False
-        if hasattr(
-            parameterized_type, "length"
-        ) and check_violates_integer_option_parameters(
+        if check_violates_integer_option_parameters(
             covered.varchar, parameterized_type, ["length"], parameters
         ):
             return False
     elif isinstance(parameterized_type, SubstraitTypeParser.FixedCharContext):
         if kind != "fixed_char":
             return False
-        if hasattr(
-            parameterized_type, "length"
-        ) and check_violates_integer_option_parameters(
+        if check_violates_integer_option_parameters(
             covered.fixed_char, parameterized_type, ["length"], parameters
         ):
             return False
@@ -215,9 +211,7 @@ def _cover_parametrize_type(
     elif isinstance(parameterized_type, SubstraitTypeParser.FixedBinaryContext):
         if kind != "fixed_binary":
             return False
-        if hasattr(
-            parameterized_type, "length"
-        ) and check_violates_integer_option_parameters(
+        if check_violates_integer_option_parameters(
             covered.fixed_binary, parameterized_type, ["length"], parameters
         ):
             return False
@@ -347,14 +341,12 @@ class FunctionEntry:
         output_type = evaluate(self.impl.return_, parameters)
 
         if self.nullability == se.NullabilityHandling.MIRROR:
-            sig_contains_nullable = any(
-                [
-                    p.__getattribute__(p.WhichOneof("kind")).nullability
-                    == Type.NULLABILITY_NULLABLE
-                    for p in signature
-                    if isinstance(p, Type)
-                ]
-            )
+            sig_contains_nullable = any([
+                p.__getattribute__(p.WhichOneof("kind")).nullability
+                == Type.NULLABILITY_NULLABLE
+                for p in signature
+                if isinstance(p, Type)
+            ])
             output_type.__getattribute__(output_type.WhichOneof("kind")).nullability = (
                 Type.NULLABILITY_NULLABLE
                 if sig_contains_nullable

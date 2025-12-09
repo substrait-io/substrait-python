@@ -2,7 +2,7 @@ import substrait.gen.proto.type_pb2 as stt
 import substrait.gen.proto.plan_pb2 as stp
 import substrait.gen.proto.algebra_pb2 as stalg
 from substrait.builders.type import boolean, i64
-from substrait.builders.plan import read_named_table, fetch
+from substrait.builders.plan import read_named_table, fetch, default_version
 from substrait.builders.extended_expression import literal
 from substrait.extension_registry import ExtensionRegistry
 
@@ -24,6 +24,7 @@ def test_fetch():
     actual = fetch(table, offset=offset, count=count)(registry)
 
     expected = stp.Plan(
+        version=default_version,
         relations=[
             stp.PlanRel(
                 root=stalg.RelRoot(
@@ -37,7 +38,7 @@ def test_fetch():
                     names=["id", "is_applicable"],
                 )
             )
-        ]
+        ],
     )
 
     assert actual == expected

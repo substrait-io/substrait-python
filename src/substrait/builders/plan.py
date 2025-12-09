@@ -5,24 +5,24 @@ All builders return UnboundPlan objects that can be materialized to a Plan using
 See `examples/builder_example.py` for usage.
 """
 
-from typing import Iterable, Optional, Union, Callable
 import re
+from typing import Callable, Iterable, Optional, Union
 
 import substrait.gen.proto.algebra_pb2 as stalg
-from substrait.gen.proto.extensions.extensions_pb2 import AdvancedExtension
+import substrait.gen.proto.extended_expression_pb2 as stee
 import substrait.gen.proto.plan_pb2 as stp
 import substrait.gen.proto.type_pb2 as stt
-import substrait.gen.proto.extended_expression_pb2 as stee
-from substrait.extension_registry import ExtensionRegistry
 from substrait.builders.extended_expression import (
     ExtendedExpressionOrUnbound,
     resolve_expression,
 )
+from substrait.extension_registry import ExtensionRegistry
+from substrait.gen.proto.extensions.extensions_pb2 import AdvancedExtension
 from substrait.type_inference import infer_plan_schema
 from substrait.utils import (
     merge_extension_declarations,
-    merge_extension_urns,
     merge_extension_uris,
+    merge_extension_urns,
 )
 from substrait.gen.version import substrait_version
 
@@ -401,6 +401,36 @@ def aggregate(
             **_merge_extensions(
                 bound_input, *bound_grouping_expressions, *bound_measures
             ),
+        )
+
+    return resolve
+
+
+def write_named_table(
+    table_names: Union[str, Iterable[str]],
+    input: PlanOrUnbound,
+    create_mode: Union[stalg.WriteRel.CreateMode.ValueType, None] = None,
+) -> UnboundPlan:
+    def resolve(registry: ExtensionRegistry) -> stp.Plan:
+        bound_input = input if isinstance(input, stp.Plan) else input(registry)
+        ns = infer_plan_schema(bound_input)
+        _table_names = [table_names] if isinstance(table_names, str) else table_names
+        _create_mode = create_mode or stalg.WriteRel.CREATE_MODE_ERROR_IF_EXISTS
+
+        write_rel = stalg.Rel(
+            write=stalg.WriteRel(
+                input=bound_input.relations[-1].root.input,
+                table_schema=ns,
+                op=stalg.WriteRel.WRITE_OP_CTAS,
+                create_mode=_create_mode,
+                named_table=stalg.NamedObjectWrite(names=_table_names),
+            )
+        )
+        return stp.Plan(
+            relations=[
+                stp.PlanRel(root=stalg.RelRoot(input=write_rel, names=ns.names))
+            ],
+            **_merge_extensions(bound_input),
         )
 
     return resolve

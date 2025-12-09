@@ -194,74 +194,74 @@ def _cover_parametrized_type(
         return False
 
     if isinstance(parameterized_type, SubstraitTypeParser.VarCharContext):
-        if kind != "varchar":
-            return False
-        if check_violates_integer_option_parameters(
+        return kind == "varchar" and not check_violates_integer_option_parameters(
             covered.varchar, parameterized_type, ["length"], parameters
-        ):
-            return False
-    elif isinstance(parameterized_type, SubstraitTypeParser.FixedCharContext):
-        if kind != "fixed_char":
-            return False
-        if check_violates_integer_option_parameters(
+        )
+
+    if isinstance(parameterized_type, SubstraitTypeParser.FixedCharContext):
+        return kind == "fixed_char" and not check_violates_integer_option_parameters(
             covered.fixed_char, parameterized_type, ["length"], parameters
-        ):
-            return False
+        )
 
-    elif isinstance(parameterized_type, SubstraitTypeParser.FixedBinaryContext):
-        if kind != "fixed_binary":
-            return False
-        if check_violates_integer_option_parameters(
+    if isinstance(parameterized_type, SubstraitTypeParser.FixedBinaryContext):
+        return kind == "fixed_binary" and not check_violates_integer_option_parameters(
             covered.fixed_binary, parameterized_type, ["length"], parameters
-        ):
-            return False
-    elif isinstance(parameterized_type, SubstraitTypeParser.DecimalContext):
-        if kind != "decimal":
-            return False
-        if not _check_nullability(check_nullability, parameterized_type, covered, kind):
-            return False
-        return not check_violates_integer_option_parameters(
-            covered.decimal, parameterized_type, ["scale", "precision"], parameters
         )
-    elif isinstance(parameterized_type, SubstraitTypeParser.PrecisionTimestampContext):
-        if kind != "precision_timestamp":
-            return False
-        return not check_violates_integer_option_parameters(
-            covered.precision_timestamp, parameterized_type, ["precision"], parameters
+
+    if isinstance(parameterized_type, SubstraitTypeParser.DecimalContext):
+        return (
+            kind == "decimal"
+            and _check_nullability(check_nullability, parameterized_type, covered, kind)
+            and not check_violates_integer_option_parameters(
+                covered.decimal, parameterized_type, ["scale", "precision"], parameters
+            )
         )
-    elif isinstance(
-        parameterized_type, SubstraitTypeParser.PrecisionTimestampTZContext
-    ):
-        if kind != "precision_timestamp_tz":
-            return False
-        return not check_violates_integer_option_parameters(
-            covered.precision_timestamp_tz,
-            parameterized_type,
-            ["precision"],
+
+    if isinstance(parameterized_type, SubstraitTypeParser.PrecisionTimestampContext):
+        return (
+            kind == "precision_timestamp"
+            and not check_violates_integer_option_parameters(
+                covered.precision_timestamp,
+                parameterized_type,
+                ["precision"],
+                parameters,
+            )
+        )
+
+    if isinstance(parameterized_type, SubstraitTypeParser.PrecisionTimestampTZContext):
+        return (
+            kind == "precision_timestamp_tz"
+            and not check_violates_integer_option_parameters(
+                covered.precision_timestamp_tz,
+                parameterized_type,
+                ["precision"],
+                parameters,
+            )
+        )
+
+    if isinstance(parameterized_type, SubstraitTypeParser.ListContext):
+        return kind == "list" and covers(
+            covered.list.type,
+            parameterized_type.expr(),
             parameters,
+            check_nullability,
         )
 
-    elif isinstance(parameterized_type, SubstraitTypeParser.ListContext):
-        if kind != "list":
-            return False
-        covered_element_type = covered.list.type
-        param_element_ctx = parameterized_type.expr()
-        return covers(
-            covered_element_type, param_element_ctx, parameters, check_nullability
+    if isinstance(parameterized_type, SubstraitTypeParser.MapContext):
+        return (
+            kind == "map"
+            and covers(
+                covered.map.key, parameterized_type.key, parameters, check_nullability
+            )
+            and covers(
+                covered.map.value,
+                parameterized_type.value,
+                parameters,
+                check_nullability,
+            )
         )
 
-    elif isinstance(parameterized_type, SubstraitTypeParser.MapContext):
-        if kind != "map":
-            return False
-        covered_key_type = covered.map.key
-        covered_value_type = covered.map.value
-        param_key_ctx = parameterized_type.key
-        param_value_ctx = parameterized_type.value
-        return covers(
-            covered_key_type, param_key_ctx, parameters, check_nullability
-        ) and covers(covered_value_type, param_value_ctx, parameters, check_nullability)
-
-    elif isinstance(parameterized_type, SubstraitTypeParser.StructContext):
+    if isinstance(parameterized_type, SubstraitTypeParser.StructContext):
         if kind != "struct":
             return False
         covered_types = covered.struct.types
@@ -272,13 +272,15 @@ def _cover_parametrized_type(
             return False
         for covered_field, param_field_ctx in zip(covered_types, param_types):
             if not covers(
-                covered_field, param_field_ctx, parameters, check_nullability
-            ):  # type: ignore
+                covered_field,
+                param_field_ctx,
+                parameters,
+                check_nullability,  # type: ignore
+            ):
                 return False
-    else:
-        raise Exception(f"Unhandled type {type(parameterized_type)}")
+        return True
 
-    return True
+    raise Exception(f"Unhandled type {type(parameterized_type)}")
 
 
 class FunctionEntry:

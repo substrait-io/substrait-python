@@ -209,12 +209,8 @@ def _cover_parametrized_type(
         )
 
     if isinstance(parameterized_type, SubstraitTypeParser.DecimalContext):
-        return (
-            kind == "decimal"
-            and _check_nullability(check_nullability, parameterized_type, covered, kind)
-            and not check_violates_integer_option_parameters(
-                covered.decimal, parameterized_type, ["scale", "precision"], parameters
-            )
+        return kind == "decimal" and not check_violates_integer_option_parameters(
+            covered.decimal, parameterized_type, ["scale", "precision"], parameters
         )
 
     if isinstance(parameterized_type, SubstraitTypeParser.PrecisionTimestampContext):

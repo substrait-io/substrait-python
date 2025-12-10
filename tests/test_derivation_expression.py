@@ -1,4 +1,4 @@
-from substrait.gen.proto.type_pb2 import Type
+from substrait.gen.proto.type_pb2 import NamedStruct, Type
 from substrait.derivation_expression import evaluate
 
 
@@ -113,3 +113,59 @@ DECIMAL<prec, scale>""",
         )
         == func_eval
     )
+
+
+def test_struct_simple():
+    """Test simple struct with two i32 fields."""
+    result = evaluate("struct<i32, i32>", {})
+    expected = Type(
+        struct=Type.Struct(
+            types=[
+                Type(i32=Type.I32(nullability=Type.NULLABILITY_REQUIRED)),
+                Type(i32=Type.I32(nullability=Type.NULLABILITY_REQUIRED)),
+            ],
+            nullability=Type.NULLABILITY_REQUIRED,
+        )
+    )
+    assert result == expected
+
+
+def test_nstruct_simple():
+    """Test named struct with field names and types."""
+    result = evaluate("nStruct<a i32, b i32>", {})
+    expected = NamedStruct(
+        names=["a", "b"],
+        struct=Type.Struct(
+            types=[
+                Type(i32=Type.I32(nullability=Type.NULLABILITY_REQUIRED)),
+                Type(i32=Type.I32(nullability=Type.NULLABILITY_REQUIRED)),
+            ],
+            nullability=Type.NULLABILITY_REQUIRED,
+        ),
+    )
+    assert result == expected
+
+
+def test_nstruct_nested():
+    """Test named struct with nested struct field."""
+    result = evaluate("nStruct<a i32, b i32, c struct<i32, fp32>>", {})
+    expected = NamedStruct(
+        names=["a", "b", "c"],
+        struct=Type.Struct(
+            types=[
+                Type(i32=Type.I32(nullability=Type.NULLABILITY_REQUIRED)),
+                Type(i32=Type.I32(nullability=Type.NULLABILITY_REQUIRED)),
+                Type(
+                    struct=Type.Struct(
+                        types=[
+                            Type(i32=Type.I32(nullability=Type.NULLABILITY_REQUIRED)),
+                            Type(fp32=Type.FP32(nullability=Type.NULLABILITY_REQUIRED)),
+                        ],
+                        nullability=Type.NULLABILITY_REQUIRED,
+                    )
+                ),
+            ],
+            nullability=Type.NULLABILITY_REQUIRED,
+        ),
+    )
+    assert result == expected

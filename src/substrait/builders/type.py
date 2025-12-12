@@ -1,4 +1,5 @@
 from typing import Iterable
+
 import substrait.gen.proto.type_pb2 as stt
 
 

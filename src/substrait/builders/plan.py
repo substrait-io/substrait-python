@@ -131,6 +131,7 @@ def project(
         )
 
         return stp.Plan(
+            version=default_version,
             relations=[stp.PlanRel(root=stalg.RelRoot(input=rel, names=names))],
             **_merge_extensions(_plan, *bound_expressions),
         )

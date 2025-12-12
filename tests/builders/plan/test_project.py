@@ -45,7 +45,7 @@ def test_project():
                     names=["id", "is_applicable", "id"],
                 )
             )
-        ]
+        ],
     )
 
     assert actual == expected
@@ -84,6 +84,7 @@ def test_select():
                 )
             )
         ],
+        version=default_version,
     )
 
     assert actual == expected

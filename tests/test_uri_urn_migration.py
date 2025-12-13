@@ -24,7 +24,7 @@ from substrait.builders.type import i64
 from substrait.builders.plan import (
     read_named_table,
     aggregate,
-    project,
+    select,
     filter,
     default_version,
 )
@@ -149,7 +149,7 @@ scalar_functions:
         alias=["add"],
     )
 
-    actual = project(table, [add_expr])(registry)
+    actual = select(table, [add_expr])(registry)
 
     ns = infer_plan_schema(table(None))
 

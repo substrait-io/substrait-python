@@ -43,8 +43,7 @@ def test_aggregate():
 
     group_expr = column("id")
     measure_expr = aggregate_function(
-        "extension:test:urn",
-        "count",
+        "extension:test:urn:count",
         expressions=[column("is_applicable")],
         alias=["count"],
     )

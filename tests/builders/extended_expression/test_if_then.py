@@ -110,8 +110,7 @@ scalar_functions:
         ifs=[
             (
                 scalar_function(
-                    "extension:io.substrait:functions_comparison",
-                    "gt",
+                    "extension:io.substrait:functions_comparison:gt",
                     expressions=[
                         column("order_total"),
                         literal(

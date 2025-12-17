@@ -2,8 +2,6 @@ setup-antlr:
 	@bash scripts/setup_antlr.sh > /dev/null
 
 
-codegen: antlr codegen-proto codegen-extensions codegen-version
-
 
 antlr: setup-antlr
 	cd third_party/substrait/grammar \
@@ -37,6 +35,6 @@ lint_fix:
 format:
 	uvx ruff@0.11.11 format
 
-pre_push: format lint_fix antlr codegen-extensions
+codegen: format lint_fix antlr codegen-proto codegen-extensions codegen-version
 	uv sync --extra test
 	uv run pytest

@@ -22,8 +22,6 @@ jobs:
           runCmd: |
             # fetch submodule tags since actions/checkout does not
             git submodule foreach 'git fetch --unshallow || true'
-            # Ensure dependencies are installed
-            uv sync --extra test --extra gen_proto
             # Run all code generation steps
             make codegen
 

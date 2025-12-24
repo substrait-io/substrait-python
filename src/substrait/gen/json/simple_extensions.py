@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, List, Optional, TypeAlias, Union
+from typing import Any, TypeAlias
 
 
 class Functions(Enum):
@@ -13,7 +13,7 @@ class Functions(Enum):
     SEPARATE = 'SEPARATE'
 
 
-Type: TypeAlias = Union[str, Dict[str, Any]]
+Type: TypeAlias = str | dict[str, Any]
 
 
 class Type1(Enum):
@@ -24,41 +24,41 @@ class Type1(Enum):
     string = 'string'
 
 
-EnumOptions: TypeAlias = List[str]
+EnumOptions: TypeAlias = list[str]
 
 
 @dataclass
 class EnumerationArg:
     options: EnumOptions
-    name: Optional[str] = None
-    description: Optional[str] = None
+    name: str | None = None
+    description: str | None = None
 
 
 @dataclass
 class ValueArg:
     value: Type
-    name: Optional[str] = None
-    description: Optional[str] = None
-    constant: Optional[bool] = None
+    name: str | None = None
+    description: str | None = None
+    constant: bool | None = None
 
 
 @dataclass
 class TypeArg:
     type: str
-    name: Optional[str] = None
-    description: Optional[str] = None
+    name: str | None = None
+    description: str | None = None
 
 
-Arguments: TypeAlias = List[Union[EnumerationArg, ValueArg, TypeArg]]
+Arguments: TypeAlias = list[EnumerationArg | ValueArg | TypeArg]
 
 
 @dataclass
 class Options1:
-    values: List[str]
-    description: Optional[str] = None
+    values: list[str]
+    description: str | None = None
 
 
-Options: TypeAlias = Dict[str, Options1]
+Options: TypeAlias = dict[str, Options1]
 
 
 class ParameterConsistency(Enum):
@@ -68,9 +68,9 @@ class ParameterConsistency(Enum):
 
 @dataclass
 class VariadicBehavior:
-    min: Optional[float] = None
-    max: Optional[float] = None
-    parameterConsistency: Optional[ParameterConsistency] = None
+    min: float | None = None
+    max: float | None = None
+    parameterConsistency: ParameterConsistency | None = None
 
 
 Deterministic: TypeAlias = bool
@@ -88,7 +88,7 @@ class NullabilityHandling(Enum):
 ReturnValue: TypeAlias = Type
 
 
-Implementation: TypeAlias = Dict[str, str]
+Implementation: TypeAlias = dict[str, str]
 
 
 Intermediate: TypeAlias = Type
@@ -109,43 +109,43 @@ Ordered: TypeAlias = bool
 @dataclass
 class Impl:
     return_: ReturnValue
-    args: Optional[Arguments] = None
-    options: Optional[Options] = None
-    variadic: Optional[VariadicBehavior] = None
-    sessionDependent: Optional[SessionDependent] = None
-    deterministic: Optional[Deterministic] = None
-    nullability: Optional[NullabilityHandling] = None
-    implementation: Optional[Implementation] = None
+    args: Arguments | None = None
+    options: Options | None = None
+    variadic: VariadicBehavior | None = None
+    sessionDependent: SessionDependent | None = None
+    deterministic: Deterministic | None = None
+    nullability: NullabilityHandling | None = None
+    implementation: Implementation | None = None
 
 
 @dataclass
 class ScalarFunction:
     name: str
-    impls: List[Impl]
-    description: Optional[str] = None
+    impls: list[Impl]
+    description: str | None = None
 
 
 @dataclass
 class Impl1:
     return_: ReturnValue
-    args: Optional[Arguments] = None
-    options: Optional[Options] = None
-    variadic: Optional[VariadicBehavior] = None
-    sessionDependent: Optional[SessionDependent] = None
-    deterministic: Optional[Deterministic] = None
-    nullability: Optional[NullabilityHandling] = None
-    implementation: Optional[Implementation] = None
-    intermediate: Optional[Intermediate] = None
-    ordered: Optional[Ordered] = None
-    maxset: Optional[Maxset] = None
-    decomposable: Optional[Decomposable] = None
+    args: Arguments | None = None
+    options: Options | None = None
+    variadic: VariadicBehavior | None = None
+    sessionDependent: SessionDependent | None = None
+    deterministic: Deterministic | None = None
+    nullability: NullabilityHandling | None = None
+    implementation: Implementation | None = None
+    intermediate: Intermediate | None = None
+    ordered: Ordered | None = None
+    maxset: Maxset | None = None
+    decomposable: Decomposable | None = None
 
 
 @dataclass
 class AggregateFunction:
     name: str
-    impls: List[Impl1]
-    description: Optional[str] = None
+    impls: list[Impl1]
+    description: str | None = None
 
 
 class WindowType(Enum):
@@ -156,64 +156,64 @@ class WindowType(Enum):
 @dataclass
 class Impl2:
     return_: ReturnValue
-    args: Optional[Arguments] = None
-    options: Optional[Options] = None
-    variadic: Optional[VariadicBehavior] = None
-    sessionDependent: Optional[SessionDependent] = None
-    deterministic: Optional[Deterministic] = None
-    nullability: Optional[NullabilityHandling] = None
-    implementation: Optional[Implementation] = None
-    intermediate: Optional[Intermediate] = None
-    ordered: Optional[Ordered] = None
-    maxset: Optional[Maxset] = None
-    decomposable: Optional[Decomposable] = None
-    window_type: Optional[WindowType] = None
+    args: Arguments | None = None
+    options: Options | None = None
+    variadic: VariadicBehavior | None = None
+    sessionDependent: SessionDependent | None = None
+    deterministic: Deterministic | None = None
+    nullability: NullabilityHandling | None = None
+    implementation: Implementation | None = None
+    intermediate: Intermediate | None = None
+    ordered: Ordered | None = None
+    maxset: Maxset | None = None
+    decomposable: Decomposable | None = None
+    window_type: WindowType | None = None
 
 
 @dataclass
 class WindowFunction:
     name: str
-    impls: List[Impl2]
-    description: Optional[str] = None
+    impls: list[Impl2]
+    description: str | None = None
 
 
 @dataclass
 class TypeVariation:
     parent: Type
     name: str
-    description: Optional[str] = None
-    functions: Optional[Functions] = None
+    description: str | None = None
+    functions: Functions | None = None
 
 
 @dataclass
 class TypeParamDef:
     type: Type1
-    name: Optional[str] = None
-    description: Optional[str] = None
-    min: Optional[float] = None
-    max: Optional[float] = None
-    options: Optional[EnumOptions] = None
-    optional: Optional[bool] = None
+    name: str | None = None
+    description: str | None = None
+    min: float | None = None
+    max: float | None = None
+    options: EnumOptions | None = None
+    optional: bool | None = None
 
 
-TypeParamDefs: TypeAlias = List[TypeParamDef]
+TypeParamDefs: TypeAlias = list[TypeParamDef]
 
 
 @dataclass
 class TypeModel:
     name: str
-    description: Optional[str] = None
-    structure: Optional[Type] = None
-    parameters: Optional[TypeParamDefs] = None
-    variadic: Optional[bool] = None
+    description: str | None = None
+    structure: Type | None = None
+    parameters: TypeParamDefs | None = None
+    variadic: bool | None = None
 
 
 @dataclass
 class SimpleExtensions:
     urn: str
-    dependencies: Optional[Dict[str, str]] = None
-    types: Optional[List[TypeModel]] = None
-    type_variations: Optional[List[TypeVariation]] = None
-    scalar_functions: Optional[List[ScalarFunction]] = None
-    aggregate_functions: Optional[List[AggregateFunction]] = None
-    window_functions: Optional[List[WindowFunction]] = None
+    dependencies: dict[str, str] | None = None
+    types: list[TypeModel] | None = None
+    type_variations: list[TypeVariation] | None = None
+    scalar_functions: list[ScalarFunction] | None = None
+    aggregate_functions: list[AggregateFunction] | None = None
+    window_functions: list[WindowFunction] | None = None

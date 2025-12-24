@@ -13,7 +13,7 @@ codegen-version:
 		&& echo '"' >> src/substrait/gen/version.py
 
 codegen-proto:
-	./gen_proto.sh
+	uv run --group gen_proto ./gen_proto.sh
 
 codegen-extensions:
 	uv run --with datamodel-code-generator datamodel-codegen \

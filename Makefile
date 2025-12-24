@@ -1,9 +1,11 @@
-codegen: antlr codegen-proto codegen-extensions codegen-version
+setup-antlr:
+	@bash scripts/setup_antlr.sh > /dev/null
 
 
-antlr:
+
+antlr: setup-antlr
 	cd third_party/substrait/grammar \
-		&& java -jar ${ANTLR_JAR} -o ../../../src/substrait/gen/antlr -Dlanguage=Python3 SubstraitType.g4 \
+		&& java -jar ../../../lib/antlr-complete.jar -o ../../../src/substrait/gen/antlr -Dlanguage=Python3 SubstraitType.g4 \
 		&& rm ../../../src/substrait/gen/antlr/*.tokens \
 		&& rm ../../../src/substrait/gen/antlr/*.interp
 
@@ -13,7 +15,7 @@ codegen-version:
 		&& echo '"' >> src/substrait/gen/version.py
 
 codegen-proto:
-	./gen_proto.sh
+	./scripts/gen_proto.sh
 
 codegen-extensions:
 	uv run --with datamodel-code-generator datamodel-codegen \
@@ -32,3 +34,7 @@ lint_fix:
 
 format:
 	uvx ruff@0.11.11 format
+
+codegen: format lint_fix antlr codegen-proto codegen-extensions codegen-version
+	uv sync --extra test
+	uv run pytest

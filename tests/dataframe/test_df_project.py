@@ -2,7 +2,7 @@ import substrait.gen.proto.type_pb2 as stt
 import substrait.gen.proto.plan_pb2 as stp
 import substrait.gen.proto.algebra_pb2 as stalg
 from substrait.builders.type import boolean, i64
-from substrait.builders.plan import read_named_table
+from substrait.builders.plan import read_named_table, default_version
 from substrait.extension_registry import ExtensionRegistry
 import substrait.dataframe as sdf
 
@@ -48,7 +48,12 @@ def test_project():
                     names=["id"],
                 )
             )
-        ]
+        ],
+        version=default_version,
     )
+
+    print(actual)
+    print("--------------")
+    print(expected)
 
     assert actual == expected

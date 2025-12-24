@@ -1,6 +1,6 @@
 from typing import Union, Iterable
 import substrait.dataframe
-from substrait.builders.plan import project
+from substrait.builders.plan import select
 from substrait.dataframe.expression import Expression
 
 
@@ -29,7 +29,7 @@ class DataFrame:
         expressions = [e.expr for e in exprs] + [
             expr.alias(alias).expr for alias, expr in named_exprs.items()
         ]
-        return DataFrame(project(self.plan, expressions=expressions))        
+        return DataFrame(select(self.plan, expressions=expressions))        
 
     # TODO handle version
     def _with_version(self, version):

@@ -34,3 +34,25 @@ respect-gitignore = true
 target-version = "py310"
 # never autoformat upstream or generated code
 exclude = ["third_party/", "src/substrait/gen"]
+
+[tool.pixi.workspace]
+channels = ["conda-forge"]
+platforms = ["win-64", "linux-64", "osx-64", "osx-arm64"]
+
+[tool.pixi.pypi-dependencies]
+substrait = { path = ".", editable = true }
+
+[tool.pixi.environments]
+default = { solve-group = "default" }
+dev = { features = ["dev"], solve-group = "default" }
+extensions = { features = ["extensions"], solve-group = "default" }
+gen-extensions = { features = ["gen_extensions"], solve-group = "default" }
+gen-proto = { features = ["gen_proto"], solve-group = "default" }
+sql = { features = ["sql"], solve-group = "default" }
+
+[tool.pixi.tasks]
+
+[tool.pixi.dependencies]
+antlr = ">=4.13.2,<5"
+buf = ">=1.62.1,<2"
+libprotobuf = ">=6.33.2,<7"

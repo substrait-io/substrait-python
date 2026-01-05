@@ -56,3 +56,4 @@ sql = { features = ["sql"], solve-group = "default" }
 antlr = ">=4.13.2,<5"
 buf = ">=1.62.1,<2"
 libprotobuf = ">=6.33.2,<7"
+uv = ">=0.9.21,<0.10"

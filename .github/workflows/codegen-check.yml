@@ -25,7 +25,7 @@ jobs:
           # fetch submodule tags since actions/checkout does not
           git submodule foreach 'git fetch --unshallow || true'
           # Run all code generation steps
-          make codegen
+          pixi run make codegen
 
       - name: Check for uncommitted changes
         run: |

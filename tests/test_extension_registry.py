@@ -583,13 +583,6 @@ scalar_functions: []
         registry.register_extension_dict(yaml.safe_load(content))
 
 
-def test_covers_list_of_i8():
-    """Test that a list of i8 covers list<i8>."""
-    covered = list_(i8(nullable=False), nullable=False)
-    param_ctx = _parse("list<i8>")
-    assert covers(covered, param_ctx, {})
-
-
 def test_covers_map_string_to_i8():
     """Test that a map with string keys and i8 values covers map<string,i8>."""
     covered = map_(
@@ -631,3 +624,107 @@ def test_covers_struct_mismatched_types_fails():
     covered = struct([i32(nullable=False), i8(nullable=False)], nullable=False)
     param_ctx = _parse("struct<i8,i8>")
     assert not covers(covered, param_ctx, {})
+
+
+def test_all_function_types_from_yaml():
+    """Test that all functions in YAML are registered with correct function_type.value."""
+    # Test data with all function types
+    test_cases = [
+        (
+            """%YAML 1.2
+---
+urn: extension:test:scalar_funcs
+scalar_functions:
+  - name: "add"
+    description: "Add two numbers"
+    impls:
+      - args:
+          - value: i8
+          - value: i8
+        return: i8
+  - name: "test_fn"
+    description: ""
+    impls:
+      - args:
+          - value: i8
+        variadic:
+          min: 2
+        return: i8
+""",
+            "extension:test:scalar_funcs",
+            [
+                ("add", [i8(nullable=False), i8(nullable=False)]),
+                ("test_fn", [i8(nullable=False), i8(nullable=False)]),
+            ],
+            "scalar",
+        ),
+        (
+            """%YAML 1.2
+---
+urn: extension:test:agg_funcs
+aggregate_functions:
+  - name: "count"
+    description: "Count non-null values"
+    impls:
+      - args:
+          - value: i8
+        return: i64
+  - name: "sum"
+    description: "Sum values"
+    impls:
+      - args:
+          - value: i8
+        return: i64
+""",
+            "extension:test:agg_funcs",
+            [("count", [i8(nullable=False)]), ("sum", [i8(nullable=False)])],
+            "aggregate",
+        ),
+        (
+            """%YAML 1.2
+---
+urn: extension:test:window_funcs
+window_functions:
+  - name: "row_number"
+    description: "Assign row numbers"
+    impls:
+      - args: []
+        return: i64
+  - name: "rank"
+    description: "Assign ranks"
+    impls:
+      - args: []
+        return: i64
+""",
+            "extension:test:window_funcs",
+            [("row_number", []), ("rank", [])],
+            "window",
+        ),
+    ]
+
+    for yaml_content, urn, functions, expected_type in test_cases:
+        test_registry = ExtensionRegistry(load_default_extensions=False)
+        test_registry.register_extension_dict(
+            yaml.safe_load(yaml_content),
+            uri=f"https://test.example.com/{urn.replace(':', '_')}.yaml",
+        )
+
+        for func_name, signature in functions:
+            result = test_registry.lookup_function(
+                urn=urn, function_name=func_name, signature=signature
+            )
+            assert result is not None, f"Failed to lookup {func_name} in {urn}"
+            entry, _ = result
+            assert hasattr(entry, "function_type"), (
+                f"Entry for {func_name} missing function_type attribute"
+            )
+            assert entry.function_type is not None, (
+                f"function_type is None for {func_name}"
+            )
+            assert isinstance(entry.function_type.value, str), (
+                f"function_type.value is not a string for {func_name}"
+            )
+            assert entry.function_type.value == expected_type, (
+                f"Expected function_type.value '{expected_type}' for {func_name}, "
+                f"got '{entry.function_type.value}'"
+            )

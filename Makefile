@@ -13,10 +13,10 @@ codegen-version:
 		&& echo '"' >> src/substrait/gen/version.py
 
 codegen-proto:
-	./gen_proto.sh
+	uv run --group gen_proto ./gen_proto.sh
 
 codegen-extensions:
-	uv run --with datamodel-code-generator datamodel-codegen \
+	uv run --group gen_extensions datamodel-codegen \
 		--input-file-type jsonschema \
 		--input third_party/substrait/text/simple_extensions_schema.yaml \
 		--output src/substrait/gen/json/simple_extensions.py \

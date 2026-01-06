@@ -1,4 +1,4 @@
-codegen: antlr codegen-proto codegen-extensions codegen-version
+codegen: antlr codegen-proto codegen-extensions codegen-version format lint_fix
 
 
 antlr:

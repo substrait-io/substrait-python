@@ -2,7 +2,7 @@ from substrait.builders.extended_expression import (
     UnboundExtendedExpression,
     ExtendedExpressionOrUnbound,
     resolve_expression,
-    scalar_function
+    scalar_function,
 )
 import substrait.gen.proto.type_pb2 as stp
 import substrait.gen.proto.extended_expression_pb2 as stee
@@ -30,7 +30,9 @@ class Expression:
     def alias(self, alias: str):
         self.expr = _alias(self.expr, alias)
         return self
-    
+
     def abs(self):
-        self.expr = scalar_function("functions_arithmetic.yaml", "abs", expressions=[self.expr]) 
+        self.expr = scalar_function(
+            "functions_arithmetic.yaml", "abs", expressions=[self.expr]
+        )
         return self

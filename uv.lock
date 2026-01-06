@@ -659,6 +659,7 @@ name = "substrait"
 source = { editable = "." }
 dependencies = [
     { name = "protobuf" },
+    { name = "typing-extensions" },
 ]
 
 [package.optional-dependencies]

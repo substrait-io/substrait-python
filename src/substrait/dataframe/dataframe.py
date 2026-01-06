@@ -29,7 +29,7 @@ class DataFrame:
         expressions = [e.expr for e in exprs] + [
             expr.alias(alias).expr for alias, expr in named_exprs.items()
         ]
-        return DataFrame(select(self.plan, expressions=expressions))        
+        return DataFrame(select(self.plan, expressions=expressions))
 
     # TODO handle version
     def _with_version(self, version):

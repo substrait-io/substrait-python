@@ -628,7 +628,6 @@ def test_covers_struct_mismatched_types_fails():
     assert not covers(covered, param_ctx, {})
 
 
-
 @pytest.mark.parametrize(
     "test_case",
     [

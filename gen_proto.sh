@@ -2,11 +2,11 @@
 
 set -eou pipefail
 
-namespace=proto
+namespace=substrait.gen.proto
 submodule_dir=./third_party/substrait
 src_dir="$submodule_dir"/proto
 tmp_dir=./buf_work_dir
-dest_dir=./src/substrait/gen
+dest_dir=./src
 extension_dir=./src/substrait/extensions
 
 # Prefix the protobuf files with a unique configuration to prevent namespace conflicts
@@ -14,11 +14,11 @@ extension_dir=./src/substrait/extensions
 python "$submodule_dir"/tools/proto_prefix.py "$tmp_dir" "$namespace" "$src_dir"
 
 # Remove the old python protobuf files
-rm -rf "$dest_dir/proto"
+rm -rf "$dest_dir/substrait/gen/proto"
 
 # Generate the new python protobuf files
 buf generate
-uv run protol --in-place --create-package --python-out "$dest_dir" buf
+find "$dest_dir/substrait/gen" -type d -exec touch {}/__init__.py \;
 
 # Remove the old extension files
 rm -rf "$extension_dir"

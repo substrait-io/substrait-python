@@ -31,4 +31,4 @@ jobs:
           uvx ruff@0.11.11 check
       - name: Run ruff formatter
         run: |
-          uvx ruff@0.11.11 format
+          uvx ruff@0.11.11 format --check

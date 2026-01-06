@@ -5,7 +5,7 @@ authors = [{name = "Substrait contributors", email = "substrait@googlegroups.com
 license = {text = "Apache-2.0"}
 readme = "README.md"
 requires-python = ">=3.10,<3.14"
-dependencies = ["protobuf >=3.19.1,<6"]
+dependencies = ["protobuf >=6.33,<7"]
 dynamic = ["version"]
 
 [tool.setuptools_scm]
@@ -17,7 +17,7 @@ sql = ["sqloxide", "deepdiff"]
 
 [dependency-groups]
 dev = ["pytest >= 7.0.0", "antlr4-python3-runtime", "pyyaml", "sqloxide", "deepdiff", "duckdb<=1.2.2", "datafusion"]
-gen_proto = ["protobuf >=3.19.1,<6", "protoletariat >= 3.0.0"]
+gen_proto = ["protobuf >=6.33,<7"]
 gen_extensions = ["datamodel-code-generator"]
 
 [tool.pytest.ini_options]

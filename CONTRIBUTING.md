@@ -22,10 +22,10 @@ git submodule update --init --recursive
 
 # Code generation
 
-You can run the full code generation using the following command or use the individual commands to selectively regenerate the generated code. This does not update the Substrait Git submodule.
+You can run the full code generation using the following command or use the individual commands to selectively regenerate the generated code. This does not update the Substrait Git submodule. You can use pixi environment defined in pyproject.toml which contains all dependencies needed for code generation.
 
 ```
-make codegen
+pixi run make codegen
 ```
 
 ## Protobuf stubs

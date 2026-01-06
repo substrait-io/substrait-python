@@ -506,6 +506,102 @@ def test_registry_default_extensions_have_uri_mappings():
 
     assert registry._uri_urn_bimap.get_urn(uri) == urn
 
+def test_registry_default_extensions_lookup_function_multiply():
+    """Test that default extensions are loaded and functions can be looked up."""
+    registry = ExtensionRegistry(load_default_extensions=True)
+
+    # Test looking up a function from the comparison extensions
+    urn = "extension:io.substrait:functions_arithmetic"
+
+    # Look up a common comparison function (e.g., "multiply")
+    result = registry.lookup_function(
+        urn=urn,
+        function_name="multiply",
+        signature=[i8(nullable=False), i8(nullable=False)],
+    )
+
+    assert result is not None, "Failed to lookup 'multiply' function from default extensions"
+    entry, return_type = result
+
+    # Verify the function entry
+    assert entry.name == "multiply"
+    assert entry.urn == urn
+    assert entry.function_type is not None
+    assert entry.function_type.value == "scalar"
+    assert isinstance(entry.anchor, int)
+
+    # Verify the URI-URN mapping exists
+    uri = registry._uri_urn_bimap.get_uri(urn)
+    assert uri is not None
+    assert "https://github.com/substrait-io/substrait/blob/main/extensions" in uri
+    assert "functions_arithmetic.yaml" in uri
+
+    # Test looking up a function across all URNs without specifying URN
+    results = registry.list_functions_across_urns(
+        function_name="multiply",
+        signature=[i8(nullable=False), i8(nullable=False)],
+    )
+
+    assert len(results) > 0, "Failed to find 'multiply' function across all URNs"
+
+    # Verify we found the same function
+    found_entry = None
+    for entry, return_type in results:
+        if entry.urn == urn and entry.name == "multiply":
+            found_entry = entry
+            break
+
+    assert found_entry is not None, "multiply function not found in cross-URN search"
+    assert found_entry.function_type.value == "scalar"
+
+def test_registry_default_extensions_lookup_function():
+    """Test that default extensions are loaded and functions can be looked up."""
+    registry = ExtensionRegistry(load_default_extensions=True)
+
+    # Test looking up a function from the comparison extensions
+    urn = "extension:io.substrait:functions_comparison"
+
+    # Look up a common comparison function (e.g., "equal")
+    result = registry.lookup_function(
+        urn=urn,
+        function_name="equal",
+        signature=[i8(nullable=False), i8(nullable=False)],
+    )
+
+    assert result is not None, "Failed to lookup 'equal' function from default extensions"
+    entry, return_type = result
+
+    # Verify the function entry
+    assert entry.name == "equal"
+    assert entry.urn == urn
+    assert entry.function_type is not None
+    assert entry.function_type.value == "scalar"
+    assert isinstance(entry.anchor, int)
+
+    # Verify the URI-URN mapping exists
+    uri = registry._uri_urn_bimap.get_uri(urn)
+    assert uri is not None
+    assert "https://github.com/substrait-io/substrait/blob/main/extensions" in uri
+    assert "functions_comparison.yaml" in uri
+
+    # Test looking up a function across all URNs without specifying URN
+    results = registry.list_functions_across_urns(
+        function_name="equal",
+        signature=[i8(nullable=False), i8(nullable=False)],
+    )
+
+    assert len(results) > 0, "Failed to find 'equal' function across all URNs"
+
+    # Verify we found the same function
+    found_entry = None
+    for entry, return_type in results:
+        if entry.urn == urn and entry.name == "equal":
+            found_entry = entry
+            break
+
+    assert found_entry is not None, "Equal function not found in cross-URN search"
+    assert found_entry.function_type.value == "scalar"
+
 
 def test_valid_urn_format():
     """Test that valid URN formats are accepted."""

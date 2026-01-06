@@ -235,6 +235,14 @@ def _handle_parameterized_type(
             covered.decimal, parameterized_type, ["scale", "precision"], parameters
         )
 
+    if isinstance(parameterized_type, SubstraitTypeParser.PrecisionTimeContext):
+        return kind == "precision_time" and check_integer_type_parameters(
+            covered.precision_time,
+            parameterized_type,
+            ["precision"],
+            parameters,
+        )
+
     if isinstance(parameterized_type, SubstraitTypeParser.PrecisionTimestampContext):
         return kind == "precision_timestamp" and check_integer_type_parameters(
             covered.precision_timestamp,
@@ -246,6 +254,14 @@ def _handle_parameterized_type(
     if isinstance(parameterized_type, SubstraitTypeParser.PrecisionTimestampTZContext):
         return kind == "precision_timestamp_tz" and check_integer_type_parameters(
             covered.precision_timestamp_tz,
+            parameterized_type,
+            ["precision"],
+            parameters,
+        )
+
+    if isinstance(parameterized_type, SubstraitTypeParser.PrecisionIntervalDayContext):
+        return kind == "interval_day" and check_integer_type_parameters(
+            covered.interval_day,
             parameterized_type,
             ["precision"],
             parameters,

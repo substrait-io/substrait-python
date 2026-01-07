@@ -2,26 +2,25 @@
 #   filename:  simple_extensions_schema.yaml
 
 from __future__ import annotations
-
-from dataclasses import dataclass
 from enum import Enum
 from typing import Any, TypeAlias
+from dataclasses import dataclass
 
 
 class Functions(Enum):
-    INHERITS = 'INHERITS'
-    SEPARATE = 'SEPARATE'
+    INHERITS = "INHERITS"
+    SEPARATE = "SEPARATE"
 
 
 Type: TypeAlias = str | dict[str, Any]
 
 
 class Type1(Enum):
-    dataType = 'dataType'
-    boolean = 'boolean'
-    integer = 'integer'
-    enumeration = 'enumeration'
-    string = 'string'
+    dataType = "dataType"
+    boolean = "boolean"
+    integer = "integer"
+    enumeration = "enumeration"
+    string = "string"
 
 
 EnumOptions: TypeAlias = list[str]
@@ -62,8 +61,8 @@ Options: TypeAlias = dict[str, Options1]
 
 
 class ParameterConsistency(Enum):
-    CONSISTENT = 'CONSISTENT'
-    INCONSISTENT = 'INCONSISTENT'
+    CONSISTENT = "CONSISTENT"
+    INCONSISTENT = "INCONSISTENT"
 
 
 @dataclass
@@ -80,9 +79,9 @@ SessionDependent: TypeAlias = bool
 
 
 class NullabilityHandling(Enum):
-    MIRROR = 'MIRROR'
-    DECLARED_OUTPUT = 'DECLARED_OUTPUT'
-    DISCRETE = 'DISCRETE'
+    MIRROR = "MIRROR"
+    DECLARED_OUTPUT = "DECLARED_OUTPUT"
+    DISCRETE = "DISCRETE"
 
 
 ReturnValue: TypeAlias = Type
@@ -95,9 +94,9 @@ Intermediate: TypeAlias = Type
 
 
 class Decomposable(Enum):
-    NONE = 'NONE'
-    ONE = 'ONE'
-    MANY = 'MANY'
+    NONE = "NONE"
+    ONE = "ONE"
+    MANY = "MANY"
 
 
 Maxset: TypeAlias = float
@@ -149,8 +148,8 @@ class AggregateFunction:
 
 
 class WindowType(Enum):
-    STREAMING = 'STREAMING'
-    PARTITION = 'PARTITION'
+    STREAMING = "STREAMING"
+    PARTITION = "PARTITION"
 
 
 @dataclass

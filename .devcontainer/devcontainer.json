@@ -14,7 +14,7 @@
 	// "forwardPorts": [],
 
 	// Use 'postCreateCommand' to run commands after the container is created.
-	"postCreateCommand": "uv venv --clear && uv sync --group gen_proto",
+	"postCreateCommand": "uv venv --clear && uv sync",
 
 	// Configure tool-specific properties.
 	"customizations": {

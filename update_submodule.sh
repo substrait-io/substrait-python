@@ -19,5 +19,3 @@ VERSION=${VERSION//v/}
 
 sed -i "s#__substrait_hash__.*#__substrait_hash__ = \"$SUBSTRAIT_HASH\"#g" src/substrait/__init__.py
 sed -i "s#__substrait_version__.*#__substrait_version__ = \"$VERSION\"#g" src/substrait/__init__.py
-
-./gen_proto.sh

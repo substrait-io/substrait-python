@@ -17,8 +17,6 @@ sql = ["sqloxide", "deepdiff"]
 
 [dependency-groups]
 dev = ["pytest >= 7.0.0", "antlr4-python3-runtime", "pyyaml", "sqloxide", "deepdiff", "duckdb<=1.2.2", "datafusion"]
-gen_proto = ["protobuf >=6.33,<7"]
-gen_extensions = ["datamodel-code-generator"]
 
 [tool.pytest.ini_options]
 pythonpath = "src"
@@ -34,3 +32,60 @@ respect-gitignore = true
 target-version = "py310"
 # never autoformat upstream or generated code
 exclude = ["third_party/", "src/substrait/gen"]
+
+[tool.pixi.workspace]
+channels = ["conda-forge"]
+platforms = ["win-64", "linux-64", "osx-64", "osx-arm64", "linux-aarch64"]
+
+[tool.pixi.pypi-dependencies]
+substrait = { path = ".", editable = true }
+
+[tool.pixi.environments]
+dev = { features = ["dev"], solve-group = "default" }
+extensions = { features = ["extensions"], solve-group = "default" }
+sql = { features = ["sql"], solve-group = "default" }
+
+[tool.pixi.tasks]
+format = "ruff format"
+lint = "ruff check"
+lint_fix = "ruff check --fix"
+
+update-substrait = [ { task = "update-submodule" }, { task = "codegen" }]
+
+update-submodule = "./update_submodule.sh"
+
+codegen = [{ task = "antlr" }, { task = "codegen-proto" }, { task = "codegen-extensions" }, { task = "codegen-version" }]
+
+check-codegen = "./check_codegen.sh"
+
+codegen-version = """bash -c '
+cd third_party/substrait
+export version=$(git describe --tags | tr -d 'v')
+echo "substrait_version = \\"$version\\"" > ../../src/substrait/gen/version.py
+'"""
+
+codegen-proto = "./gen_proto.sh"
+
+antlr = """
+	cd third_party/substrait/grammar \
+		&& antlr4 -o ../../../src/substrait/gen/antlr -Dlanguage=Python3 SubstraitType.g4 \
+		&& rm ../../../src/substrait/gen/antlr/*.tokens \
+		&& rm ../../../src/substrait/gen/antlr/*.interp
+"""
+
+codegen-extensions = """
+    datamodel-codegen \
+		--input-file-type jsonschema \
+		--input third_party/substrait/text/simple_extensions_schema.yaml \
+		--output src/substrait/gen/json/simple_extensions.py \
+		--output-model-type dataclasses.dataclass \
+		--target-python-version 3.10  \
+		--disable-timestamp \
+		--formatters ruff-format
+"""
+
+[tool.pixi.dependencies]
+antlr = ">=4.13.2,<5"
+buf = ">=1.62.1,<2"
+datamodel-code-generator = ">=0.52.0,<0.53"
+ruff = ">=0.14.10,<0.15"

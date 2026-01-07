@@ -16,25 +16,17 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Run code generation in devcontainer
-        uses: devcontainers/ci@v0.3
+      - uses: prefix-dev/setup-pixi@v0.9.3
         with:
-          runCmd: |
-            # fetch submodule tags since actions/checkout does not
-            git submodule foreach 'git fetch --unshallow || true'
-            # Run all code generation steps
-            make codegen
+          pixi-version: v0.62.2
+
+      - name: Run code generation
+        run: |
+          # fetch submodule tags since actions/checkout does not
+          git submodule foreach 'git fetch --unshallow || true'
+          # Run all code generation steps
+          pixi run codegen
 
       - name: Check for uncommitted changes
         run: |
-          # Check for diffs, ignoring timestamp lines
-          if ! git diff --quiet --exit-code src/substrait/gen/; then
-            echo "Code generation produced changes. Generated code is out of sync!"
-            echo ""
-            git diff src/substrait/gen/
-            echo ""
-            echo "To fix this, run:"
-            echo "  make codegen"
-            echo "Then commit the changes."
-            exit 1
-          fi
+          pixi run check-codegen

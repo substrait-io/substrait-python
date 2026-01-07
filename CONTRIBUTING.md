@@ -33,13 +33,13 @@ pixi run make codegen
 Run the upgrade script to upgrade the submodule and regenerate the protobuf stubs.
 
 ```
-uv run --group gen_proto ./update_proto.sh <version>
+pixi run ./update_proto.sh <version>
 ```
 
 Or run the proto codegen without updating the Substrait Git submodule:
 
 ```
-make codegen-proto
+pixi run make codegen-proto
 ```
 
 ## Antlr grammar
@@ -47,7 +47,7 @@ make codegen-proto
 Substrait uses antlr grammar to derive output types of extension functions. Make sure java is installed and ANTLR_JAR environment variable is set. Take a look at .devcontainer/Dockerfile for example setup.
 
 ```
-make antlr
+pixi run make antlr
 ```
 
 ## Extensions stubs
@@ -55,7 +55,7 @@ make antlr
 Substrait uses jsonschema to describe the data model for extension files.
 
 ```
-make codegen-extensions
+pixi run make codegen-extensions
 ```
 
 # Lint & Format

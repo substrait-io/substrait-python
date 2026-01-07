@@ -18,6 +18,11 @@ You can run update-submodule task to pull in latest substrait from upstream.
 pixi run update-submodule <version>
 ```
 
+Or you can update submodule and run code generation at the same time with
+```
+pixi run update-substrait
+```
+
 This might be necessary if you are updating an existing checkout.
 ```
 git submodule sync --recursive

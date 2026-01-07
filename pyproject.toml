@@ -50,6 +50,8 @@ format = "ruff format"
 lint = "ruff check"
 lint_fix = "ruff check --fix"
 
+update-substrait = [ { task = "update-submodule" }, { task = "codegen" }]
+
 update-submodule = "./update_submodule.sh"
 
 codegen = [{ task = "antlr" }, { task = "codegen-proto" }, { task = "codegen-extensions" }, { task = "codegen-version" }]

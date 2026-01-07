@@ -131,8 +131,6 @@ def registry():
     return reg
 
 
-
-
 def test_non_existing_urn(registry):
     assert (
         registry.lookup_function(

@@ -43,6 +43,7 @@ def test_covers_decimal_happy_path():
     assert covers(covered, param_ctx, params)
     assert params["P"] == 10 and params["S"] == 2
 
+
 def test_covers_decimal_happy_path_2():
     """Test decimal coverage with parameter binding."""
     params = {}
@@ -56,10 +57,10 @@ def test_covers_any():
     param_ctx = _parse("any")
     assert covers(covered, param_ctx, {})
 
+
 def test_covers_any_2():
     """Test that any type can be covered by any concrete type."""
     assert covers(decimal(8, 10), _parse("any"), {})
-
 
 
 def test_covers_varchar_length_ok():
@@ -365,7 +366,9 @@ def test_covers_time():
 
 def test_covers_interval_year():
     """Test interval_year type coverage."""
-    covered = Type(interval_year=Type.IntervalYear(nullability=Type.NULLABILITY_REQUIRED))
+    covered = Type(
+        interval_year=Type.IntervalYear(nullability=Type.NULLABILITY_REQUIRED)
+    )
     param_ctx = _parse("interval_year")
     assert covers(covered, param_ctx, {})
 

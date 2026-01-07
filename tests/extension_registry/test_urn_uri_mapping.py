@@ -73,9 +73,9 @@ def test_registry_default_extensions_lookup_function_multiply():
         signature=[i8(nullable=False), i8(nullable=False)],
     )
 
-    assert (
-        result is not None
-    ), "Failed to lookup 'multiply' function from default extensions"
+    assert result is not None, (
+        "Failed to lookup 'multiply' function from default extensions"
+    )
     entry, return_type = result
 
     # Verify the function entry
@@ -124,9 +124,9 @@ def test_registry_default_extensions_lookup_function():
         signature=[i8(nullable=False), i8(nullable=False)],
     )
 
-    assert (
-        result is not None
-    ), "Failed to lookup 'equal' function from default extensions"
+    assert result is not None, (
+        "Failed to lookup 'equal' function from default extensions"
+    )
     entry, return_type = result
 
     # Verify the function entry

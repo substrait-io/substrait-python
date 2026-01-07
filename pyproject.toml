@@ -41,12 +41,12 @@ platforms = ["win-64", "linux-64", "osx-64", "osx-arm64", "linux-aarch64"]
 substrait = { path = ".", editable = true }
 
 [tool.pixi.environments]
-default = { solve-group = "default" }
 dev = { features = ["dev"], solve-group = "default" }
 extensions = { features = ["extensions"], solve-group = "default" }
 sql = { features = ["sql"], solve-group = "default" }
 
 [tool.pixi.tasks]
+format = "ruff format"
 
 [tool.pixi.dependencies]
 antlr = ">=4.13.2,<5"

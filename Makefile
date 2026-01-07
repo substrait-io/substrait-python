@@ -29,6 +29,3 @@ lint:
 
 lint_fix:
 	uvx ruff@0.11.11 check --fix
-
-format:
-	uvx ruff@0.11.11 format

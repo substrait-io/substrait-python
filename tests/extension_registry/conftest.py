@@ -1,13 +1,6 @@
 """Tests for parsing of a registry yaml and basic registry operations (lookup, registration)."""
 
-from substrait.builders.type import i8, i16
-from substrait.builders.type import (
-    decimal,
-    i8,
-    i16,
-    i32,
-    struct,
-)
+from substrait.builders.type import i8, decimal, i16
 from substrait.gen.proto.type_pb2 import Type
 
 import pytest

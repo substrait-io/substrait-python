@@ -13,12 +13,16 @@ uv sync --extra test
 ```
 
 ## Update the substrait submodule locally
+You can run update-submodule task to pull in latest substrait from upstream.
+```
+pixi run update-submodule <version>
+```
+
 This might be necessary if you are updating an existing checkout.
 ```
 git submodule sync --recursive
 git submodule update --init --recursive
 ```
-
 
 # Code generation
 
@@ -30,13 +34,7 @@ pixi run codegen
 
 ## Protobuf stubs
 
-Run the upgrade script to upgrade the submodule and regenerate the protobuf stubs.
-
-```
-pixi run ./update_proto.sh <version>
-```
-
-Or run the proto codegen without updating the Substrait Git submodule:
+Run the proto codegen only:
 
 ```
 pixi run codegen-proto

@@ -5,7 +5,7 @@ if ! git diff --quiet --exit-code src/substrait/gen/; then
     git diff src/substrait/gen/
     echo ""
     echo "To fix this, run:"
-    echo "  make codegen"
+    echo "  pixi run codegen"
     echo "Then commit the changes."
     exit 1
 fi

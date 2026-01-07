@@ -50,7 +50,11 @@ format = "ruff format"
 lint = "ruff check"
 lint_fix = "ruff check --fix"
 
+update-submodule = "./update_submodule.sh"
+
 codegen = [{ task = "antlr" }, { task = "codegen-proto" }, { task = "codegen-extensions" }, { task = "codegen-version" }]
+
+check-codegen = "./check_codegen.sh"
 
 codegen-version = """bash -c '
 cd third_party/substrait

@@ -1,6 +1,5 @@
 codegen: antlr codegen-proto codegen-extensions codegen-version
 
-
 antlr:
 	cd third_party/substrait/grammar \
 		&& antlr4 -o ../../../src/substrait/gen/antlr -Dlanguage=Python3 SubstraitType.g4 \
@@ -13,16 +12,17 @@ codegen-version:
 		&& echo '"' >> src/substrait/gen/version.py
 
 codegen-proto:
-	uv run --group gen_proto ./gen_proto.sh
+	./gen_proto.sh
 
 codegen-extensions:
-	uv run --group gen_extensions datamodel-codegen \
+	datamodel-codegen \
 		--input-file-type jsonschema \
 		--input third_party/substrait/text/simple_extensions_schema.yaml \
 		--output src/substrait/gen/json/simple_extensions.py \
 		--output-model-type dataclasses.dataclass \
 		--target-python-version 3.10  \
-		--disable-timestamp
+		--disable-timestamp \
+		--formatters ruff-format
 
 lint:
 	uvx ruff@0.11.11 check

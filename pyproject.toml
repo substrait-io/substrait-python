@@ -17,8 +17,6 @@ sql = ["sqloxide", "deepdiff"]
 
 [dependency-groups]
 dev = ["pytest >= 7.0.0", "antlr4-python3-runtime", "pyyaml", "sqloxide", "deepdiff", "duckdb<=1.2.2", "datafusion"]
-gen_proto = ["protobuf >=6.33,<7"]
-gen_extensions = ["datamodel-code-generator"]
 
 [tool.pytest.ini_options]
 pythonpath = "src"
@@ -46,8 +44,6 @@ substrait = { path = ".", editable = true }
 default = { solve-group = "default" }
 dev = { features = ["dev"], solve-group = "default" }
 extensions = { features = ["extensions"], solve-group = "default" }
-gen-extensions = { features = ["gen_extensions"], solve-group = "default" }
-gen-proto = { features = ["gen_proto"], solve-group = "default" }
 sql = { features = ["sql"], solve-group = "default" }
 
 [tool.pixi.tasks]
@@ -55,4 +51,5 @@ sql = { features = ["sql"], solve-group = "default" }
 [tool.pixi.dependencies]
 antlr = ">=4.13.2,<5"
 buf = ">=1.62.1,<2"
-uv = ">=0.9.21,<0.10"
+datamodel-code-generator = ">=0.52.0,<0.53"
+ruff = ">=0.14.10,<0.15"

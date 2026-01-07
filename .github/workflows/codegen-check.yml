@@ -30,4 +30,3 @@ jobs:
       - name: Check for uncommitted changes
         run: |
           pixi run check-codegen
-          bash ./check_codegen.sh

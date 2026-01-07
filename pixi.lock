@@ -4175,8 +4175,8 @@ packages:
   requires_python: '>=3.7'
 - pypi: ./
   name: substrait
-  version: 0.1.dev111+g2c827c25f.d20260107
-  sha256: fafcb7ef6e3aa8dc7b69365ba10de74c5497c5e3d871d586ba6f5b65543862d7
+  version: 0.1.dev112+gecdb52b4d.d20260107
+  sha256: c1e89f55cef59bcaf78f43534576a768696da6456e5e5d594275d57ac2edb8e8
   requires_dist:
   - protobuf>=6.33,<7
   - antlr4-python3-runtime ; extra == 'extensions'

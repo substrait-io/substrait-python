@@ -25,7 +25,7 @@ git submodule update --init --recursive
 You can run the full code generation using the following command or use the individual commands to selectively regenerate the generated code. This does not update the Substrait Git submodule. You can use pixi environment defined in pyproject.toml which contains all dependencies needed for code generation.
 
 ```
-pixi run make codegen
+pixi run codegen
 ```
 
 ## Protobuf stubs
@@ -39,7 +39,7 @@ pixi run ./update_proto.sh <version>
 Or run the proto codegen without updating the Substrait Git submodule:
 
 ```
-pixi run make codegen-proto
+pixi run codegen-proto
 ```
 
 ## Antlr grammar
@@ -47,7 +47,7 @@ pixi run make codegen-proto
 Substrait uses antlr grammar to derive output types of extension functions. Make sure java is installed and ANTLR_JAR environment variable is set. Take a look at .devcontainer/Dockerfile for example setup.
 
 ```
-pixi run make antlr
+pixi run antlr
 ```
 
 ## Extensions stubs
@@ -55,16 +55,16 @@ pixi run make antlr
 Substrait uses jsonschema to describe the data model for extension files.
 
 ```
-pixi run make codegen-extensions
+pixi run codegen-extensions
 ```
 
 # Lint & Format
 
-Run the following make commands to lint and format with ruff.
+Run the following pixi tasks to lint and format with ruff.
 
 ```
-make lint
-make format
+pixi run lint
+pixi run format
 ```
 
 # Test

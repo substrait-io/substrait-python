@@ -39,9 +39,6 @@ lint.extend-select = ["I"]
 channels = ["conda-forge"]
 platforms = ["win-64", "linux-64", "osx-64", "osx-arm64", "linux-aarch64"]
 
-[tool.pixi.pypi-dependencies]
-substrait = { path = ".", editable = true }
-
 [tool.pixi.environments]
 dev = { features = ["dev"], solve-group = "default" }
 extensions = { features = ["extensions"], solve-group = "default" }

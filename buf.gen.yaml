@@ -1,6 +1,6 @@
 version: v2
 plugins:
-  - remote: buf.build/protocolbuffers/python:v33.2
+  - remote: buf.build/protocolbuffers/python:v29.5
     out: src
-  - remote: buf.build/community/nipunn1313-mypy:v4.0.0
+  - remote: buf.build/community/nipunn1313-mypy:v3.7.0
     out: src

@@ -4175,10 +4175,10 @@ packages:
   requires_python: '>=3.7'
 - pypi: ./
   name: substrait
-  version: 0.1.dev115+g5ac67c29f.d20260107
-  sha256: 8afd3c0e98d7b4cb53b225cdc614585f138fed7c780629dff400a58062ee3dd4
+  version: 0.25.1.dev16+gb404a0fc2.d20260108
+  sha256: abf8d815f223d799e5615102c87cd34e6882d2dd6e7e2b81d162f4111ca29a8a
   requires_dist:
-  - protobuf>=6.33,<7
+  - protobuf>=5,<7
   - antlr4-python3-runtime ; extra == 'extensions'
   - pyyaml ; extra == 'extensions'
   - sqloxide ; extra == 'sql'

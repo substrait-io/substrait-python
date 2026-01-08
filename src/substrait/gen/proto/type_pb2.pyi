@@ -537,6 +537,43 @@ class Type(google.protobuf.message.Message):
         def ClearField(self, field_name: typing.Literal["key", b"key", "nullability", b"nullability", "type_variation_reference", b"type_variation_reference", "value", b"value"]) -> None: ...
 
     @typing.final
+    class Func(google.protobuf.message.Message):
+        """A function type for higher-order functions.
+        Represents a function that takes parameters of specified types and
+        returns a value of a specified type.
+        """
+
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        PARAMETER_TYPES_FIELD_NUMBER: builtins.int
+        RETURN_TYPE_FIELD_NUMBER: builtins.int
+        NULLABILITY_FIELD_NUMBER: builtins.int
+        nullability: Global___Type.Nullability.ValueType
+        """Nullability of the function value itself, not its return type.
+        A nullable function type (e.g., func?<i32 -> i32>) means the function
+        reference may be null. This is distinct from the return type's
+        nullability (e.g., func<i32 -> i32?> where the function always exists
+        but may return null).
+        """
+        @property
+        def parameter_types(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[Global___Type]:
+            """Types of parameters this function type accepts."""
+
+        @property
+        def return_type(self) -> Global___Type:
+            """Return type of the function."""
+
+        def __init__(
+            self,
+            *,
+            parameter_types: collections.abc.Iterable[Global___Type] | None = ...,
+            return_type: Global___Type | None = ...,
+            nullability: Global___Type.Nullability.ValueType = ...,
+        ) -> None: ...
+        def HasField(self, field_name: typing.Literal["return_type", b"return_type"]) -> builtins.bool: ...
+        def ClearField(self, field_name: typing.Literal["nullability", b"nullability", "parameter_types", b"parameter_types", "return_type", b"return_type"]) -> None: ...
+
+    @typing.final
     class UserDefined(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -642,6 +679,7 @@ class Type(google.protobuf.message.Message):
     STRUCT_FIELD_NUMBER: builtins.int
     LIST_FIELD_NUMBER: builtins.int
     MAP_FIELD_NUMBER: builtins.int
+    FUNC_FIELD_NUMBER: builtins.int
     USER_DEFINED_FIELD_NUMBER: builtins.int
     USER_DEFINED_TYPE_REFERENCE_FIELD_NUMBER: builtins.int
     ALIAS_FIELD_NUMBER: builtins.int
@@ -714,6 +752,8 @@ class Type(google.protobuf.message.Message):
     @property
     def map(self) -> Global___Type.Map: ...
     @property
+    def func(self) -> Global___Type.Func: ...
+    @property
     def user_defined(self) -> Global___Type.UserDefined: ...
     @property
     def alias(self) -> Global___Type.TypeAliasReference:
@@ -749,13 +789,14 @@ class Type(google.protobuf.message.Message):
         struct: Global___Type.Struct | None = ...,
         list: Global___Type.List | None = ...,
         map: Global___Type.Map | None = ...,
+        func: Global___Type.Func | None = ...,
         user_defined: Global___Type.UserDefined | None = ...,
         user_defined_type_reference: builtins.int = ...,
         alias: Global___Type.TypeAliasReference | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing.Literal["alias", b"alias", "binary", b"binary", "bool", b"bool", "date", b"date", "decimal", b"decimal", "fixed_binary", b"fixed_binary", "fixed_char", b"fixed_char", "fp32", b"fp32", "fp64", b"fp64", "i16", b"i16", "i32", b"i32", "i64", b"i64", "i8", b"i8", "interval_compound", b"interval_compound", "interval_day", b"interval_day", "interval_year", b"interval_year", "kind", b"kind", "list", b"list", "map", b"map", "precision_time", b"precision_time", "precision_timestamp", b"precision_timestamp", "precision_timestamp_tz", b"precision_timestamp_tz", "string", b"string", "struct", b"struct", "time", b"time", "timestamp", b"timestamp", "timestamp_tz", b"timestamp_tz", "user_defined", b"user_defined", "user_defined_type_reference", b"user_defined_type_reference", "uuid", b"uuid", "varchar", b"varchar"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["alias", b"alias", "binary", b"binary", "bool", b"bool", "date", b"date", "decimal", b"decimal", "fixed_binary", b"fixed_binary", "fixed_char", b"fixed_char", "fp32", b"fp32", "fp64", b"fp64", "i16", b"i16", "i32", b"i32", "i64", b"i64", "i8", b"i8", "interval_compound", b"interval_compound", "interval_day", b"interval_day", "interval_year", b"interval_year", "kind", b"kind", "list", b"list", "map", b"map", "precision_time", b"precision_time", "precision_timestamp", b"precision_timestamp", "precision_timestamp_tz", b"precision_timestamp_tz", "string", b"string", "struct", b"struct", "time", b"time", "timestamp", b"timestamp", "timestamp_tz", b"timestamp_tz", "user_defined", b"user_defined", "user_defined_type_reference", b"user_defined_type_reference", "uuid", b"uuid", "varchar", b"varchar"]) -> None: ...
-    def WhichOneof(self, oneof_group: typing.Literal["kind", b"kind"]) -> typing.Literal["bool", "i8", "i16", "i32", "i64", "fp32", "fp64", "string", "binary", "timestamp", "date", "time", "interval_year", "interval_day", "interval_compound", "timestamp_tz", "uuid", "fixed_char", "varchar", "fixed_binary", "decimal", "precision_time", "precision_timestamp", "precision_timestamp_tz", "struct", "list", "map", "user_defined", "user_defined_type_reference", "alias"] | None: ...
+    def HasField(self, field_name: typing.Literal["alias", b"alias", "binary", b"binary", "bool", b"bool", "date", b"date", "decimal", b"decimal", "fixed_binary", b"fixed_binary", "fixed_char", b"fixed_char", "fp32", b"fp32", "fp64", b"fp64", "func", b"func", "i16", b"i16", "i32", b"i32", "i64", b"i64", "i8", b"i8", "interval_compound", b"interval_compound", "interval_day", b"interval_day", "interval_year", b"interval_year", "kind", b"kind", "list", b"list", "map", b"map", "precision_time", b"precision_time", "precision_timestamp", b"precision_timestamp", "precision_timestamp_tz", b"precision_timestamp_tz", "string", b"string", "struct", b"struct", "time", b"time", "timestamp", b"timestamp", "timestamp_tz", b"timestamp_tz", "user_defined", b"user_defined", "user_defined_type_reference", b"user_defined_type_reference", "uuid", b"uuid", "varchar", b"varchar"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["alias", b"alias", "binary", b"binary", "bool", b"bool", "date", b"date", "decimal", b"decimal", "fixed_binary", b"fixed_binary", "fixed_char", b"fixed_char", "fp32", b"fp32", "fp64", b"fp64", "func", b"func", "i16", b"i16", "i32", b"i32", "i64", b"i64", "i8", b"i8", "interval_compound", b"interval_compound", "interval_day", b"interval_day", "interval_year", b"interval_year", "kind", b"kind", "list", b"list", "map", b"map", "precision_time", b"precision_time", "precision_timestamp", b"precision_timestamp", "precision_timestamp_tz", b"precision_timestamp_tz", "string", b"string", "struct", b"struct", "time", b"time", "timestamp", b"timestamp", "timestamp_tz", b"timestamp_tz", "user_defined", b"user_defined", "user_defined_type_reference", b"user_defined_type_reference", "uuid", b"uuid", "varchar", b"varchar"]) -> None: ...
+    def WhichOneof(self, oneof_group: typing.Literal["kind", b"kind"]) -> typing.Literal["bool", "i8", "i16", "i32", "i64", "fp32", "fp64", "string", "binary", "timestamp", "date", "time", "interval_year", "interval_day", "interval_compound", "timestamp_tz", "uuid", "fixed_char", "varchar", "fixed_binary", "decimal", "precision_time", "precision_timestamp", "precision_timestamp_tz", "struct", "list", "map", "func", "user_defined", "user_defined_type_reference", "alias"] | None: ...
 
 Global___Type: typing_extensions.TypeAlias = Type
 

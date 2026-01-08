@@ -328,7 +328,7 @@ dev = [
 requires-dist = [
     { name = "antlr4-python3-runtime", marker = "extra == 'extensions'" },
     { name = "deepdiff", marker = "extra == 'sql'" },
-    { name = "protobuf", specifier = ">=6.33,<7" },
+    { name = "protobuf", specifier = ">=5,<7" },
     { name = "pyyaml", marker = "extra == 'extensions'" },
     { name = "sqloxide", marker = "extra == 'sql'" },
 ]

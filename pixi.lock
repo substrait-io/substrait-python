@@ -4178,7 +4178,7 @@ packages:
   version: 0.1.dev104+gb404a0fc2.d20260108
   sha256: df50367f24568151cb8d797a4b96c955b0b76e239f2c62c15800237ab3a45a22
   requires_dist:
-  - protobuf>=6.33,<7
+  - protobuf>=5,<7
   - antlr4-python3-runtime ; extra == 'extensions'
   - pyyaml ; extra == 'extensions'
   - sqloxide ; extra == 'sql'

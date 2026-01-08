@@ -1,19 +1,19 @@
-from substrait.builders.plan import (
-    read_named_table,
-    select,
-    filter,
-    sort,
-    fetch,
-)
+import substrait.gen.proto.algebra_pb2 as stalg
 from substrait.builders.extended_expression import (
     column,
-    scalar_function,
     literal,
+    scalar_function,
 )
-from substrait.builders.type import i64, boolean, struct, named_struct, fp64, string
+from substrait.builders.plan import (
+    fetch,
+    filter,
+    read_named_table,
+    select,
+    sort,
+)
+from substrait.builders.type import boolean, fp64, i64, named_struct, string, struct
 from substrait.extension_registry import ExtensionRegistry
-from substrait.utils.display import pretty_print_plan, pretty_print_expression
-import substrait.gen.proto.algebra_pb2 as stalg
+from substrait.utils.display import pretty_print_expression, pretty_print_plan
 
 registry = ExtensionRegistry(load_default_extensions=True)
 

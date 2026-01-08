@@ -1,7 +1,8 @@
 from datetime import date
+
 import substrait.gen.proto.algebra_pb2 as stalg
-from substrait.builders.extended_expression import literal
 from substrait.builders import type as sttb
+from substrait.builders.extended_expression import literal
 
 
 def extract_literal(builder):

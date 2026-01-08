@@ -1,5 +1,6 @@
-from substrait.gen.json import simple_extensions as se
 from typing import Union
+
+from substrait.gen.json import simple_extensions as se
 
 
 def build_arg(d: dict) -> Union[se.ValueArg, se.TypeArg, se.EnumerationArg]:

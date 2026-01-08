@@ -1,29 +1,31 @@
 import random
 import string
+from typing import Callable
+
+from deepdiff import DeepDiff
 from sqloxide import parse_sql
+
 from substrait.builders.extended_expression import (
     UnboundExtendedExpression,
-    column,
-    scalar_function,
-    literal,
     aggregate_function,
+    column,
+    literal,
+    scalar_function,
     window_function,
 )
 from substrait.builders.plan import (
+    aggregate,
+    fetch,
+    filter,
+    join,
     read_named_table,
     select,
-    filter,
-    sort,
-    fetch,
     set,
-    join,
-    aggregate,
+    sort,
 )
-from substrait.gen.proto import type_pb2 as stt
-from substrait.gen.proto import algebra_pb2 as stalg
 from substrait.extension_registry import ExtensionRegistry
-from typing import Callable
-from deepdiff import DeepDiff
+from substrait.gen.proto import algebra_pb2 as stalg
+from substrait.gen.proto import type_pb2 as stt
 
 SchemaResolver = Callable[[str], stt.NamedStruct]
 

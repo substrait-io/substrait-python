@@ -32,13 +32,12 @@ respect-gitignore = true
 target-version = "py310"
 # never autoformat upstream or generated code
 exclude = ["third_party/", "src/substrait/gen"]
+lint.extend-select = ["I"]
+
 
 [tool.pixi.workspace]
 channels = ["conda-forge"]
 platforms = ["win-64", "linux-64", "osx-64", "osx-arm64", "linux-aarch64"]
-
-[tool.pixi.pypi-dependencies]
-substrait = { path = ".", editable = true }
 
 [tool.pixi.environments]
 dev = { features = ["dev"], solve-group = "default" }

@@ -1,11 +1,11 @@
+import substrait.gen.proto.extended_expression_pb2 as stee
+import substrait.gen.proto.type_pb2 as stp
 from substrait.builders.extended_expression import (
-    UnboundExtendedExpression,
     ExtendedExpressionOrUnbound,
+    UnboundExtendedExpression,
     resolve_expression,
     scalar_function,
 )
-import substrait.gen.proto.type_pb2 as stp
-import substrait.gen.proto.extended_expression_pb2 as stee
 from substrait.extension_registry import ExtensionRegistry
 
 

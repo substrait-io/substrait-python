@@ -9,25 +9,25 @@ is complete across all Substrait implementations.
 
 import yaml
 
-import substrait.gen.proto.type_pb2 as stt
-import substrait.gen.proto.plan_pb2 as stp
 import substrait.gen.proto.algebra_pb2 as stalg
 import substrait.gen.proto.extended_expression_pb2 as stex
 import substrait.gen.proto.extensions.extensions_pb2 as ste
+import substrait.gen.proto.plan_pb2 as stp
+import substrait.gen.proto.type_pb2 as stt
 from substrait.builders.extended_expression import (
-    scalar_function,
-    literal,
-    column,
     aggregate_function,
+    column,
+    literal,
+    scalar_function,
+)
+from substrait.builders.plan import (
+    aggregate,
+    default_version,
+    filter,
+    read_named_table,
+    select,
 )
 from substrait.builders.type import i64
-from substrait.builders.plan import (
-    read_named_table,
-    aggregate,
-    select,
-    filter,
-    default_version,
-)
 from substrait.extension_registry import ExtensionRegistry
 from substrait.type_inference import infer_plan_schema
 

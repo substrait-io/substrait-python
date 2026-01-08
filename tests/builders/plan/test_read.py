@@ -1,12 +1,13 @@
-import substrait.gen.proto.type_pb2 as stt
-import substrait.gen.proto.plan_pb2 as stp
-import substrait.gen.proto.algebra_pb2 as stalg
-from substrait.builders.type import boolean, i64
-from substrait.builders.plan import read_named_table, default_version
 import pytest
-from substrait.gen.proto.extensions.extensions_pb2 import AdvancedExtension
 from google.protobuf import any_pb2
 from google.protobuf.wrappers_pb2 import StringValue
+
+import substrait.gen.proto.algebra_pb2 as stalg
+import substrait.gen.proto.plan_pb2 as stp
+import substrait.gen.proto.type_pb2 as stt
+from substrait.builders.plan import default_version, read_named_table
+from substrait.builders.type import boolean, i64
+from substrait.gen.proto.extensions.extensions_pb2 import AdvancedExtension
 
 struct = stt.Type.Struct(
     types=[i64(nullable=False), boolean()],

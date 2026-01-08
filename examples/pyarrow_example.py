@@ -8,8 +8,9 @@
 import pyarrow as pa
 import pyarrow.compute as pc
 import pyarrow.substrait as pa_substrait
+
 import substrait
-from substrait.builders.plan import select, read_named_table
+from substrait.builders.plan import read_named_table, select
 
 arrow_schema = pa.schema([pa.field("x", pa.int32()), pa.field("y", pa.int32())])
 

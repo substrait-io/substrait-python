@@ -1,5 +1,5 @@
-from substrait.gen.proto.type_pb2 import NamedStruct, Type
 from substrait.derivation_expression import evaluate
+from substrait.gen.proto.type_pb2 import NamedStruct, Type
 
 
 def test_simple_arithmetic():

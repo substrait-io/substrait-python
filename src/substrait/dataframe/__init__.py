@@ -1,6 +1,5 @@
 import substrait.dataframe
 from substrait.builders.extended_expression import column
-
 from substrait.dataframe.dataframe import DataFrame
 from substrait.dataframe.expression import Expression
 

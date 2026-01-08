@@ -1,7 +1,7 @@
-import substrait.gen.proto.type_pb2 as stt
-from substrait.builders.type import boolean, i64
-from substrait.builders.type import named_struct
 import pytest
+
+import substrait.gen.proto.type_pb2 as stt
+from substrait.builders.type import boolean, i64, named_struct
 
 
 def test_named_struct_required():

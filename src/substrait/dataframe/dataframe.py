@@ -1,4 +1,5 @@
-from typing import Union, Iterable
+from typing import Iterable, Union
+
 import substrait.dataframe
 from substrait.builders.plan import select
 from substrait.dataframe.expression import Expression

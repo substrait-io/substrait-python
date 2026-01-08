@@ -9,11 +9,12 @@
 
 
 import duckdb
-from substrait.builders.plan import read_named_table, select, filter
-from substrait.builders.extended_expression import column, scalar_function, literal
+import pyarrow.substrait as pa_substrait
+
+from substrait.builders.extended_expression import column, literal, scalar_function
+from substrait.builders.plan import filter, read_named_table, select
 from substrait.builders.type import i32
 from substrait.extension_registry import ExtensionRegistry
-import pyarrow.substrait as pa_substrait
 
 try:
     duckdb.install_extension("substrait")

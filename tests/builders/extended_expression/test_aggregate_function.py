@@ -1,9 +1,9 @@
 import yaml
 
 import substrait.gen.proto.algebra_pb2 as stalg
-import substrait.gen.proto.type_pb2 as stt
 import substrait.gen.proto.extended_expression_pb2 as stee
 import substrait.gen.proto.extensions.extensions_pb2 as ste
+import substrait.gen.proto.type_pb2 as stt
 from substrait.builders.extended_expression import aggregate_function, literal
 from substrait.extension_registry import ExtensionRegistry
 

@@ -1,11 +1,12 @@
-from substrait.extension_registry import ExtensionRegistry
-from substrait.sql.sql_to_substrait import convert
-import pyarrow
+import sys
 import tempfile
+
+import pyarrow
 import pyarrow.substrait as pa_substrait
 import pytest
-import sys
 
+from substrait.extension_registry import ExtensionRegistry
+from substrait.sql.sql_to_substrait import convert
 
 data: pyarrow.Table = pyarrow.Table.from_batches(
     [

@@ -41,7 +41,7 @@ _normalized_key_names = {
     "struct": "struct",
     "list": "list",
     "map": "map",
-    "func": "func"
+    "func": "func",
 }
 
 

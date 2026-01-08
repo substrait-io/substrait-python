@@ -1,6 +1,6 @@
-import substrait.gen.proto.type_pb2 as stt
 import substrait.gen.proto.extensions.extensions_pb2 as ste
-from substrait.utils import type_num_names, merge_extension_uris, merge_extension_urns
+import substrait.gen.proto.type_pb2 as stt
+from substrait.utils import merge_extension_uris, merge_extension_urns, type_num_names
 
 
 def test_type_num_names_flat_struct():

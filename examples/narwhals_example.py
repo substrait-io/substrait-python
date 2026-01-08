@@ -6,14 +6,13 @@
 # ]
 # ///
 
-from substrait.builders.plan import read_named_table
-from substrait.builders.type import i64, boolean, struct, named_struct
-from substrait.extension_registry import ExtensionRegistry
-
-from narwhals.typing import FrameT
 import narwhals as nw
-import substrait.dataframe as sdf
+from narwhals.typing import FrameT
 
+import substrait.dataframe as sdf
+from substrait.builders.plan import read_named_table
+from substrait.builders.type import boolean, i64, named_struct, struct
+from substrait.extension_registry import ExtensionRegistry
 
 registry = ExtensionRegistry(load_default_extensions=True)
 

@@ -18,13 +18,13 @@ from substrait.builders.extended_expression import (
 )
 from substrait.extension_registry import ExtensionRegistry
 from substrait.gen.proto.extensions.extensions_pb2 import AdvancedExtension
+from substrait.gen.version import substrait_version
 from substrait.type_inference import infer_plan_schema
 from substrait.utils import (
     merge_extension_declarations,
     merge_extension_uris,
     merge_extension_urns,
 )
-from substrait.gen.version import substrait_version
 
 UnboundPlan = Callable[[ExtensionRegistry], stp.Plan]
 

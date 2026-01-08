@@ -1,11 +1,10 @@
-import substrait.gen.proto.type_pb2 as stt
-import substrait.gen.proto.plan_pb2 as stp
-import substrait.gen.proto.algebra_pb2 as stalg
-from substrait.builders.type import boolean, i64
-from substrait.builders.plan import read_named_table, default_version
-from substrait.extension_registry import ExtensionRegistry
 import substrait.dataframe as sdf
-
+import substrait.gen.proto.algebra_pb2 as stalg
+import substrait.gen.proto.plan_pb2 as stp
+import substrait.gen.proto.type_pb2 as stt
+from substrait.builders.plan import default_version, read_named_table
+from substrait.builders.type import boolean, i64
+from substrait.extension_registry import ExtensionRegistry
 
 registry = ExtensionRegistry(load_default_extensions=False)
 

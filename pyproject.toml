@@ -32,6 +32,8 @@ respect-gitignore = true
 target-version = "py310"
 # never autoformat upstream or generated code
 exclude = ["third_party/", "src/substrait/gen"]
+lint.extend-select = ["I"]
+
 
 [tool.pixi.workspace]
 channels = ["conda-forge"]

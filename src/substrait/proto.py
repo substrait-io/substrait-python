@@ -11,10 +11,11 @@ def _load():
     substrait.gen.proto.extensions.extensions_pb2.SimpleExtensionDeclaration
     becomes substrait.proto.SimpleExtensionDeclaration
     """
-    import sys
+    import importlib
     import inspect
     import pkgutil
-    import importlib
+    import sys
+
     from substrait.gen import proto as _proto
 
     selfmodule = sys.modules[__name__]

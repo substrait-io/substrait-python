@@ -1,7 +1,7 @@
 """Extension Registry class."""
 
-import re
 import itertools
+import re
 from collections import defaultdict
 from importlib.resources import files as importlib_files
 from pathlib import Path
@@ -14,7 +14,6 @@ from substrait.gen.proto.type_pb2 import Type
 from substrait.simple_extension_utils import build_simple_extensions
 
 from .function_entry import FunctionEntry, FunctionType
-
 
 # Constants
 DEFAULT_URN_PREFIX = "https://github.com/substrait-io/substrait/blob/main/extensions"

@@ -53,15 +53,9 @@ update-substrait = [ { task = "update-submodule" }, { task = "codegen" }]
 
 update-submodule = "./update_submodule.sh"
 
-codegen = [{ task = "antlr" }, { task = "codegen-proto" }, { task = "codegen-extensions" }, { task = "codegen-version" }]
+codegen = [{ task = "antlr" }, { task = "codegen-proto" }, { task = "codegen-extensions" }]
 
 check-codegen = "./check_codegen.sh"
-
-codegen-version = """bash -c '
-cd third_party/substrait
-export version=$(git describe --tags | tr -d 'v')
-echo "substrait_version = \\"$version\\"" > ../../src/substrait/gen/version.py
-'"""
 
 codegen-proto = "./gen_proto.sh"
 

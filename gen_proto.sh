@@ -7,7 +7,7 @@ submodule_dir=./third_party/substrait
 src_dir="$submodule_dir"/proto
 tmp_dir=./buf_work_dir
 dest_dir=./src
-extension_dir=./src/substrait/extensions
+extension_dir=./src/substrait/extension_files
 
 # Prefix the protobuf files with a unique configuration to prevent namespace conflicts
 # with other substrait packages. Save output to the work dir.

@@ -32,7 +32,7 @@ class ExtensionRegistry:
         # Bidirectional URI <-> URN mapping (temporary during migration)
         self._uri_urn_bimap = UriUrnBiDiMap()
         if load_default_extensions:
-            for fpath in importlib_files("substrait.extensions").glob(  # type: ignore
+            for fpath in importlib_files("substrait.extension_files").glob(  # type: ignore
                 "functions*.yaml"
             ):
                 # Derive URI from DEFAULT_URN_PREFIX and filename

@@ -301,6 +301,7 @@ name = "substrait"
 source = { editable = "." }
 dependencies = [
     { name = "protobuf" },
+    { name = "vbarua-substrait-protobuf" },
 ]
 
 [package.optional-dependencies]
@@ -331,6 +332,7 @@ requires-dist = [
     { name = "protobuf", specifier = ">=5,<7" },
     { name = "pyyaml", marker = "extra == 'extensions'" },
     { name = "sqloxide", marker = "extra == 'sql'" },
+    { name = "vbarua-substrait-protobuf", specifier = ">=0.1.0.dev0" },
 ]
 provides-extras = ["extensions", "sql"]
 
@@ -385,4 +387,16 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/72/94/1a15dd82efb362ac84269196e94cf00f187f7ed21c242792a923cdb1c61f/typing_extensions-4.15.0.tar.gz", hash = "sha256:0cea48d173cc12fa28ecabc3b837ea3cf6f38c6d1136f85cbaaf598984861466", size = 109391, upload-time = "2025-08-25T13:49:26.313Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/18/67/36e9267722cc04a6b9f15c7f3441c2363321a3ea07da7ae0c0707beb2a9c/typing_extensions-4.15.0-py3-none-any.whl", hash = "sha256:f0fa19c6845758ab08074a0cfa8b7aecb71c999ca73d62883bc25cc018c4e548", size = 44614, upload-time = "2025-08-25T13:49:24.86Z" },
+]
+
+[[package]]
+name = "vbarua-substrait-protobuf"
+version = "0.1.0.dev0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "protobuf" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/79/0f/79893291b2133c689fa5dd797ea7398b24401ca10ba3cbd32197121b01b2/vbarua_substrait_protobuf-0.1.0.dev0.tar.gz", hash = "sha256:434d505f51c5fab9e254e595831b85d14705385cd843a88928ab3eefee3537fe", size = 82349, upload-time = "2026-01-13T23:42:47.113Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/31/18/9129c1f70d7294d6318da5f9e95bbcbe90a215b188f0ab01269878c20f52/vbarua_substrait_protobuf-0.1.0.dev0-py3-none-any.whl", hash = "sha256:14694293d3e829e4e680d5d07e9b08863cf6476683e80dda27c72063c78d67d2", size = 83496, upload-time = "2026-01-13T23:42:45.715Z" },
 ]

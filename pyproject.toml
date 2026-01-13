@@ -5,7 +5,10 @@ authors = [{name = "Substrait contributors", email = "substrait@googlegroups.com
 license = {text = "Apache-2.0"}
 readme = "README.md"
 requires-python = ">=3.10,<3.14"
-dependencies = ["protobuf >=5,<7"]
+dependencies = [
+    "protobuf >=5,<7",
+    "vbarua-substrait-protobuf>=0.1.0.dev0",
+]
 dynamic = ["version"]
 
 [tool.setuptools_scm]

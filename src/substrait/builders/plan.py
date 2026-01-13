@@ -12,7 +12,7 @@ import substrait.gen.proto.algebra_pb2 as stalg
 import substrait.gen.proto.extended_expression_pb2 as stee
 import substrait.gen.proto.plan_pb2 as stp
 import substrait.gen.proto.type_pb2 as stt
-from substrait import __substrait_version__
+from substrait.version import __substrait_version__
 from substrait.builders.extended_expression import (
     ExtendedExpressionOrUnbound,
     resolve_expression,

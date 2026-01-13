@@ -173,7 +173,7 @@ class SimpleExtensionDeclaration(google.protobuf.message.Message):
         specific function
         """
         name: builtins.str
-        """A function signature compound name"""
+        """A function signature"""
         def __init__(
             self,
             *,

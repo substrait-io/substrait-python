@@ -440,7 +440,7 @@ class ReadRel(google.protobuf.message.Message):
 
     @typing.final
     class LocalFiles(google.protobuf.message.Message):
-        """Represents a list of files in input of a scan operation"""
+        """Represents a list of locally-accessible files in input of a scan operation"""
 
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -2784,11 +2784,14 @@ class Expression(google.protobuf.message.Message):
             DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
             TYPE_REFERENCE_FIELD_NUMBER: builtins.int
+            TYPE_ALIAS_REFERENCE_FIELD_NUMBER: builtins.int
             TYPE_PARAMETERS_FIELD_NUMBER: builtins.int
             VALUE_FIELD_NUMBER: builtins.int
             STRUCT_FIELD_NUMBER: builtins.int
             type_reference: builtins.int
             """points to a type_anchor defined in this plan"""
+            type_alias_reference: builtins.int
+            """points to a type_alias_anchor defined in this plan."""
             @property
             def type_parameters(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[substrait.gen.proto.type_pb2.Type.Parameter]:
                 """The parameters to be bound to the type class, if the type class is
@@ -2807,12 +2810,16 @@ class Expression(google.protobuf.message.Message):
                 self,
                 *,
                 type_reference: builtins.int = ...,
+                type_alias_reference: builtins.int = ...,
                 type_parameters: collections.abc.Iterable[substrait.gen.proto.type_pb2.Type.Parameter] | None = ...,
                 value: google.protobuf.any_pb2.Any | None = ...,
                 struct: Global___Expression.Literal.Struct | None = ...,
             ) -> None: ...
-            def HasField(self, field_name: typing.Literal["struct", b"struct", "val", b"val", "value", b"value"]) -> builtins.bool: ...
-            def ClearField(self, field_name: typing.Literal["struct", b"struct", "type_parameters", b"type_parameters", "type_reference", b"type_reference", "val", b"val", "value", b"value"]) -> None: ...
+            def HasField(self, field_name: typing.Literal["struct", b"struct", "type_alias_reference", b"type_alias_reference", "type_anchor_type", b"type_anchor_type", "type_reference", b"type_reference", "val", b"val", "value", b"value"]) -> builtins.bool: ...
+            def ClearField(self, field_name: typing.Literal["struct", b"struct", "type_alias_reference", b"type_alias_reference", "type_anchor_type", b"type_anchor_type", "type_parameters", b"type_parameters", "type_reference", b"type_reference", "val", b"val", "value", b"value"]) -> None: ...
+            @typing.overload
+            def WhichOneof(self, oneof_group: typing.Literal["type_anchor_type", b"type_anchor_type"]) -> typing.Literal["type_reference", "type_alias_reference"] | None: ...
+            @typing.overload
             def WhichOneof(self, oneof_group: typing.Literal["val", b"val"]) -> typing.Literal["value", "struct"] | None: ...
 
         BOOLEAN_FIELD_NUMBER: builtins.int
@@ -3072,6 +3079,67 @@ class Expression(google.protobuf.message.Message):
         def HasField(self, field_name: typing.Literal["list", b"list", "map", b"map", "nested_type", b"nested_type", "struct", b"struct"]) -> builtins.bool: ...
         def ClearField(self, field_name: typing.Literal["list", b"list", "map", b"map", "nested_type", b"nested_type", "nullable", b"nullable", "struct", b"struct", "type_variation_reference", b"type_variation_reference"]) -> None: ...
         def WhichOneof(self, oneof_group: typing.Literal["nested_type", b"nested_type"]) -> typing.Literal["struct", "list", "map"] | None: ...
+
+    @typing.final
+    class Lambda(google.protobuf.message.Message):
+        """A lambda expression representing an inline, anonymous function.
+        Lambda expressions have parameters and a body expression that can reference
+        those parameters using FieldReference with FieldReference.LambdaParameterReference as the root_type.
+        """
+
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        PARAMETERS_FIELD_NUMBER: builtins.int
+        BODY_FIELD_NUMBER: builtins.int
+        @property
+        def parameters(self) -> substrait.gen.proto.type_pb2.Type.Struct:
+            """Parameters this lambda accepts, represented as a struct where each field corresponds
+            to a parameter. Parameters can be accessed using FieldReference with
+            FieldReference.LambdaParameterReference as root_type and StructField to select
+            specific parameters. The struct's nullability must be NULLABILITY_REQUIRED.
+            """
+
+        @property
+        def body(self) -> Global___Expression:
+            """The lambda body expression. Lambda parameters can be referenced using FieldReference
+            with FieldReference.LambdaParameterReference as root_type.
+            """
+
+        def __init__(
+            self,
+            *,
+            parameters: substrait.gen.proto.type_pb2.Type.Struct | None = ...,
+            body: Global___Expression | None = ...,
+        ) -> None: ...
+        def HasField(self, field_name: typing.Literal["body", b"body", "parameters", b"parameters"]) -> builtins.bool: ...
+        def ClearField(self, field_name: typing.Literal["body", b"body", "parameters", b"parameters"]) -> None: ...
+
+    @typing.final
+    class LambdaInvocation(google.protobuf.message.Message):
+        """Invokes an inline lambda expression with provided arguments.
+        Enables immediate invocation patterns like: ((x) -> x * 2)(5)
+
+        The return type is derived from the type of the lambda's body expression.
+        """
+
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        LAMBDA_FIELD_NUMBER: builtins.int
+        ARGUMENTS_FIELD_NUMBER: builtins.int
+        @property
+        def arguments(self) -> Global___Expression.Nested.Struct:
+            """Arguments to pass to the lambda, as a struct expression. The struct must have
+            exactly one Expression field for each lambda parameter, and the expression at
+            each position must have a type that matches the corresponding parameter type.
+            """
+
+        def __init__(
+            self,
+            *,
+            arguments: Global___Expression.Nested.Struct | None = ...,
+        ) -> None: ...
+        def HasField(self, field_name: typing.Literal["arguments", b"arguments", "lambda", b"lambda"]) -> builtins.bool: ...
+        def ClearField(self, field_name: typing.Literal["arguments", b"arguments", "lambda", b"lambda"]) -> None: ...
 
     @typing.final
     class ScalarFunction(google.protobuf.message.Message):
@@ -3919,8 +3987,11 @@ class Expression(google.protobuf.message.Message):
 
     @typing.final
     class FieldReference(google.protobuf.message.Message):
-        """A reference to an inner part of a complex object. Can reference reference a
-        single element or a masked version of elements
+        """A reference to data within a structured object, supporting navigation into
+        nested fields. The root_type specifies the origin of the data (input record,
+        outer query, lambda parameters, or an arbitrary expression), and the
+        reference_type specifies how to navigate from that root (either a direct
+        path to a single element or a mask selecting multiple elements).
         """
 
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -3956,11 +4027,37 @@ class Expression(google.protobuf.message.Message):
             ) -> None: ...
             def ClearField(self, field_name: typing.Literal["steps_out", b"steps_out"]) -> None: ...
 
+        @typing.final
+        class LambdaParameterReference(google.protobuf.message.Message):
+            """A reference to a lambda parameter within a lambda body expression.
+            This identifies which lambda scope to reference, treating its parameters
+            as a struct. Use FieldReference with this as root_type to access specific
+            parameters or nested fields within parameters.
+            """
+
+            DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+            STEPS_OUT_FIELD_NUMBER: builtins.int
+            steps_out: builtins.int
+            """Number of lambda boundaries to traverse up for this reference.
+            For nested lambdas:
+              0 = innermost lambda (current lambda's parameters as a struct)
+              1 = one lambda level out (outer lambda's parameters as a struct)
+              2 = two lambda levels out, etc.
+            """
+            def __init__(
+                self,
+                *,
+                steps_out: builtins.int = ...,
+            ) -> None: ...
+            def ClearField(self, field_name: typing.Literal["steps_out", b"steps_out"]) -> None: ...
+
         DIRECT_REFERENCE_FIELD_NUMBER: builtins.int
         MASKED_REFERENCE_FIELD_NUMBER: builtins.int
         EXPRESSION_FIELD_NUMBER: builtins.int
         ROOT_REFERENCE_FIELD_NUMBER: builtins.int
         OUTER_REFERENCE_FIELD_NUMBER: builtins.int
+        LAMBDA_PARAMETER_REFERENCE_FIELD_NUMBER: builtins.int
         @property
         def direct_reference(self) -> Global___Expression.ReferenceSegment: ...
         @property
@@ -3971,6 +4068,8 @@ class Expression(google.protobuf.message.Message):
         def root_reference(self) -> Global___Expression.FieldReference.RootReference: ...
         @property
         def outer_reference(self) -> Global___Expression.FieldReference.OuterReference: ...
+        @property
+        def lambda_parameter_reference(self) -> Global___Expression.FieldReference.LambdaParameterReference: ...
         def __init__(
             self,
             *,
@@ -3979,13 +4078,14 @@ class Expression(google.protobuf.message.Message):
             expression: Global___Expression | None = ...,
             root_reference: Global___Expression.FieldReference.RootReference | None = ...,
             outer_reference: Global___Expression.FieldReference.OuterReference | None = ...,
+            lambda_parameter_reference: Global___Expression.FieldReference.LambdaParameterReference | None = ...,
         ) -> None: ...
-        def HasField(self, field_name: typing.Literal["direct_reference", b"direct_reference", "expression", b"expression", "masked_reference", b"masked_reference", "outer_reference", b"outer_reference", "reference_type", b"reference_type", "root_reference", b"root_reference", "root_type", b"root_type"]) -> builtins.bool: ...
-        def ClearField(self, field_name: typing.Literal["direct_reference", b"direct_reference", "expression", b"expression", "masked_reference", b"masked_reference", "outer_reference", b"outer_reference", "reference_type", b"reference_type", "root_reference", b"root_reference", "root_type", b"root_type"]) -> None: ...
+        def HasField(self, field_name: typing.Literal["direct_reference", b"direct_reference", "expression", b"expression", "lambda_parameter_reference", b"lambda_parameter_reference", "masked_reference", b"masked_reference", "outer_reference", b"outer_reference", "reference_type", b"reference_type", "root_reference", b"root_reference", "root_type", b"root_type"]) -> builtins.bool: ...
+        def ClearField(self, field_name: typing.Literal["direct_reference", b"direct_reference", "expression", b"expression", "lambda_parameter_reference", b"lambda_parameter_reference", "masked_reference", b"masked_reference", "outer_reference", b"outer_reference", "reference_type", b"reference_type", "root_reference", b"root_reference", "root_type", b"root_type"]) -> None: ...
         @typing.overload
         def WhichOneof(self, oneof_group: typing.Literal["reference_type", b"reference_type"]) -> typing.Literal["direct_reference", "masked_reference"] | None: ...
         @typing.overload
-        def WhichOneof(self, oneof_group: typing.Literal["root_type", b"root_type"]) -> typing.Literal["expression", "root_reference", "outer_reference"] | None: ...
+        def WhichOneof(self, oneof_group: typing.Literal["root_type", b"root_type"]) -> typing.Literal["expression", "root_reference", "outer_reference", "lambda_parameter_reference"] | None: ...
 
     @typing.final
     class Subquery(google.protobuf.message.Message):
@@ -4199,6 +4299,8 @@ class Expression(google.protobuf.message.Message):
     SUBQUERY_FIELD_NUMBER: builtins.int
     NESTED_FIELD_NUMBER: builtins.int
     DYNAMIC_PARAMETER_FIELD_NUMBER: builtins.int
+    LAMBDA_FIELD_NUMBER: builtins.int
+    LAMBDA_INVOCATION_FIELD_NUMBER: builtins.int
     ENUM_FIELD_NUMBER: builtins.int
     @property
     def literal(self) -> Global___Expression.Literal: ...
@@ -4225,6 +4327,8 @@ class Expression(google.protobuf.message.Message):
     @property
     def dynamic_parameter(self) -> Global___DynamicParameter: ...
     @property
+    def lambda_invocation(self) -> Global___Expression.LambdaInvocation: ...
+    @property
     def enum(self) -> Global___Expression.Enum:
         """deprecated: enum literals are only sensible in the context of
         function arguments, for which FunctionArgument should now be
@@ -4246,11 +4350,12 @@ class Expression(google.protobuf.message.Message):
         subquery: Global___Expression.Subquery | None = ...,
         nested: Global___Expression.Nested | None = ...,
         dynamic_parameter: Global___DynamicParameter | None = ...,
+        lambda_invocation: Global___Expression.LambdaInvocation | None = ...,
         enum: Global___Expression.Enum | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing.Literal["cast", b"cast", "dynamic_parameter", b"dynamic_parameter", "enum", b"enum", "if_then", b"if_then", "literal", b"literal", "multi_or_list", b"multi_or_list", "nested", b"nested", "rex_type", b"rex_type", "scalar_function", b"scalar_function", "selection", b"selection", "singular_or_list", b"singular_or_list", "subquery", b"subquery", "switch_expression", b"switch_expression", "window_function", b"window_function"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["cast", b"cast", "dynamic_parameter", b"dynamic_parameter", "enum", b"enum", "if_then", b"if_then", "literal", b"literal", "multi_or_list", b"multi_or_list", "nested", b"nested", "rex_type", b"rex_type", "scalar_function", b"scalar_function", "selection", b"selection", "singular_or_list", b"singular_or_list", "subquery", b"subquery", "switch_expression", b"switch_expression", "window_function", b"window_function"]) -> None: ...
-    def WhichOneof(self, oneof_group: typing.Literal["rex_type", b"rex_type"]) -> typing.Literal["literal", "selection", "scalar_function", "window_function", "if_then", "switch_expression", "singular_or_list", "multi_or_list", "cast", "subquery", "nested", "dynamic_parameter", "enum"] | None: ...
+    def HasField(self, field_name: typing.Literal["cast", b"cast", "dynamic_parameter", b"dynamic_parameter", "enum", b"enum", "if_then", b"if_then", "lambda", b"lambda", "lambda_invocation", b"lambda_invocation", "literal", b"literal", "multi_or_list", b"multi_or_list", "nested", b"nested", "rex_type", b"rex_type", "scalar_function", b"scalar_function", "selection", b"selection", "singular_or_list", b"singular_or_list", "subquery", b"subquery", "switch_expression", b"switch_expression", "window_function", b"window_function"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["cast", b"cast", "dynamic_parameter", b"dynamic_parameter", "enum", b"enum", "if_then", b"if_then", "lambda", b"lambda", "lambda_invocation", b"lambda_invocation", "literal", b"literal", "multi_or_list", b"multi_or_list", "nested", b"nested", "rex_type", b"rex_type", "scalar_function", b"scalar_function", "selection", b"selection", "singular_or_list", b"singular_or_list", "subquery", b"subquery", "switch_expression", b"switch_expression", "window_function", b"window_function"]) -> None: ...
+    def WhichOneof(self, oneof_group: typing.Literal["rex_type", b"rex_type"]) -> typing.Literal["literal", "selection", "scalar_function", "window_function", "if_then", "switch_expression", "singular_or_list", "multi_or_list", "cast", "subquery", "nested", "dynamic_parameter", "lambda", "lambda_invocation", "enum"] | None: ...
 
 Global___Expression: typing_extensions.TypeAlias = Expression
 

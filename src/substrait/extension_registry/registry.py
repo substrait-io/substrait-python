@@ -8,9 +8,9 @@ from pathlib import Path
 from typing import Optional, Union
 
 import yaml
+from substrait.type_pb2 import Type
 
 from substrait.bimap import UriUrnBiDiMap
-from substrait.gen.proto.type_pb2 import Type
 from substrait.simple_extension_utils import build_simple_extensions
 
 from .function_entry import FunctionEntry, FunctionType

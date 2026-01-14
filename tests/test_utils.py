@@ -1,5 +1,6 @@
-import substrait.gen.proto.extensions.extensions_pb2 as ste
-import substrait.gen.proto.type_pb2 as stt
+import substrait.extensions.extensions_pb2 as ste
+import substrait.type_pb2 as stt
+
 from substrait.utils import merge_extension_uris, merge_extension_urns, type_num_names
 
 

@@ -1,7 +1,7 @@
-import substrait.gen.proto.algebra_pb2 as stalg
-import substrait.gen.proto.extended_expression_pb2 as stee
-import substrait.gen.proto.plan_pb2 as stp
-import substrait.gen.proto.type_pb2 as stt
+import substrait.algebra_pb2 as stalg
+import substrait.extended_expression_pb2 as stee
+import substrait.plan_pb2 as stp
+import substrait.type_pb2 as stt
 
 
 def infer_literal_type(literal: stalg.Expression.Literal) -> stt.Type:

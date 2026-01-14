@@ -5,6 +5,8 @@ from typing import Callable
 from deepdiff import DeepDiff
 from sqloxide import parse_sql
 
+from substrait import algebra_pb2 as stalg
+from substrait import type_pb2 as stt
 from substrait.builders.extended_expression import (
     UnboundExtendedExpression,
     aggregate_function,
@@ -24,8 +26,6 @@ from substrait.builders.plan import (
     sort,
 )
 from substrait.extension_registry import ExtensionRegistry
-from substrait.gen.proto import algebra_pb2 as stalg
-from substrait.gen.proto import type_pb2 as stt
 
 SchemaResolver = Callable[[str], stt.NamedStruct]
 

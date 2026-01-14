@@ -8,7 +8,7 @@ def _load():
     the protocol modules with a friendly name making the protocol
     more convenient to use.
 
-    substrait.gen.proto.extensions.extensions_pb2.SimpleExtensionDeclaration
+    substrait.extensions.extensions_pb2.SimpleExtensionDeclaration
     becomes substrait.proto.SimpleExtensionDeclaration
     """
     import importlib

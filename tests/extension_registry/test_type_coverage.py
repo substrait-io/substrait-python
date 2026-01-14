@@ -1,11 +1,12 @@
 """Tests for the covers() function - type coverage and matching."""
 
+from substrait.type_pb2 import Type
+
 from substrait.builders.type import decimal, i8, i16, i32, struct
 from substrait.builders.type import list as list_
 from substrait.builders.type import map as map_
 from substrait.derivation_expression import _parse
 from substrait.extension_registry import covers
-from substrait.gen.proto.type_pb2 import Type
 
 
 def test_covers():

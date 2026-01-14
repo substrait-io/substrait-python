@@ -1,7 +1,7 @@
 import pytest
+import substrait.algebra_pb2 as stalg
+import substrait.type_pb2 as stt
 
-import substrait.gen.proto.algebra_pb2 as stalg
-import substrait.gen.proto.type_pb2 as stt
 from substrait.type_inference import infer_literal_type
 
 testcases = [

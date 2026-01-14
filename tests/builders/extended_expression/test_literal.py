@@ -1,6 +1,7 @@
 from datetime import date
 
-import substrait.gen.proto.algebra_pb2 as stalg
+import substrait.algebra_pb2 as stalg
+
 from substrait.builders import type as sttb
 from substrait.builders.extended_expression import literal
 

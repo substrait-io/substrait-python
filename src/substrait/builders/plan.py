@@ -8,23 +8,24 @@ See `examples/builder_example.py` for usage.
 import re
 from typing import Callable, Iterable, Optional, Union
 
-import substrait.gen.proto.algebra_pb2 as stalg
-import substrait.gen.proto.extended_expression_pb2 as stee
-import substrait.gen.proto.plan_pb2 as stp
-import substrait.gen.proto.type_pb2 as stt
-from substrait import __substrait_version__
+import substrait.algebra_pb2 as stalg
+import substrait.extended_expression_pb2 as stee
+import substrait.plan_pb2 as stp
+import substrait.type_pb2 as stt
+from substrait.extensions.extensions_pb2 import AdvancedExtension
+
 from substrait.builders.extended_expression import (
     ExtendedExpressionOrUnbound,
     resolve_expression,
 )
 from substrait.extension_registry import ExtensionRegistry
-from substrait.gen.proto.extensions.extensions_pb2 import AdvancedExtension
 from substrait.type_inference import infer_plan_schema
 from substrait.utils import (
     merge_extension_declarations,
     merge_extension_uris,
     merge_extension_urns,
 )
+from substrait.version import substrait_version
 
 UnboundPlan = Callable[[ExtensionRegistry], stp.Plan]
 
@@ -33,7 +34,7 @@ PlanOrUnbound = Union[stp.Plan, UnboundPlan]
 
 def _create_default_version():
     p = re.compile(r"(\d+)\.(\d+)\.(\d+)")
-    m = p.match(__substrait_version__)
+    m = p.match(substrait_version)
     global default_version
     default_version = stp.Version(
         major_number=int(m.group(1)),

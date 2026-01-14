@@ -1,6 +1,6 @@
 import pytest
+import substrait.type_pb2 as stt
 
-import substrait.gen.proto.type_pb2 as stt
 from substrait.builders.type import boolean, i64, named_struct
 
 

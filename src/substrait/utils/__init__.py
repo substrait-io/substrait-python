@@ -4,8 +4,8 @@ Utility and debugging functions for Substrait.
 
 from typing import Iterable
 
-import substrait.gen.proto.extensions.extensions_pb2 as ste
-import substrait.gen.proto.type_pb2 as stp
+import substrait.extensions.extensions_pb2 as ste
+import substrait.type_pb2 as stp
 
 
 def type_num_names(typ: stp.Type):

@@ -1,6 +1,7 @@
-import substrait.gen.proto.algebra_pb2 as stalg
-import substrait.gen.proto.extended_expression_pb2 as stee
-import substrait.gen.proto.type_pb2 as stt
+import substrait.algebra_pb2 as stalg
+import substrait.extended_expression_pb2 as stee
+import substrait.type_pb2 as stt
+
 from substrait.builders.extended_expression import cast, literal
 from substrait.builders.type import i8, i16
 from substrait.extension_registry import ExtensionRegistry
@@ -47,9 +48,9 @@ def test_cast():
 
 
 def test_cast_with_extension():
+    import substrait.extensions.extensions_pb2 as ste
     import yaml
 
-    import substrait.gen.proto.extensions.extensions_pb2 as ste
     from substrait.builders.extended_expression import scalar_function
 
     registry_with_ext = ExtensionRegistry(load_default_extensions=False)

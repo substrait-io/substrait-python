@@ -1,4 +1,5 @@
-import substrait.gen.proto.algebra_pb2 as stalg
+import substrait.algebra_pb2 as stalg
+
 from substrait.builders.extended_expression import (
     column,
     literal,

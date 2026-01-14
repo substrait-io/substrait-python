@@ -2,6 +2,7 @@ import substrait.algebra_pb2 as stalg
 import substrait.extended_expression_pb2 as stee
 import substrait.extensions.extensions_pb2 as ste
 import substrait.type_pb2 as stt
+
 from substrait.builders.extended_expression import (
     column,
     if_then,

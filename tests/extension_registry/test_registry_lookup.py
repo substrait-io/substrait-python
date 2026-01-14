@@ -1,5 +1,6 @@
-from substrait.builders.type import decimal, i8, i16
 from substrait.type_pb2 import Type
+
+from substrait.builders.type import decimal, i8, i16
 
 
 def test_non_existing_urn(registry):

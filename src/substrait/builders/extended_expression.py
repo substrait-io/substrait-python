@@ -6,6 +6,7 @@ import substrait.algebra_pb2 as stalg
 import substrait.extended_expression_pb2 as stee
 import substrait.extensions.extensions_pb2 as ste
 import substrait.type_pb2 as stp
+
 from substrait.extension_registry import ExtensionRegistry
 from substrait.type_inference import infer_extended_expression_schema
 from substrait.utils import (

@@ -7,13 +7,13 @@ NOTE: This file is temporary and can be removed once the URI -> URN migration
 is complete across all Substrait implementations.
 """
 
-import yaml
-
 import substrait.algebra_pb2 as stalg
 import substrait.extended_expression_pb2 as stex
 import substrait.extensions.extensions_pb2 as ste
 import substrait.plan_pb2 as stp
 import substrait.type_pb2 as stt
+import yaml
+
 from substrait.builders.extended_expression import (
     aggregate_function,
     column,

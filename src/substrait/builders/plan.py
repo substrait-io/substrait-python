@@ -12,19 +12,20 @@ import substrait.algebra_pb2 as stalg
 import substrait.extended_expression_pb2 as stee
 import substrait.plan_pb2 as stp
 import substrait.type_pb2 as stt
-from substrait.version import __substrait_version__
+from substrait.extensions.extensions_pb2 import AdvancedExtension
+
 from substrait.builders.extended_expression import (
     ExtendedExpressionOrUnbound,
     resolve_expression,
 )
 from substrait.extension_registry import ExtensionRegistry
-from substrait.extensions.extensions_pb2 import AdvancedExtension
 from substrait.type_inference import infer_plan_schema
 from substrait.utils import (
     merge_extension_declarations,
     merge_extension_uris,
     merge_extension_urns,
 )
+from substrait.version import __substrait_version__
 
 UnboundPlan = Callable[[ExtensionRegistry], stp.Plan]
 

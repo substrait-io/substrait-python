@@ -1,5 +1,6 @@
 import substrait.extended_expression_pb2 as stee
 import substrait.type_pb2 as stp
+
 from substrait.builders.extended_expression import (
     ExtendedExpressionOrUnbound,
     UnboundExtendedExpression,

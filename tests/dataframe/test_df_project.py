@@ -1,7 +1,8 @@
-import substrait.dataframe as sdf
 import substrait.algebra_pb2 as stalg
 import substrait.plan_pb2 as stp
 import substrait.type_pb2 as stt
+
+import substrait.dataframe as sdf
 from substrait.builders.plan import default_version, read_named_table
 from substrait.builders.type import boolean, i64
 from substrait.extension_registry import ExtensionRegistry

@@ -1,3 +1,5 @@
+# ruff: noqa: F401 F403
+
 import substrait.algebra_pb2 as algebra
 import substrait.capabilities_pb2 as capabilities
 import substrait.extended_expression_pb2 as extended_expression

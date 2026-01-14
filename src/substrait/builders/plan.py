@@ -25,7 +25,7 @@ from substrait.utils import (
     merge_extension_uris,
     merge_extension_urns,
 )
-from substrait.version import __substrait_version__
+from substrait.version import substrait_version
 
 UnboundPlan = Callable[[ExtensionRegistry], stp.Plan]
 
@@ -34,7 +34,7 @@ PlanOrUnbound = Union[stp.Plan, UnboundPlan]
 
 def _create_default_version():
     p = re.compile(r"(\d+)\.(\d+)\.(\d+)")
-    m = p.match(__substrait_version__)
+    m = p.match(substrait_version)
     global default_version
     default_version = stp.Version(
         major_number=int(m.group(1)),

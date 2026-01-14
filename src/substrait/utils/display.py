@@ -5,9 +5,9 @@ This module provides a concise pretty printer for Substrait plans and expression
 in a readable format using indentation, -> characters, and colors.
 """
 
-import substrait.gen.proto.algebra_pb2 as stalg
-import substrait.gen.proto.plan_pb2 as stp
-import substrait.gen.proto.type_pb2 as stt
+import substrait.algebra_pb2 as stalg
+import substrait.plan_pb2 as stp
+import substrait.type_pb2 as stt
 
 
 # ANSI color codes

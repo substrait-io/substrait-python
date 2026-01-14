@@ -24,8 +24,8 @@ from substrait.builders.plan import (
     sort,
 )
 from substrait.extension_registry import ExtensionRegistry
-from substrait.gen.proto import algebra_pb2 as stalg
-from substrait.gen.proto import type_pb2 as stt
+from substrait import algebra_pb2 as stalg
+from substrait import type_pb2 as stt
 
 SchemaResolver = Callable[[str], stt.NamedStruct]
 

@@ -4,7 +4,7 @@ from typing import Dict
 
 from substrait.derivation_expression import _evaluate
 from substrait.gen.antlr.SubstraitTypeParser import SubstraitTypeParser
-from substrait.gen.proto.type_pb2 import Type
+from substrait.type_pb2 import Type
 
 from .exceptions import UnhandledParameterizedTypeError, UnrecognizedSubstraitTypeError
 

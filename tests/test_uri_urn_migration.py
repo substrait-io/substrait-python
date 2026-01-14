@@ -9,11 +9,11 @@ is complete across all Substrait implementations.
 
 import yaml
 
-import substrait.gen.proto.algebra_pb2 as stalg
-import substrait.gen.proto.extended_expression_pb2 as stex
-import substrait.gen.proto.extensions.extensions_pb2 as ste
-import substrait.gen.proto.plan_pb2 as stp
-import substrait.gen.proto.type_pb2 as stt
+import substrait.algebra_pb2 as stalg
+import substrait.extended_expression_pb2 as stex
+import substrait.extensions.extensions_pb2 as ste
+import substrait.plan_pb2 as stp
+import substrait.type_pb2 as stt
 from substrait.builders.extended_expression import (
     aggregate_function,
     column,

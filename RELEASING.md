@@ -8,3 +8,7 @@ Given that you are a Substrait committer or PMC member and have the appropriate 
 4. Click `Generate release notes` which will automatically populate the release title and release notes fields.
 5. If you are happy with the release notes and you are ready for an immediate release simply click `Publish release` otherwise save the release as a draft for later.
 6. Monitor the Github Actions release build for the newly created release and tag.
+
+## Versioning
+
+substrait-python follows semantic versioning as described for the Substrait specification here: https://substrait.io/spec/versioning/.

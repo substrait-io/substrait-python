@@ -37,6 +37,14 @@ You can run the full code generation using the following command or use the indi
 pixi run codegen
 ```
 
+## Extension Copying
+
+Copy the core function extensions into substrait-python
+
+```
+pixi run copy-extensions
+```
+
 ## Antlr grammar
 
 Substrait uses antlr grammar to derive output types of extension functions. Make sure java is installed and ANTLR_JAR environment variable is set. Take a look at .devcontainer/Dockerfile for example setup.

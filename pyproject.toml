@@ -56,9 +56,11 @@ update-substrait = [ { task = "update-submodule" }, { task = "codegen" }]
 
 update-submodule = "./update_submodule.sh"
 
-codegen = [{ task = "antlr" }, { task = "codegen-extensions" }]
+codegen = [{ task = "antlr" }, { task = "copy-extensions" }, { task = "codegen-extensions" }]
 
 check-codegen = "./check_codegen.sh"
+
+copy-extensions = "./copy_extension_yamls.sh"
 
 antlr = """
 	cd third_party/substrait/grammar \

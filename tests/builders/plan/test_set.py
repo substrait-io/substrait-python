@@ -1,6 +1,7 @@
-import substrait.gen.proto.algebra_pb2 as stalg
-import substrait.gen.proto.plan_pb2 as stp
-import substrait.gen.proto.type_pb2 as stt
+import substrait.algebra_pb2 as stalg
+import substrait.plan_pb2 as stp
+import substrait.type_pb2 as stt
+
 from substrait.builders.plan import default_version, read_named_table, set
 from substrait.builders.type import boolean, i64
 from substrait.extension_registry import ExtensionRegistry

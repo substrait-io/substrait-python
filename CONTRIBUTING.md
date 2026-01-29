@@ -37,12 +37,12 @@ You can run the full code generation using the following command or use the indi
 pixi run codegen
 ```
 
-## Protobuf stubs
+## Extension Copying
 
-Run the proto codegen only:
+Copy the core function extensions into substrait-python
 
 ```
-pixi run codegen-proto
+pixi run copy-extensions
 ```
 
 ## Antlr grammar

@@ -1,10 +1,10 @@
 from typing import Optional
 
 from antlr4 import CommonTokenStream, InputStream
+from substrait.type_pb2 import NamedStruct, Type
 
 from substrait.gen.antlr.SubstraitTypeLexer import SubstraitTypeLexer
 from substrait.gen.antlr.SubstraitTypeParser import SubstraitTypeParser
-from substrait.gen.proto.type_pb2 import NamedStruct, Type
 
 
 def _evaluate(x, values: dict):

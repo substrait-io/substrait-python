@@ -8,9 +8,9 @@ from pathlib import Path
 from typing import Optional, Union
 
 import yaml
+from substrait.type_pb2 import Type
 
 from substrait.bimap import UriUrnBiDiMap
-from substrait.gen.proto.type_pb2 import Type
 from substrait.simple_extension_utils import build_simple_extensions
 
 from .function_entry import FunctionEntry, FunctionType
@@ -32,7 +32,7 @@ class ExtensionRegistry:
         # Bidirectional URI <-> URN mapping (temporary during migration)
         self._uri_urn_bimap = UriUrnBiDiMap()
         if load_default_extensions:
-            for fpath in importlib_files("substrait.extensions").glob(  # type: ignore
+            for fpath in importlib_files("substrait.extension_files").glob(  # type: ignore
                 "functions*.yaml"
             ):
                 # Derive URI from DEFAULT_URN_PREFIX and filename

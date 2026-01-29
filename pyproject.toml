@@ -5,7 +5,10 @@ authors = [{name = "Substrait contributors", email = "substrait@googlegroups.com
 license = {text = "Apache-2.0"}
 readme = "README.md"
 requires-python = ">=3.10,<3.14"
-dependencies = ["protobuf >=5,<7"]
+dependencies = [
+    "protobuf >=5,<7",
+    "substrait-protobuf==0.79.0",
+]
 dynamic = ["version"]
 
 [tool.setuptools_scm]
@@ -53,11 +56,11 @@ update-substrait = [ { task = "update-submodule" }, { task = "codegen" }]
 
 update-submodule = "./update_submodule.sh"
 
-codegen = [{ task = "antlr" }, { task = "codegen-proto" }, { task = "codegen-extensions" }]
+codegen = [{ task = "antlr" }, { task = "copy-extensions" }, { task = "codegen-extensions" }]
 
 check-codegen = "./check_codegen.sh"
 
-codegen-proto = "./gen_proto.sh"
+copy-extensions = "./copy_extension_yamls.sh"
 
 antlr = """
 	cd third_party/substrait/grammar \

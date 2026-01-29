@@ -1,6 +1,7 @@
-import substrait.gen.proto.algebra_pb2 as stalg
-import substrait.gen.proto.extended_expression_pb2 as stee
-import substrait.gen.proto.type_pb2 as stt
+import substrait.algebra_pb2 as stalg
+import substrait.extended_expression_pb2 as stee
+import substrait.type_pb2 as stt
+
 from substrait.builders.extended_expression import literal, singular_or_list
 from substrait.builders.type import i8
 from substrait.extension_registry import ExtensionRegistry
@@ -53,9 +54,9 @@ def test_singular_or_list():
 
 
 def test_singular_or_list_with_extension():
+    import substrait.extensions.extensions_pb2 as ste
     import yaml
 
-    import substrait.gen.proto.extensions.extensions_pb2 as ste
     from substrait.builders.extended_expression import scalar_function
 
     registry_with_ext = ExtensionRegistry(load_default_extensions=False)

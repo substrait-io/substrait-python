@@ -332,7 +332,7 @@ requires-dist = [
     { name = "protobuf", specifier = ">=5,<7" },
     { name = "pyyaml", marker = "extra == 'extensions'" },
     { name = "sqloxide", marker = "extra == 'sql'" },
-    { name = "substrait-protobuf", specifier = ">=0.79.0" },
+    { name = "substrait-protobuf", specifier = "==0.79.0" },
 ]
 provides-extras = ["extensions", "sql"]
 

@@ -7,7 +7,7 @@ readme = "README.md"
 requires-python = ">=3.10,<3.14"
 dependencies = [
     "protobuf >=5,<7",
-    "substrait-protobuf>=0.79.0",
+    "substrait-protobuf==0.79.0",
 ]
 dynamic = ["version"]
 

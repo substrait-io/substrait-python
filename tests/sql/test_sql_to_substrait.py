@@ -5,6 +5,8 @@ import pyarrow
 import pyarrow.substrait as pa_substrait
 import pytest
 
+pytest.importorskip("sqloxide")
+
 from substrait.extension_registry import ExtensionRegistry
 from substrait.sql.sql_to_substrait import convert
 

@@ -3,8 +3,8 @@ name: Run tests
 on:
   pull_request:
   push:
-    branches: [ main ]
-    tags: [ 'v*.*.*' ]
+    branches: [main]
+    tags: ["v*.*.*"]
 
 permissions:
   contents: read
@@ -16,6 +16,7 @@ jobs:
       matrix:
         os: [macos-latest, ubuntu-latest, windows-latest]
         python: ["3.10", "3.11", "3.12", "3.13"]
+        substrait_version: ["0.78.0", "0.79.0"]
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout code
@@ -28,4 +29,4 @@ jobs:
           python-version: ${{ matrix.python }}
       - name: Run tests
         run: |
-          uv run --frozen pytest
+          uv run --frozen --with substrait-protobuf==${{ matrix.substrait_version }} pytest

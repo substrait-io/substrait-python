@@ -78,8 +78,7 @@ scalar_functions:
 
     actual = singular_or_list(
         value=scalar_function(
-            "extension:test:functions",
-            "add",
+            "extension:test:functions:add",
             expressions=[literal(1, i8()), literal(2, i8())],
         ),
         options=[literal(3, i8()), literal(4, i8())],

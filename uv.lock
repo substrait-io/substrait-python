@@ -308,6 +308,7 @@ dependencies = [
 extensions = [
     { name = "antlr4-python3-runtime" },
     { name = "pyyaml" },
+    { name = "substrait-antlr" },
 ]
 sql = [
     { name = "deepdiff" },
@@ -323,6 +324,7 @@ dev = [
     { name = "pytest" },
     { name = "pyyaml" },
     { name = "sqloxide" },
+    { name = "substrait-antlr" },
 ]
 
 [package.metadata]
@@ -332,6 +334,7 @@ requires-dist = [
     { name = "protobuf", specifier = ">=5,<7" },
     { name = "pyyaml", marker = "extra == 'extensions'" },
     { name = "sqloxide", marker = "extra == 'sql'" },
+    { name = "substrait-antlr", marker = "extra == 'extensions'", git = "https://github.com/substrait-io/substrait-packaging?subdirectory=python%2Fsubstrait-antlr&branch=python%2Fsubstrait-antlr%2Fv0.79.0" },
     { name = "substrait-protobuf", specifier = "==0.79.0" },
 ]
 provides-extras = ["extensions", "sql"]
@@ -345,6 +348,15 @@ dev = [
     { name = "pytest", specifier = ">=7.0.0" },
     { name = "pyyaml" },
     { name = "sqloxide" },
+    { name = "substrait-antlr", git = "https://github.com/substrait-io/substrait-packaging?subdirectory=python%2Fsubstrait-antlr&branch=python%2Fsubstrait-antlr%2Fv0.79.0" },
+]
+
+[[package]]
+name = "substrait-antlr"
+version = "0.79.0"
+source = { git = "https://github.com/substrait-io/substrait-packaging?subdirectory=python%2Fsubstrait-antlr&branch=python%2Fsubstrait-antlr%2Fv0.79.0#f77988bc9fe5359a99414210e3959f0848eb701b" }
+dependencies = [
+    { name = "antlr4-python3-runtime" },
 ]
 
 [[package]]

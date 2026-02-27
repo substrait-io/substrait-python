@@ -30,8 +30,7 @@ def basic_example():
     table = filter(
         table,
         expression=scalar_function(
-            "extension:io.substrait:functions_comparison",
-            "lt",
+            "extension:io.substrait:functions_comparison:lt",
             expressions=[column("id"), literal(100, i64(nullable=False))],
         ),
     )
@@ -173,8 +172,7 @@ def advanced_example():
     table = filter(
         table,
         expression=scalar_function(
-            "extension:io.substrait:functions_comparison",
-            "lt",
+            "extension:io.substrait:functions_comparison:lt",
             expressions=[column("id"), literal(100, i64(nullable=False))],
         ),
     )
@@ -206,8 +204,7 @@ def advanced_example():
     adult_users = filter(
         users,
         expression=scalar_function(
-            "extension:io.substrait:functions_comparison",
-            "gt",
+            "extension:io.substrait:functions_comparison:gt",
             expressions=[column("age"), literal(25, i64())],
         ),
     )
@@ -222,8 +219,7 @@ def advanced_example():
             column("salary"),
             # Add a calculated field (this would show function options if available)
             scalar_function(
-                "extension:io.substrait:functions_arithmetic",
-                "multiply",
+                "extension:io.substrait:functions_arithmetic:multiply",
                 expressions=[column("salary"), literal(1.1, fp64())],
                 alias="salary_with_bonus",
             ),
@@ -255,8 +251,7 @@ def advanced_example():
     high_value_orders = filter(
         orders,
         expression=scalar_function(
-            "extension:io.substrait:functions_comparison",
-            "gt",
+            "extension:io.substrait:functions_comparison:gt",
             expressions=[column("amount"), literal(50.0, fp64())],
         ),
     )
@@ -287,17 +282,14 @@ def expression_only_example():
     print("=== Expression-Only Example ===")
     # Show complex expression structure
     complex_expr = scalar_function(
-        "extension:io.substrait:functions_arithmetic",
-        "multiply",
+        "extension:io.substrait:functions_arithmetic:multiply",
         expressions=[
             scalar_function(
-                "extension:io.substrait:functions_arithmetic",
-                "add",
+                "extension:io.substrait:functions_arithmetic:add",
                 expressions=[
                     column("base_salary"),
                     scalar_function(
-                        "extension:io.substrait:functions_arithmetic",
-                        "multiply",
+                        "extension:io.substrait:functions_arithmetic:multiply",
                         expressions=[
                             column("base_salary"),
                             literal(0.15, fp64()),  # 15% bonus
@@ -306,8 +298,7 @@ def expression_only_example():
                 ],
             ),
             scalar_function(
-                "extension:io.substrait:functions_arithmetic",
-                "subtract",
+                "extension:io.substrait:functions_arithmetic:subtract",
                 expressions=[
                     literal(1.0, fp64()),
                     literal(0.25, fp64()),  # 25% tax rate

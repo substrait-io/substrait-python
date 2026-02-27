@@ -59,18 +59,11 @@ update-substrait = [ { task = "update-submodule" }, { task = "codegen" }]
 
 update-submodule = "./update_submodule.sh"
 
-codegen = [{ task = "antlr" }, { task = "copy-extensions" }, { task = "codegen-extensions" }]
+codegen = [{ task = "copy-extensions" }, { task = "codegen-extensions" }]
 
 check-codegen = "./check_codegen.sh"
 
 copy-extensions = "./copy_extension_yamls.sh"
-
-antlr = """
-	cd third_party/substrait/grammar \
-		&& antlr4 -o ../../../src/substrait/gen/antlr -Dlanguage=Python3 SubstraitType.g4 \
-		&& rm ../../../src/substrait/gen/antlr/*.tokens \
-		&& rm ../../../src/substrait/gen/antlr/*.interp
-"""
 
 codegen-extensions = """
     datamodel-codegen \
@@ -84,8 +77,6 @@ codegen-extensions = """
 """
 
 [tool.pixi.dependencies]
-antlr = ">=4.13.2,<5"
-buf = ">=1.62.1,<2"
 datamodel-code-generator = ">=0.52.0,<0.53"
 ruff = ">=0.14.10,<0.15"
 

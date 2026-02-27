@@ -15,11 +15,11 @@ dynamic = ["version"]
 write_to = "src/substrait/_version.py"
 
 [project.optional-dependencies]
-extensions = ["antlr4-python3-runtime", "pyyaml"]
+extensions = ["antlr4-python3-runtime", "pyyaml", "substrait-antlr ==0.79.0"]
 sql = ["sqloxide", "deepdiff"]
 
 [dependency-groups]
-dev = ["pytest >= 7.0.0", "antlr4-python3-runtime", "pyyaml", "sqloxide", "deepdiff", "duckdb<=1.2.2", "datafusion"]
+dev = ["pytest >= 7.0.0", "antlr4-python3-runtime", "pyyaml", "substrait-antlr ==0.79.0", "sqloxide", "deepdiff", "duckdb<=1.2.2", "datafusion"]
 
 [tool.pytest.ini_options]
 pythonpath = "src"
@@ -37,6 +37,9 @@ target-version = "py310"
 exclude = ["third_party/", "src/substrait/gen"]
 lint.extend-select = ["I"]
 
+
+[tool.uv.sources]
+substrait-antlr = { git = "https://github.com/substrait-io/substrait-packaging", branch = "python/substrait-antlr/v0.79.0", subdirectory = "python/substrait-antlr" }
 
 [tool.pixi.workspace]
 channels = ["conda-forge"]
@@ -56,18 +59,11 @@ update-substrait = [ { task = "update-submodule" }, { task = "codegen" }]
 
 update-submodule = "./update_submodule.sh"
 
-codegen = [{ task = "antlr" }, { task = "copy-extensions" }, { task = "codegen-extensions" }]
+codegen = [{ task = "copy-extensions" }, { task = "codegen-extensions" }]
 
 check-codegen = "./check_codegen.sh"
 
 copy-extensions = "./copy_extension_yamls.sh"
-
-antlr = """
-	cd third_party/substrait/grammar \
-		&& antlr4 -o ../../../src/substrait/gen/antlr -Dlanguage=Python3 SubstraitType.g4 \
-		&& rm ../../../src/substrait/gen/antlr/*.tokens \
-		&& rm ../../../src/substrait/gen/antlr/*.interp
-"""
 
 codegen-extensions = """
     datamodel-codegen \
@@ -81,7 +77,8 @@ codegen-extensions = """
 """
 
 [tool.pixi.dependencies]
-antlr = ">=4.13.2,<5"
-buf = ">=1.62.1,<2"
 datamodel-code-generator = ">=0.52.0,<0.53"
 ruff = ">=0.14.10,<0.15"
+
+[tool.pixi.pypi-dependencies]
+substrait-antlr = { git = "https://github.com/substrait-io/substrait-packaging", branch = "python/substrait-antlr/v0.79.0", subdirectory = "python/substrait-antlr" }

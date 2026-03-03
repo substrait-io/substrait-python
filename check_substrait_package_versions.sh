@@ -2,6 +2,7 @@
 set -euo pipefail
 
 # Check that all substrait-* packages have the same version
+uv sync
 
 protobuf_version=$(uv pip show substrait-protobuf | grep '^Version:' | awk '{print $2}')
 antlr_version=$(uv pip show substrait-antlr | grep '^Version:' | awk '{print $2}')

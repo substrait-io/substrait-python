@@ -45,14 +45,6 @@ Copy the core function extensions into substrait-python
 pixi run copy-extensions
 ```
 
-## Antlr grammar
-
-Substrait uses antlr grammar to derive output types of extension functions. Make sure java is installed and ANTLR_JAR environment variable is set. Take a look at .devcontainer/Dockerfile for example setup.
-
-```
-pixi run antlr
-```
-
 ## Extensions stubs
 
 Substrait uses jsonschema to describe the data model for extension files.

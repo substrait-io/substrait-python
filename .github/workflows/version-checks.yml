@@ -1,0 +1,24 @@
+name: Substrait Package Version Checks
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  substrait-package-version-checks:
+    name: Verify substrait-* Package Versions
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: Install uv with python
+        uses: astral-sh/setup-uv@v7
+
+      - name: Verify substrait-* versions
+        run: ./check_substrait_package_versions.sh
+

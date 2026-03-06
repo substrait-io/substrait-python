@@ -34,7 +34,7 @@ respect-gitignore = true
 # should target minimum supported version
 target-version = "py310"
 # never autoformat upstream or generated code
-exclude = ["third_party/", "src/substrait/gen"]
+exclude = ["third_party/"]
 lint.extend-select = ["I"]
 
 
@@ -52,27 +52,5 @@ format = "ruff format"
 lint = "ruff check"
 lint_fix = "ruff check --fix"
 
-update-substrait = [ { task = "update-submodule" }, { task = "codegen" }]
-
-update-submodule = "./update_submodule.sh"
-
-codegen = [{ task = "copy-extensions" }, { task = "codegen-extensions" }]
-
-check-codegen = "./check_codegen.sh"
-
-copy-extensions = "./copy_extension_yamls.sh"
-
-codegen-extensions = """
-    datamodel-codegen \
-		--input-file-type jsonschema \
-		--input third_party/substrait/text/simple_extensions_schema.yaml \
-		--output src/substrait/gen/json/simple_extensions.py \
-		--output-model-type dataclasses.dataclass \
-		--target-python-version 3.10  \
-		--disable-timestamp \
-		--formatters ruff-format
-"""
-
 [tool.pixi.dependencies]
-datamodel-code-generator = ">=0.52.0,<0.53"
 ruff = ">=0.14.10,<0.15"

@@ -33,8 +33,6 @@ build-backend = "setuptools.build_meta"
 respect-gitignore = true
 # should target minimum supported version
 target-version = "py310"
-# never autoformat upstream or generated code
-exclude = ["third_party/"]
 lint.extend-select = ["I"]
 
 

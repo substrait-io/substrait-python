@@ -8,6 +8,7 @@ requires-python = ">=3.10,<3.15"
 dependencies = [
     "protobuf >=5,<7",
     "substrait-protobuf==0.79.0",
+    "substrait-extensions==0.79.0",
 ]
 dynamic = ["version"]
 

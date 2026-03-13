@@ -337,6 +337,7 @@ name = "substrait"
 source = { editable = "." }
 dependencies = [
     { name = "protobuf" },
+    { name = "substrait-extensions" },
     { name = "substrait-protobuf" },
 ]
 
@@ -371,6 +372,7 @@ requires-dist = [
     { name = "pyyaml", marker = "extra == 'extensions'" },
     { name = "sqloxide", marker = "python_full_version < '3.14' and extra == 'sql'" },
     { name = "substrait-antlr", marker = "extra == 'extensions'", specifier = "==0.79.0" },
+    { name = "substrait-extensions", specifier = "==0.79.0" },
     { name = "substrait-protobuf", specifier = "==0.79.0" },
 ]
 provides-extras = ["extensions", "sql"]
@@ -397,6 +399,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/e4/ad/ed433ae08b5d9c97aeeea876ddc85cf724e80e3163b94873bf237916881c/substrait_antlr-0.79.0.tar.gz", hash = "sha256:fa745258a3d00a9e09a44078b0dca49dd58e2917bc5cc0db0134e76c38b0074f", size = 61302, upload-time = "2026-03-03T15:55:09.652Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/76/e0/5318b6a4cc19122a4aa7b6a7d92cd7106ba5baa5536131d851b47cb50645/substrait_antlr-0.79.0-py3-none-any.whl", hash = "sha256:c2bca78d23049d38c83c51ba360ee32f64e45126cf65bbd457a8f98fe1f8c7e5", size = 70703, upload-time = "2026-03-03T15:55:08.735Z" },
+]
+
+[[package]]
+name = "substrait-extensions"
+version = "0.79.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/ba/80/d8c822bc2a70026beb80eff121c2dd1160befa2622e4f0a766506b71bba2/substrait_extensions-0.79.0.tar.gz", hash = "sha256:ae295944eb007d5d8243b4e9b818635ee054c6cab224b28e2d45746541b384f2", size = 48636, upload-time = "2026-03-13T17:12:49.411Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/f3/2f/a05dd536db76ba9309bb80df559a203614d107ef2381560872fb12370396/substrait_extensions-0.79.0-py3-none-any.whl", hash = "sha256:4ca15d059b912e7e030b4c7a5f0a7c434206c7543f699e5f896caf9cb0b47b65", size = 101699, upload-time = "2026-03-13T17:12:48.505Z" },
 ]
 
 [[package]]

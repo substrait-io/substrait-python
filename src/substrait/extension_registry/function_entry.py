@@ -4,9 +4,9 @@ from enum import Enum
 from typing import Optional, Union
 
 from substrait.type_pb2 import Type
+from substrait_extensions.extensions import simple_extensions as se
 
 from substrait.derivation_expression import _parse, evaluate
-from substrait.gen.json import simple_extensions as se
 
 from .signature_checker_helpers import covers, normalize_substrait_type_names
 

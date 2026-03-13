@@ -6,6 +6,7 @@ on:
     tags: [ 'v[0-9]+.[0-9]+.[0-9]+' ]
 
 permissions:
+  id-token: write
   contents: write
 
 jobs:
@@ -53,6 +54,7 @@ jobs:
     name: Publish to PyPI
     runs-on: ubuntu-latest
     needs: release
+    environment: pypi
     steps:
       - name: Download artifact
         uses: actions/download-artifact@v7
@@ -61,5 +63,3 @@ jobs:
           path: dist/
       - name: Publish package to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          password: ${{ secrets.PYPI_API_TOKEN }}

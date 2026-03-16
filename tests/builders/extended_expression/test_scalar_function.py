@@ -47,8 +47,7 @@ registry.register_extension_dict(yaml.safe_load(content), uri=test_uri)
 
 def test_sclar_add():
     e = scalar_function(
-        "extension:test:urn",
-        "test_func",
+        "extension:test:urn:test_func",
         expressions=[
             literal(
                 10,
@@ -117,17 +116,19 @@ def test_sclar_add():
         base_schema=named_struct,
     )
 
+    print(e)
+    print("---------------")
+    print(expected)
+
     assert e == expected
 
 
 def test_nested_scalar_calls():
     e = scalar_function(
-        "extension:test:urn",
-        "is_positive",
+        "extension:test:urn:is_positive",
         expressions=[
             scalar_function(
-                "extension:test:urn",
-                "test_func",
+                "extension:test:urn:test_func",
                 expressions=[
                     literal(
                         10,

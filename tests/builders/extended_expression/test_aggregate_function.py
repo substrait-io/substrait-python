@@ -45,8 +45,7 @@ registry.register_extension_dict(
 
 def test_aggregate_count():
     e = aggregate_function(
-        "extension:test:urn",
-        "count",
+        "extension:test:urn:count",
         expressions=[
             literal(
                 10,

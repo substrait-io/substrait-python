@@ -29,21 +29,21 @@ from substrait.extension_registry import ExtensionRegistry
 
 SchemaResolver = Callable[[str], stt.NamedStruct]
 
-function_mapping = {
-    "Plus": ("extension:io.substrait:functions_arithmetic", "add"),
-    "Minus": ("extension:io.substrait:functions_arithmetic", "subtract"),
-    "Gt": ("extension:io.substrait:functions_comparison", "gt"),
-    "GtEq": ("extension:io.substrait:functions_comparison", "gte"),
-    "Lt": ("extension:io.substrait:functions_comparison", "lt"),
-    "Eq": ("extension:io.substrait:functions_comparison", "equal"),
+scalar_function_mapping = {
+    "Plus": ["extension:io.substrait:functions_arithmetic:add"],
+    "Minus": ["extension:io.substrait:functions_arithmetic:subtract"],
+    "Gt": ["extension:io.substrait:functions_comparison:gt"],
+    "GtEq": ["extension:io.substrait:functions_comparison:gte"],
+    "Lt": ["extension:io.substrait:functions_comparison:lt"],
+    "Eq": ["extension:io.substrait:functions_comparison:equal"],
 }
 
 aggregate_function_mapping = {
-    "SUM": ("extension:io.substrait:functions_arithmetic", "sum")
+    "SUM": ["extension:io.substrait:functions_arithmetic:sum"]
 }
 
 window_function_mapping = {
-    "row_number": ("extension:io.substrait:functions_arithmetic", "row_number"),
+    "row_number": ["extension:io.substrait:functions_arithmetic:row_number"],
 }
 
 
@@ -108,8 +108,8 @@ def translate_expression(
                 groupings=groupings,
             ),
         ]
-        func = function_mapping[ast["op"]]
-        return scalar_function(func[0], func[1], expressions=expressions, alias=alias)
+        func = scalar_function_mapping[ast["op"]]
+        return scalar_function(func, expressions=expressions, alias=alias)
     elif op == "Value":
         return literal(
             int(ast["value"]["Number"][0]), stt.Type(i64=stt.Type.I64()), alias=alias
@@ -127,8 +127,8 @@ def translate_expression(
         ]
         name = ast["name"][0]["Identifier"]["value"]
 
-        if name in function_mapping:
-            func = function_mapping[name]
+        if name in scalar_function_mapping:
+            func = scalar_function_mapping[name]
             return scalar_function(func[0], func[1], *expressions, alias=alias)
         elif name in aggregate_function_mapping:
             # All measures need to be extracted out because substrait calculates measures in a separate rel
@@ -142,7 +142,7 @@ def translate_expression(
             random_name = "".join(
                 random.choices(string.ascii_uppercase + string.digits, k=5)
             )  # TODO make this deterministic
-            aggr = aggregate_function(func[0], func[1], expressions, alias=random_name)
+            aggr = aggregate_function(func, expressions, alias=random_name)
             measures.append((aggr, ast, random_name))
             return column(random_name, alias=alias)
         elif name in window_function_mapping:
@@ -160,7 +160,7 @@ def translate_expression(
             ]
 
             return window_function(
-                func[0], func[1], expressions, partitions=partitions, alias=alias
+                func, expressions, partitions=partitions, alias=alias
             )
 
         else:

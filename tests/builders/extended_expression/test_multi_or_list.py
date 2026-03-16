@@ -110,8 +110,7 @@ scalar_functions:
     actual = multi_or_list(
         value=[
             scalar_function(
-                "extension:test:functions",
-                "add",
+                "extension:test:functions:add",
                 expressions=[literal(1, i8()), literal(2, i8())],
             ),
             literal(10, i8()),

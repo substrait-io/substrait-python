@@ -498,3 +498,97 @@ def write_named_table(
         )
 
     return resolve
+
+
+def consistent_partition_window(
+    plan: PlanOrUnbound,
+    window_functions: Iterable[ExtendedExpressionOrUnbound],
+    partition_expressions: Iterable[ExtendedExpressionOrUnbound] = (),
+    sorts: Iterable[
+        Union[
+            ExtendedExpressionOrUnbound,
+            tuple[ExtendedExpressionOrUnbound, stalg.SortField.SortDirection.ValueType],
+        ]
+    ] = (),
+    extension: Optional[AdvancedExtension] = None,
+) -> UnboundPlan:
+    def resolve(registry: ExtensionRegistry) -> stp.Plan:
+        bound_plan = plan if isinstance(plan, stp.Plan) else plan(registry)
+        ns = infer_plan_schema(bound_plan)
+
+        bound_partitions = [
+            resolve_expression(e, ns, registry) for e in partition_expressions
+        ]
+
+        bound_sorts = [
+            (e, stalg.SortField.SORT_DIRECTION_ASC_NULLS_LAST)
+            if not isinstance(e, tuple)
+            else e
+            for e in sorts
+        ]
+        bound_sorts = [
+            (resolve_expression(e[0], ns, registry), e[1]) for e in bound_sorts
+        ]
+
+        bound_window_fns = [
+            resolve_expression(e, ns, registry) for e in window_functions
+        ]
+
+        window_rel_functions = []
+        for wf_ee in bound_window_fns:
+            wf_expr = wf_ee.referred_expr[0].expression.window_function
+            window_rel_functions.append(
+                stalg.ConsistentPartitionWindowRel.WindowRelFunction(
+                    function_reference=wf_expr.function_reference,
+                    arguments=list(wf_expr.arguments),
+                    options=list(wf_expr.options),
+                    output_type=wf_expr.output_type,
+                    phase=wf_expr.phase,
+                    invocation=wf_expr.invocation,
+                    lower_bound=wf_expr.lower_bound
+                    if wf_expr.HasField("lower_bound")
+                    else None,
+                    upper_bound=wf_expr.upper_bound
+                    if wf_expr.HasField("upper_bound")
+                    else None,
+                    bounds_type=wf_expr.bounds_type,
+                )
+            )
+
+        names = list(bound_plan.relations[-1].root.names) + [
+            wf_ee.referred_expr[0].output_names[0]
+            if wf_ee.referred_expr[0].output_names
+            else f"window_{i}"
+            for i, wf_ee in enumerate(bound_window_fns)
+        ]
+
+        rel = stalg.Rel(
+            window=stalg.ConsistentPartitionWindowRel(
+                input=bound_plan.relations[-1].root.input,
+                window_functions=window_rel_functions,
+                partition_expressions=[
+                    e.referred_expr[0].expression for e in bound_partitions
+                ],
+                sorts=[
+                    stalg.SortField(
+                        expr=e[0].referred_expr[0].expression,
+                        direction=e[1],
+                    )
+                    for e in bound_sorts
+                ],
+                advanced_extension=extension,
+            )
+        )
+
+        return stp.Plan(
+            version=default_version,
+            relations=[stp.PlanRel(root=stalg.RelRoot(input=rel, names=names))],
+            **_merge_extensions(
+                bound_plan,
+                *bound_partitions,
+                *[e[0] for e in bound_sorts],
+                *bound_window_fns,
+            ),
+        )
+
+    return resolve

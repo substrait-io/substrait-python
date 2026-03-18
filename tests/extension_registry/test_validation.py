@@ -21,9 +21,7 @@ scalar_functions:
 """
     registry = ExtensionRegistry(load_default_extensions=False)
 
-    registry.register_extension_dict(
-        yaml.safe_load(content), uri="https://test.example.com/functions_test.yaml"
-    )  # Should not raise
+    registry.register_extension_dict(yaml.safe_load(content))  # Should not raise
 
 
 def test_invalid_urn_no_prefix():
@@ -36,9 +34,7 @@ scalar_functions: []
     registry = ExtensionRegistry(load_default_extensions=False)
 
     with pytest.raises(ValueError, match="Invalid URN format"):
-        registry.register_extension_dict(
-            yaml.safe_load(content), uri="https://test.example.com/invalid.yaml"
-        )
+        registry.register_extension_dict(yaml.safe_load(content))
 
 
 def test_invalid_urn_too_short():
@@ -51,9 +47,7 @@ scalar_functions: []
     registry = ExtensionRegistry(load_default_extensions=False)
 
     with pytest.raises(ValueError, match="Invalid URN format"):
-        registry.register_extension_dict(
-            yaml.safe_load(content), uri="https://test.example.com/invalid.yaml"
-        )
+        registry.register_extension_dict(yaml.safe_load(content))
 
 
 def test_missing_urn():
@@ -65,6 +59,4 @@ scalar_functions: []
     registry = ExtensionRegistry(load_default_extensions=False)
 
     with pytest.raises(ValueError, match="must contain a 'urn' field"):
-        registry.register_extension_dict(
-            yaml.safe_load(content), uri="https://test.example.com/missing_urn.yaml"
-        )
+        registry.register_extension_dict(yaml.safe_load(content))

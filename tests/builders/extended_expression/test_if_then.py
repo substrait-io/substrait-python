@@ -100,10 +100,7 @@ scalar_functions:
           - value: fp32
         return: boolean
 """
-    registry.register_extension_dict(
-        yaml.safe_load(content),
-        uri="https://github.com/substrait-io/substrait/blob/main/extensions/functions_comparison.yaml",
-    )
+    registry.register_extension_dict(yaml.safe_load(content))
 
     # Create if_then: if order_total > 100 then "expensive" else "cheap"
     actual = if_then(
@@ -143,12 +140,6 @@ scalar_functions:
     )(named_struct, registry)
 
     expected = stee.ExtendedExpression(
-        extension_uris=[
-            ste.SimpleExtensionURI(
-                extension_uri_anchor=1,
-                uri="https://github.com/substrait-io/substrait/blob/main/extensions/functions_comparison.yaml",
-            )
-        ],
         extension_urns=[
             ste.SimpleExtensionURN(
                 extension_urn_anchor=1,
@@ -158,7 +149,6 @@ scalar_functions:
         extensions=[
             ste.SimpleExtensionDeclaration(
                 extension_function=ste.SimpleExtensionDeclaration.ExtensionFunction(
-                    extension_uri_reference=1,
                     extension_urn_reference=1,
                     function_anchor=1,
                     name="gt:fp32_fp32",

@@ -121,8 +121,5 @@ scalar_functions:
 def registry():
     """Create a registry with test functions loaded."""
     reg = ExtensionRegistry(load_default_extensions=True)
-    reg.register_extension_dict(
-        yaml.safe_load(CONTENT),
-        uri="https://test.example.com/extension_test_functions.yaml",
-    )
+    reg.register_extension_dict(yaml.safe_load(CONTENT))
     return reg

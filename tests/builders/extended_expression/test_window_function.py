@@ -43,9 +43,7 @@ window_functions:
 
 
 registry = ExtensionRegistry(load_default_extensions=False)
-registry.register_extension_dict(
-    yaml.safe_load(content), uri="https://test.example.com/test.yaml"
-)
+registry.register_extension_dict(yaml.safe_load(content))
 
 
 def test_row_number():
@@ -57,16 +55,10 @@ def test_row_number():
         extension_urns=[
             ste.SimpleExtensionURN(extension_urn_anchor=1, urn="extension:test:urn")
         ],
-        extension_uris=[
-            ste.SimpleExtensionURI(
-                extension_uri_anchor=1, uri="https://test.example.com/test.yaml"
-            )
-        ],
         extensions=[
             ste.SimpleExtensionDeclaration(
                 extension_function=ste.SimpleExtensionDeclaration.ExtensionFunction(
                     extension_urn_reference=1,
-                    extension_uri_reference=1,
                     function_anchor=1,
                     name="row_number:",
                 )

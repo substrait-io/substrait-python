@@ -381,7 +381,7 @@ def test_covers_interval_compound():
             nullability=Type.NULLABILITY_REQUIRED, precision=6
         )
     )
-    param_ctx = _parse("interval_compound")
+    param_ctx = _parse("interval_compound<6>")
     assert covers(covered, param_ctx, {})
 
 
@@ -511,16 +511,16 @@ def test_covers_interval_day_with_parameter():
 
 
 def test_covers_interval_compound_with_precision():
-    """Test interval_compound with precision parameter."""
+    """Test interval_compound with precision parameter binding."""
     covered = Type(
         interval_compound=Type.IntervalCompound(
             nullability=Type.NULLABILITY_REQUIRED, precision=9
         )
     )
-    # Note: interval_compound doesn't have a parameterized syntax in the grammar
-    # so we just test the basic type coverage
-    param_ctx = _parse("interval_compound")
-    assert covers(covered, param_ctx, {})
+    params: dict = {}
+    param_ctx = _parse("interval_compound<P>")
+    assert covers(covered, param_ctx, params)
+    assert params["P"] == 9
 
 
 def test_covers_nested_list():

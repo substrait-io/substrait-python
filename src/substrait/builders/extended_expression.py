@@ -11,7 +11,6 @@ from substrait.extension_registry import ExtensionRegistry
 from substrait.type_inference import infer_extended_expression_schema
 from substrait.utils import (
     merge_extension_declarations,
-    merge_extension_uris,
     merge_extension_urns,
     type_num_names,
 )
@@ -238,23 +237,10 @@ def scalar_function(
             )
         ]
 
-        # Create URI extension for backwards compatibility during URI -> URN migration
-        uri = registry._uri_urn_bimap.get_uri(urn)
-        func_extension_uris = []
-        if uri:
-            uri_anchor = registry.lookup_uri_anchor(uri)
-            if uri_anchor:
-                func_extension_uris = [
-                    ste.SimpleExtensionURI(extension_uri_anchor=uri_anchor, uri=uri)
-                ]
-
         func_extensions = [
             ste.SimpleExtensionDeclaration(
                 extension_function=ste.SimpleExtensionDeclaration.ExtensionFunction(
                     extension_urn_reference=registry.lookup_urn(urn),
-                    extension_uri_reference=registry.lookup_uri_anchor(uri)
-                    if uri
-                    else 0,
                     function_anchor=func[0].anchor,
                     name=str(func[0]),
                 )
@@ -263,10 +249,6 @@ def scalar_function(
 
         extension_urns = merge_extension_urns(
             func_extension_urns, *[b.extension_urns for b in bound_expressions]
-        )
-
-        extension_uris = merge_extension_uris(
-            func_extension_uris, *[b.extension_uris for b in bound_expressions]
         )
 
         extensions = merge_extension_declarations(
@@ -297,7 +279,6 @@ def scalar_function(
             ],
             base_schema=base_schema,
             extension_urns=extension_urns,
-            extension_uris=extension_uris,
             extensions=extensions,
         )
 
@@ -336,23 +317,10 @@ def aggregate_function(
             )
         ]
 
-        # Create URI extension for backwards compatibility during URI -> URN migration
-        uri = registry._uri_urn_bimap.get_uri(urn)
-        func_extension_uris = []
-        if uri:
-            uri_anchor = registry.lookup_uri_anchor(uri)
-            if uri_anchor:
-                func_extension_uris = [
-                    ste.SimpleExtensionURI(extension_uri_anchor=uri_anchor, uri=uri)
-                ]
-
         func_extensions = [
             ste.SimpleExtensionDeclaration(
                 extension_function=ste.SimpleExtensionDeclaration.ExtensionFunction(
                     extension_urn_reference=registry.lookup_urn(urn),
-                    extension_uri_reference=registry.lookup_uri_anchor(uri)
-                    if uri
-                    else 0,
                     function_anchor=func[0].anchor,
                     name=str(func[0]),
                 )
@@ -361,10 +329,6 @@ def aggregate_function(
 
         extension_urns = merge_extension_urns(
             func_extension_urns, *[b.extension_urns for b in bound_expressions]
-        )
-
-        extension_uris = merge_extension_uris(
-            func_extension_uris, *[b.extension_uris for b in bound_expressions]
         )
 
         extensions = merge_extension_declarations(
@@ -391,7 +355,6 @@ def aggregate_function(
             ],
             base_schema=base_schema,
             extension_urns=extension_urns,
-            extension_uris=extension_uris,
             extensions=extensions,
         )
 
@@ -436,23 +399,10 @@ def window_function(
             )
         ]
 
-        # Create URI extension for backwards compatibility during URI -> URN migration
-        uri = registry._uri_urn_bimap.get_uri(urn)
-        func_extension_uris = []
-        if uri:
-            uri_anchor = registry.lookup_uri_anchor(uri)
-            if uri_anchor:
-                func_extension_uris = [
-                    ste.SimpleExtensionURI(extension_uri_anchor=uri_anchor, uri=uri)
-                ]
-
         func_extensions = [
             ste.SimpleExtensionDeclaration(
                 extension_function=ste.SimpleExtensionDeclaration.ExtensionFunction(
                     extension_urn_reference=registry.lookup_urn(urn),
-                    extension_uri_reference=registry.lookup_uri_anchor(uri)
-                    if uri
-                    else 0,
                     function_anchor=func[0].anchor,
                     name=str(func[0]),
                 )
@@ -463,12 +413,6 @@ def window_function(
             func_extension_urns,
             *[b.extension_urns for b in bound_expressions],
             *[b.extension_urns for b in bound_partitions],
-        )
-
-        extension_uris = merge_extension_uris(
-            func_extension_uris,
-            *[b.extension_uris for b in bound_expressions],
-            *[b.extension_uris for b in bound_partitions],
         )
 
         extensions = merge_extension_declarations(
@@ -504,7 +448,6 @@ def window_function(
             ],
             base_schema=base_schema,
             extension_urns=extension_urns,
-            extension_uris=extension_uris,
             extensions=extensions,
         )
 
@@ -530,12 +473,6 @@ def if_then(
         ]
 
         bound_else = resolve_expression(_else, base_schema, registry)
-
-        extension_uris = merge_extension_uris(
-            *[b[0].extension_uris for b in bound_ifs],
-            *[b[1].extension_uris for b in bound_ifs],
-            bound_else.extension_uris,
-        )
 
         extension_urns = merge_extension_urns(
             *[b[0].extension_urns for b in bound_ifs],
@@ -588,7 +525,6 @@ def if_then(
                 )
             ],
             base_schema=base_schema,
-            extension_uris=extension_uris,
             extension_urns=extension_urns,
             extensions=extensions,
         )
@@ -615,12 +551,6 @@ def switch(
             for a, b in ifs
         ]
         bound_else = resolve_expression(_else, base_schema, registry)
-
-        extension_uris = merge_extension_uris(
-            bound_match.extension_uris,
-            *[b.extension_uris for _, b in bound_ifs],
-            bound_else.extension_uris,
-        )
 
         extension_urns = merge_extension_urns(
             bound_match.extension_urns,
@@ -657,7 +587,6 @@ def switch(
             ],
             base_schema=base_schema,
             extension_urns=extension_urns,
-            extension_uris=extension_uris,
             extensions=extensions,
         )
 
@@ -674,10 +603,6 @@ def singular_or_list(
     ) -> stee.ExtendedExpression:
         bound_value = resolve_expression(value, base_schema, registry)
         bound_options = [resolve_expression(o, base_schema, registry) for o in options]
-
-        extension_uris = merge_extension_uris(
-            bound_value.extension_uris, *[b.extension_uris for b in bound_options]
-        )
 
         extension_urns = merge_extension_urns(
             bound_value.extension_urns, *[b.extension_urns for b in bound_options]
@@ -705,7 +630,6 @@ def singular_or_list(
             ],
             base_schema=base_schema,
             extension_urns=extension_urns,
-            extension_uris=extension_uris,
             extensions=extensions,
         )
 
@@ -725,11 +649,6 @@ def multi_or_list(
         bound_options = [
             [resolve_expression(e, base_schema, registry) for e in o] for o in options
         ]
-
-        extension_uris = merge_extension_uris(
-            *[b.extension_uris for b in bound_value],
-            *[e.extension_uris for b in bound_options for e in b],
-        )
 
         extension_urns = merge_extension_urns(
             *[b.extension_urns for b in bound_value],
@@ -762,7 +681,6 @@ def multi_or_list(
             ],
             base_schema=base_schema,
             extension_urns=extension_urns,
-            extension_uris=extension_uris,
             extensions=extensions,
         )
 
@@ -798,7 +716,6 @@ def cast(
             ],
             base_schema=base_schema,
             extension_urns=bound_input.extension_urns,
-            extension_uris=bound_input.extension_uris,
             extensions=bound_input.extensions,
         )
 

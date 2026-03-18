@@ -7,8 +7,8 @@ readme = "README.md"
 requires-python = ">=3.10,<3.15"
 dependencies = [
     "protobuf >=5,<7",
-    "substrait-protobuf==0.79.0",
-    "substrait-extensions==0.79.0",
+    "substrait-protobuf==0.85.0",
+    "substrait-extensions==0.85.0",
 ]
 dynamic = ["version"]
 
@@ -16,11 +16,11 @@ dynamic = ["version"]
 write_to = "src/substrait/_version.py"
 
 [project.optional-dependencies]
-extensions = ["antlr4-python3-runtime", "substrait-antlr==0.79.0", "pyyaml"]
+extensions = ["antlr4-python3-runtime", "substrait-antlr==0.85.0", "pyyaml"]
 sql = ["sqloxide; python_version < '3.14'", "deepdiff"]
 
 [dependency-groups]
-dev = ["pytest >= 7.0.0", "antlr4-python3-runtime", "substrait-antlr==0.79.0", "pyyaml", "sqloxide; python_version < '3.14'", "deepdiff", "duckdb<=1.2.2; python_version < '3.14'", "datafusion"]
+dev = ["pytest >= 7.0.0", "antlr4-python3-runtime", "substrait-antlr==0.85.0", "pyyaml", "sqloxide; python_version < '3.14'", "deepdiff", "duckdb<=1.2.2; python_version < '3.14'", "datafusion"]
 
 [tool.pytest.ini_options]
 pythonpath = "src"

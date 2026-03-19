@@ -270,6 +270,16 @@ def _handle_parameterized_type(
             parameters,
         )
 
+    if isinstance(
+        parameterized_type, SubstraitTypeParser.PrecisionIntervalCompoundContext
+    ):
+        return kind == "interval_compound" and check_integer_type_parameters(
+            covered.interval_compound,
+            parameterized_type,
+            ["precision"],
+            parameters,
+        )
+
     if isinstance(parameterized_type, SubstraitTypeParser.ListContext):
         return kind == "list" and covers(
             covered.list.type,

@@ -147,10 +147,7 @@ from substrait.extension_registry import ExtensionRegistry
 def test_all_function_types_from_yaml(test_case):
     """Test that all functions in YAML are registered with correct function_type.value."""
     test_registry = ExtensionRegistry(load_default_extensions=False)
-    test_registry.register_extension_dict(
-        yaml.safe_load(test_case["yaml_content"]),
-        uri=f"https://test.example.com/{test_case['urn'].replace(':', '_')}.yaml",
-    )
+    test_registry.register_extension_dict(yaml.safe_load(test_case["yaml_content"]))
 
     result = test_registry.lookup_function(
         urn=test_case["urn"],

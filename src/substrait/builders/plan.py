@@ -22,7 +22,6 @@ from substrait.extension_registry import ExtensionRegistry
 from substrait.type_inference import infer_plan_schema
 from substrait.utils import (
     merge_extension_declarations,
-    merge_extension_uris,
     merge_extension_urns,
 )
 from substrait.version import substrait_version
@@ -47,13 +46,8 @@ _create_default_version()
 
 
 def _merge_extensions(*objs):
-    """Merge extension URIs, URNs, and declarations from multiple plan/expression objects.
-
-    During the URI -> URN migration period, we maintain both URI and URN references
-    for backwards compatibility.
-    """
+    """Merge extension URNs and declarations from multiple plan/expression objects."""
     return {
-        "extension_uris": merge_extension_uris(*[b.extension_uris for b in objs if b]),
         "extension_urns": merge_extension_urns(*[b.extension_urns for b in objs if b]),
         "extensions": merge_extension_declarations(*[b.extensions for b in objs if b]),
     }

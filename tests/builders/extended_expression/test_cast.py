@@ -66,9 +66,7 @@ scalar_functions:
           - value: i8
         return: i8
 """
-    registry_with_ext.register_extension_dict(
-        yaml.safe_load(content), uri="https://test.example.com/functions.yaml"
-    )
+    registry_with_ext.register_extension_dict(yaml.safe_load(content))
 
     actual = cast(
         input=scalar_function(
@@ -80,11 +78,6 @@ scalar_functions:
     )(named_struct, registry_with_ext)
 
     expected = stee.ExtendedExpression(
-        extension_uris=[
-            ste.SimpleExtensionURI(
-                extension_uri_anchor=1, uri="https://test.example.com/functions.yaml"
-            )
-        ],
         extension_urns=[
             ste.SimpleExtensionURN(
                 extension_urn_anchor=1, urn="extension:test:functions"
@@ -93,7 +86,6 @@ scalar_functions:
         extensions=[
             ste.SimpleExtensionDeclaration(
                 extension_function=ste.SimpleExtensionDeclaration.ExtensionFunction(
-                    extension_uri_reference=1,
                     extension_urn_reference=1,
                     function_anchor=1,
                     name="add:i8_i8",

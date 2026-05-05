@@ -171,6 +171,8 @@ class PlanPrinter:
             self._stream_extension_single_rel(rel.extension_single, stream, depth)
         elif rel.HasField("extension_multi"):
             self._stream_extension_multi_rel(rel.extension_multi, stream, depth)
+        elif rel.HasField("window"):
+            self._stream_window_rel(rel.window, stream, depth)
         else:
             stream.write(f"{indent}<unknown_relation>\n")
 
@@ -400,6 +402,43 @@ class PlanPrinter:
                 stream.write(
                     f"{self._get_indent_with_arrow(depth + 2)}<unpackable_detail>\n"
                 )
+
+    def _stream_window_rel(
+        self, window: stalg.ConsistentPartitionWindowRel, stream, depth: int
+    ):
+        """Print a consistent partition window relation concisely"""
+        indent = " " * (depth * self.indent_size)
+
+        stream.write(
+            f"{indent}{self._color('window', Colors.MAGENTA)}: "
+            f"{self._color(str(len(window.window_functions)), Colors.YELLOW)} functions\n"
+        )
+        stream.write(
+            f"{self._get_indent_with_arrow(depth + 1)}{self._color('input:', Colors.BLUE)}\n"
+        )
+        self._stream_rel(window.input, stream, depth + 1)
+
+        if window.partition_expressions:
+            stream.write(
+                f"{self._get_indent_with_arrow(depth + 1)}"
+                f"{self._color('partitions:', Colors.BLUE)} "
+                f"{self._color(str(len(window.partition_expressions)), Colors.YELLOW)}\n"
+            )
+
+        if window.sorts:
+            stream.write(
+                f"{self._get_indent_with_arrow(depth + 1)}"
+                f"{self._color('sorts:', Colors.BLUE)} "
+                f"{self._color(str(len(window.sorts)), Colors.YELLOW)}\n"
+            )
+
+        for i, wf in enumerate(window.window_functions):
+            stream.write(
+                f"{self._get_indent_with_arrow(depth + 1)}"
+                f"{self._color('window_fn', Colors.BLUE)}"
+                f"[{self._color(str(i), Colors.CYAN)}]: "
+                f"func_ref={wf.function_reference}\n"
+            )
 
     def _stream_expression(self, expression: stalg.Expression, stream, depth: int):
         """Print an expression concisely"""

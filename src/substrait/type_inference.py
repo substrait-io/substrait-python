@@ -342,6 +342,14 @@ def infer_rel_schema(rel: stalg.Rel) -> stt.Type.Struct:
             raise Exception(f"Unhandled join_type {rel.join.type}")
 
         (common, struct) = (rel.join.common, raw_schema)
+    elif rel_type == "window":
+        parent_schema = infer_rel_schema(rel.window.input)
+        window_output_types = [wf.output_type for wf in rel.window.window_functions]
+        raw_schema = stt.Type.Struct(
+            types=list(parent_schema.types) + window_output_types,
+            nullability=parent_schema.nullability,
+        )
+        (common, struct) = (rel.window.common, raw_schema)
     else:
         raise Exception(f"Unhandled rel_type {rel_type}")
 

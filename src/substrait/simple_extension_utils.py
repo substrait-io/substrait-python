@@ -1,6 +1,16 @@
-from typing import Union
+from typing import Optional, Union
 
 from substrait_extensions.extensions import simple_extensions as se
+
+
+def build_deprecation_status(d: Optional[dict]) -> Optional[se.DeprecationStatus]:
+    if d is None:
+        return None
+    return se.DeprecationStatus(
+        since=d["since"],
+        reason=d.get("reason"),
+        metadata=d.get("metadata"),
+    )
 
 
 def build_arg(d: dict) -> Union[se.ValueArg, se.TypeArg, se.EnumerationArg]:
@@ -44,6 +54,8 @@ def build_scalar_function(d: dict) -> se.ScalarFunction:
         impls=[
             se.Impl(
                 return_=i["return"],
+                deprecated=build_deprecation_status(i.get("deprecated")),
+                description=i.get("description"),
                 args=[build_arg(arg) for arg in i["args"]] if "args" in i else None,
                 options=build_options(i["options"]) if "options" in i else None,
                 variadic=build_variadic_behavior(i["variadic"])
@@ -58,7 +70,9 @@ def build_scalar_function(d: dict) -> se.ScalarFunction:
             )
             for i in d["impls"]
         ],
+        deprecated=build_deprecation_status(d.get("deprecated")),
         description=d.get("description"),
+        metadata=d.get("metadata"),
     )
 
 
@@ -68,6 +82,8 @@ def build_aggregate_function(d: dict) -> se.AggregateFunction:
         impls=[
             se.Impl1(
                 return_=i["return"],
+                deprecated=build_deprecation_status(i.get("deprecated")),
+                description=i.get("description"),
                 args=[build_arg(arg) for arg in i["args"]] if "args" in i else None,
                 options=build_options(i["options"]) if "options" in i else None,
                 variadic=build_variadic_behavior(i["variadic"])
@@ -88,7 +104,9 @@ def build_aggregate_function(d: dict) -> se.AggregateFunction:
             )
             for i in d["impls"]
         ],
+        deprecated=build_deprecation_status(d.get("deprecated")),
         description=d.get("description"),
+        metadata=d.get("metadata"),
     )
 
 
@@ -98,6 +116,8 @@ def build_window_function(d: dict) -> se.WindowFunction:
         impls=[
             se.Impl2(
                 return_=i["return"],
+                deprecated=build_deprecation_status(i.get("deprecated")),
+                description=i.get("description"),
                 args=[build_arg(arg) for arg in i["args"]] if "args" in i else None,
                 options=build_options(i["options"]) if "options" in i else None,
                 variadic=build_variadic_behavior(i["variadic"])
@@ -121,13 +141,18 @@ def build_window_function(d: dict) -> se.WindowFunction:
             )
             for i in d["impls"]
         ],
+        deprecated=build_deprecation_status(d.get("deprecated")),
         description=d.get("description"),
+        metadata=d.get("metadata"),
     )
 
 
 def build_type_model(d: dict) -> se.TypeModel:
     return se.TypeModel(
         name=d["name"],
+        deprecated=build_deprecation_status(d.get("deprecated")),
+        description=d.get("description"),
+        metadata=d.get("metadata"),
         structure=d.get("structure"),
         parameters=d.get("parameters"),
         variadic=d.get("variadic"),
@@ -138,6 +163,7 @@ def build_type_variation(d: dict) -> se.TypeVariation:
     return se.TypeVariation(
         parent=d["parent"],
         name=d["name"],
+        deprecated=build_deprecation_status(d.get("deprecated")),
         description=d.get("description"),
         functions=se.Functions(d["functions"]) if "functions" in d else None,
     )

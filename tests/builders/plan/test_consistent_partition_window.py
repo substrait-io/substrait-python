@@ -54,9 +54,7 @@ window_functions:
 """
 
 registry = ExtensionRegistry(load_default_extensions=False)
-registry.register_extension_dict(
-    yaml.safe_load(content), uri="https://test.example.com/test.yaml"
-)
+registry.register_extension_dict(yaml.safe_load(content))
 
 struct = stt.Type.Struct(
     types=[i64(nullable=False), i16(nullable=False), i32(nullable=False)],
@@ -106,7 +104,6 @@ def test_consistent_partition_window_single():
     expected = stp.Plan(
         version=default_version,
         extension_urns=list(lead_ee.extension_urns),
-        extension_uris=list(lead_ee.extension_uris),
         extensions=list(lead_ee.extensions),
         relations=[
             stp.PlanRel(

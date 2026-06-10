@@ -148,6 +148,16 @@ def _evaluate(x, values: dict):
                         nullability=nullability,
                     )
                 )
+            elif isinstance(
+                parametrized_type, SubstraitTypeParser.PrecisionIntervalDayContext
+            ):
+                precision = _evaluate(parametrized_type.precision, values)
+                return Type(
+                    interval_day=Type.IntervalDay(
+                        precision=precision,
+                        nullability=nullability,
+                    )
+                )
             elif isinstance(parametrized_type, SubstraitTypeParser.StructContext):
                 types = list(
                     map(lambda x: _evaluate(x, values), parametrized_type.expr())

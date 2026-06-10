@@ -116,6 +116,19 @@ DECIMAL<prec, scale>""",
     )
 
 
+def test_interval_day():
+    assert evaluate("interval_day<6>") == Type(
+        interval_day=Type.IntervalDay(
+            precision=6, nullability=Type.NULLABILITY_REQUIRED
+        )
+    )
+    assert evaluate("interval_day?<3>") == Type(
+        interval_day=Type.IntervalDay(
+            precision=3, nullability=Type.NULLABILITY_NULLABLE
+        )
+    )
+
+
 def test_struct_simple():
     """Test simple struct with two i32 fields."""
     result = evaluate("struct<i32, i32>", {})

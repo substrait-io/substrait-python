@@ -129,6 +129,15 @@ def test_interval_day():
     )
 
 
+def test_interval_day_no_precision():
+    assert evaluate("interval_day") == Type(
+        interval_day=Type.IntervalDay(nullability=Type.NULLABILITY_REQUIRED)
+    )
+    assert evaluate("interval_day?") == Type(
+        interval_day=Type.IntervalDay(nullability=Type.NULLABILITY_NULLABLE)
+    )
+
+
 def test_struct_simple():
     """Test simple struct with two i32 fields."""
     result = evaluate("struct<i32, i32>", {})

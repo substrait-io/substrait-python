@@ -5,8 +5,6 @@ import pyarrow
 import pyarrow.substrait as pa_substrait
 import pytest
 
-pytest.importorskip("sqloxide")
-
 from substrait.extension_registry import ExtensionRegistry
 from substrait.sql.sql_to_substrait import convert
 
@@ -74,7 +72,7 @@ def assert_query_datafusion(query: str, ignore_order=True):
 
 
 def assert_query_duckdb(query: str, ignore_order=True):
-    import duckdb
+    duckdb = pytest.importorskip("duckdb")
 
     duckdb.install_extension("substrait", repository="community")
     duckdb.load_extension("substrait")

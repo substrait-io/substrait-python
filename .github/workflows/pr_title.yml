@@ -6,7 +6,7 @@ on:
 
 # Most recent PR change supersedes previous changes.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 # Default to the minimum read-only token for all jobs.

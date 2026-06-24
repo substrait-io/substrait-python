@@ -151,6 +151,12 @@ def _evaluate(x, values: dict):
             elif isinstance(
                 parametrized_type, SubstraitTypeParser.PrecisionIntervalDayContext
             ):
+                if parametrized_type.precision is None:
+                    return Type(
+                        interval_day=Type.IntervalDay(
+                            nullability=nullability,
+                        )
+                    )
                 precision = _evaluate(parametrized_type.precision, values)
                 return Type(
                     interval_day=Type.IntervalDay(

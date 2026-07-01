@@ -1,8 +1,14 @@
 name: PR Title Check
 
 on:
+  # Only the PR title and description are validated, and neither changes on a
+  # push (synchronize). Including synchronize caused a race: a Dependabot rebase
+  # force-pushes and edits the PR body at the same time, firing synchronize and
+  # edited together. Both land in the same concurrency group, so one run is
+  # cancelled, leaving a cancelled check-run on the head commit that fails the
+  # status rollup.
   pull_request_target:
-    types: [opened, edited, synchronize, reopened]
+    types: [opened, edited, reopened]
 
 # Most recent PR change supersedes previous changes.
 concurrency:

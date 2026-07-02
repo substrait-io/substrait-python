@@ -1,7 +1,7 @@
-import substrait.dataframe
+import substrait.narwhals
 from substrait.builders.extended_expression import column
-from substrait.dataframe.dataframe import DataFrame
-from substrait.dataframe.expression import Expression
+from substrait.narwhals.dataframe import DataFrame
+from substrait.narwhals.expression import Expression
 
 __all__ = [DataFrame, Expression]
 
@@ -13,4 +13,4 @@ def col(name: str) -> Expression:
 
 # TODO handle str_as_lit argument
 def parse_into_expr(expr, str_as_lit: bool):
-    return expr._to_compliant_expr(substrait.dataframe)
+    return expr._to_compliant_expr(substrait.narwhals)

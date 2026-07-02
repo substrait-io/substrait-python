@@ -79,6 +79,12 @@ def infer_literal_type(literal: stalg.Expression.Literal) -> stt.Type:
                 nullability=nullability,
             )
         )
+    elif literal_type == "precision_time":
+        return stt.Type(
+            precision_time=stt.Type.PrecisionTime(
+                precision=literal.precision_time.precision, nullability=nullability
+            )
+        )
     elif literal_type == "precision_timestamp":
         return stt.Type(
             precision_timestamp=stt.Type.PrecisionTimestamp(

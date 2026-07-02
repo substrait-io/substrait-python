@@ -138,6 +138,18 @@ class ExtensionRegistry:
     def lookup_urn(self, urn: str) -> Optional[int]:
         return self._urn_mapping.get(urn, None)
 
+    def iter_functions(self):
+        """Yield ``(urn, name, function_type)`` for every registered function.
+
+        One tuple per ``(urn, name)`` group (overloads are collapsed). Useful for
+        discovering the full set of available functions, e.g. to build a
+        function-helper namespace.
+        """
+        for urn, names in self._function_mapping.items():
+            for name, entries in names.items():
+                if entries:
+                    yield urn, name, entries[0].function_type
+
 
 def validate_urn_format(urn: str) -> str:
     """Validate that a URN follows the expected format.

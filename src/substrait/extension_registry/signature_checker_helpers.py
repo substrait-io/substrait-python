@@ -302,6 +302,26 @@ def _handle_parameterized_type(
             )
         )
 
+    if isinstance(parameterized_type, SubstraitTypeParser.FuncContext):
+        if kind != "func":
+            return False
+        func_params = parameterized_type.funcParams()
+        param_exprs = func_params.expr()
+        if not isinstance(param_exprs, list):
+            param_exprs = [param_exprs]
+        covered_params = covered.func.parameter_types
+        if len(covered_params) != len(param_exprs):
+            return False
+        for covered_param, param_expr in zip(covered_params, param_exprs):
+            if not covers(covered_param, param_expr, parameters, check_nullability):
+                return False
+        return covers(
+            covered.func.return_type,
+            parameterized_type.returnType,
+            parameters,
+            check_nullability,
+        )
+
     if isinstance(parameterized_type, SubstraitTypeParser.StructContext):
         if kind != "struct":
             return False

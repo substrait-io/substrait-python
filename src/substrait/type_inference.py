@@ -181,7 +181,9 @@ def infer_expression_type(
     rex_type = expression.WhichOneof("rex_type")
     if rex_type == "selection":
         root_type = expression.selection.WhichOneof("root_type")
-        assert root_type == "root_reference"
+        # A lambda parameter reference resolves against the lambda's parameter
+        # struct (passed in as parent_schema); otherwise against the input row.
+        assert root_type in ("root_reference", "lambda_parameter_reference")
 
         reference_type = expression.selection.WhichOneof("reference_type")
 
@@ -217,6 +219,18 @@ def infer_expression_type(
         )
     elif rex_type == "nested":
         return infer_nested_type(expression.nested, parent_schema)
+    elif rex_type == "lambda":
+        # A lambda's type is func<param_types -> body_type>; the body's parameter
+        # references resolve against the lambda's own parameter struct.
+        lam = getattr(expression, "lambda")
+        body_type = infer_expression_type(lam.body, lam.parameters)
+        return stt.Type(
+            func=stt.Type.Func(
+                parameter_types=list(lam.parameters.types),
+                return_type=body_type,
+                nullability=stt.Type.NULLABILITY_REQUIRED,
+            )
+        )
     elif rex_type == "subquery":
         subquery_type = expression.subquery.WhichOneof("subquery_type")
 

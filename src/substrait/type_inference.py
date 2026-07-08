@@ -254,6 +254,31 @@ def infer_extended_expression_schema(ee: stee.ExtendedExpression) -> stt.Type.St
     )
 
 
+def _join_output_struct(type_name: str, left_rel, right_rel) -> stt.Type.Struct:
+    """Join output columns by join-type NAME (shared across all join relations,
+    whose enum integer values differ)."""
+    left = infer_rel_schema(left_rel)
+    right = infer_rel_schema(right_rel)
+    required = stt.Type.Nullability.NULLABILITY_REQUIRED
+    if type_name in ("JOIN_TYPE_LEFT_SEMI", "JOIN_TYPE_LEFT_ANTI"):
+        types = list(left.types)
+    elif type_name in ("JOIN_TYPE_RIGHT_SEMI", "JOIN_TYPE_RIGHT_ANTI"):
+        types = list(right.types)
+    elif type_name in ("JOIN_TYPE_LEFT_MARK", "JOIN_TYPE_RIGHT_MARK"):
+        types = (
+            list(left.types)
+            + list(right.types)
+            + [
+                stt.Type(
+                    bool=stt.Type.Boolean(nullability=stt.Type.NULLABILITY_NULLABLE)
+                )
+            ]
+        )
+    else:  # inner / outer / left / right / single
+        types = list(left.types) + list(right.types)
+    return stt.Type.Struct(types=types, nullability=required)
+
+
 def infer_rel_schema(rel: stalg.Rel) -> stt.Type.Struct:
     rel_type = rel.WhichOneof("rel_type")
 
@@ -387,6 +412,15 @@ def infer_rel_schema(rel: stalg.Rel) -> stt.Type.Struct:
             types=field_types, nullability=parent_schema.nullability
         )
         (common, struct) = (rel.expand.common, raw_schema)
+    elif rel_type == "nested_loop_join":
+        name = stalg.NestedLoopJoinRel.JoinType.Name(rel.nested_loop_join.type)
+        raw_schema = _join_output_struct(
+            name, rel.nested_loop_join.left, rel.nested_loop_join.right
+        )
+        (common, struct) = (rel.nested_loop_join.common, raw_schema)
+    elif rel_type == "exchange":
+        # Exchange redistributes rows without changing the schema.
+        (common, struct) = (rel.exchange.common, infer_rel_schema(rel.exchange.input))
     elif rel_type == "reference":
         subtrees = reference_subtrees.get()
         if subtrees is None:

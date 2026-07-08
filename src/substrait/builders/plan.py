@@ -894,3 +894,85 @@ def expand(
         )
 
     return resolve
+
+
+def nested_loop_join(
+    left: PlanOrUnbound,
+    right: PlanOrUnbound,
+    expression: ExtendedExpressionOrUnbound,
+    type: stalg.NestedLoopJoinRel.JoinType.ValueType,
+    extension: Optional[AdvancedExtension] = None,
+) -> UnboundPlan:
+    """A NestedLoopJoinRel: join over the Cartesian product using ``expression``."""
+
+    def resolve(registry: ExtensionRegistry) -> stp.Plan:
+        bound_left = left if isinstance(left, stp.Plan) else left(registry)
+        bound_right = right if isinstance(right, stp.Plan) else right(registry)
+        left_ns = infer_plan_schema(bound_left)
+        right_ns = infer_plan_schema(bound_right)
+
+        ns = stt.NamedStruct(
+            struct=stt.Type.Struct(
+                types=list(left_ns.struct.types) + list(right_ns.struct.types),
+                nullability=stt.Type.Nullability.NULLABILITY_REQUIRED,
+            ),
+            names=list(left_ns.names) + list(right_ns.names),
+        )
+        bound_expression = resolve_expression(expression, ns, registry)
+
+        rel = stalg.Rel(
+            nested_loop_join=stalg.NestedLoopJoinRel(
+                left=bound_left.relations[-1].root.input,
+                right=bound_right.relations[-1].root.input,
+                expression=bound_expression.referred_expr[0].expression,
+                type=type,
+                advanced_extension=extension,
+            )
+        )
+        return stp.Plan(
+            version=default_version,
+            relations=[stp.PlanRel(root=stalg.RelRoot(input=rel, names=ns.names))],
+            **_merge_extensions(bound_left, bound_right, bound_expression),
+        )
+
+    return resolve
+
+
+def exchange(
+    plan: PlanOrUnbound,
+    partition_count: int = 0,
+    broadcast: bool = False,
+) -> UnboundPlan:
+    """An ExchangeRel that redistributes rows (schema unchanged).
+
+    Defaults to round-robin partitioning into ``partition_count`` partitions;
+    pass ``broadcast=True`` to broadcast every row to all partitions.
+    """
+
+    def resolve(registry: ExtensionRegistry) -> stp.Plan:
+        bound_plan = plan if isinstance(plan, stp.Plan) else plan(registry)
+        kind = (
+            {"broadcast": stalg.ExchangeRel.Broadcast()}
+            if broadcast
+            else {"round_robin": stalg.ExchangeRel.RoundRobin()}
+        )
+        rel = stalg.Rel(
+            exchange=stalg.ExchangeRel(
+                input=bound_plan.relations[-1].root.input,
+                partition_count=partition_count,
+                **kind,
+            )
+        )
+        return stp.Plan(
+            version=default_version,
+            relations=[
+                stp.PlanRel(
+                    root=stalg.RelRoot(
+                        input=rel, names=bound_plan.relations[-1].root.names
+                    )
+                )
+            ],
+            **_merge_extensions(bound_plan),
+        )
+
+    return resolve

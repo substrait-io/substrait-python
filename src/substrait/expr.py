@@ -40,6 +40,9 @@ from substrait.builders.extended_expression import (
     switch,
 )
 from substrait.builders.extended_expression import (
+    execution_context_variable as _execution_context_variable,
+)
+from substrait.builders.extended_expression import (
     in_predicate as _in_predicate,
 )
 from substrait.builders.extended_expression import (
@@ -712,6 +715,41 @@ def coalesce(*exprs: Any) -> Expr:
         raise ValueError("coalesce needs at least one expression")
     args = [Expr._coerce(e)._unbound for e in exprs]
     return Expr(scalar_function(FUNCTIONS_COMPARISON, "coalesce", expressions=args))
+
+
+def current_timestamp(precision: int = 6, alias: Union[str, None] = None) -> Expr:
+    """The query's execution timestamp (``precision_timestamp_tz``)."""
+    return Expr(
+        _execution_context_variable(
+            "current_timestamp",
+            stp.Type.PrecisionTimestampTZ(
+                precision=precision, nullability=stp.Type.NULLABILITY_REQUIRED
+            ),
+            alias,
+        )
+    )
+
+
+def current_date(alias: Union[str, None] = None) -> Expr:
+    """The query's execution date."""
+    return Expr(
+        _execution_context_variable(
+            "current_date",
+            stp.Type.Date(nullability=stp.Type.NULLABILITY_REQUIRED),
+            alias,
+        )
+    )
+
+
+def current_timezone(alias: Union[str, None] = None) -> Expr:
+    """The query's execution timezone (a ``string``)."""
+    return Expr(
+        _execution_context_variable(
+            "current_timezone",
+            stp.Type.String(nullability=stp.Type.NULLABILITY_REQUIRED),
+            alias,
+        )
+    )
 
 
 def scalar_subquery(subquery: Any, alias: Union[str, None] = None) -> Expr:

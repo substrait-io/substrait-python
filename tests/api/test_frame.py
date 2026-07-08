@@ -903,6 +903,52 @@ def test_exchange_preserves_schema_for_chaining():
     assert plan.relations[-1].root.input.HasField("filter")
 
 
+# -- Phase (0.96-unblocked): TopN + execution-context variables -----------
+
+
+def test_top_n_structure_and_chaining():
+    df = sub.read_named_table("t", {"id": sub.i64, "score": sub.fp64})
+    plan = df.top_n(5, "score", descending=True, with_ties=True).select("id").to_plan()
+    tn = plan.relations[-1].root.input.project.input.top_n
+    assert len(tn.sorts) == 1
+    assert tn.sorts[0].direction == stalg.SortField.SORT_DIRECTION_DESC_NULLS_LAST
+    assert tn.count.literal.i64 == 5
+    assert tn.mode == stalg.FetchMode.FETCH_MODE_WITH_TIES
+    assert not tn.HasField("offset")
+    assert list(plan.relations[-1].root.names) == ["id"]
+
+
+def test_top_n_offset_and_multikey():
+    df = sub.read_named_table("t", {"id": sub.i64, "score": sub.fp64})
+    tn = df.top_n(3, ["score", "id"], offset=2).to_plan().relations[-1].root.input.top_n
+    assert len(tn.sorts) == 2
+    assert tn.offset.literal.i64 == 2
+    assert tn.mode == stalg.FetchMode.FETCH_MODE_ROWS_ONLY
+
+
+@pytest.mark.parametrize(
+    "make, variable, kind",
+    [
+        (sub.current_timestamp, "current_timestamp", "precision_timestamp_tz"),
+        (sub.current_date, "current_date", "date"),
+        (sub.current_timezone, "current_timezone", "string"),
+    ],
+)
+def test_execution_context_variable(make, variable, kind):
+    from substrait.type_inference import infer_plan_schema
+
+    df = sub.read_named_table("t", {"id": sub.i64})
+    plan = df.with_columns(v=make()).to_plan()
+    e = plan.relations[-1].root.input.project.expressions[0]
+    assert e.WhichOneof("rex_type") == "execution_context_variable"
+    assert (
+        e.execution_context_variable.WhichOneof("execution_context_variable_type")
+        == variable
+    )
+    # infer_expression_type derives the variable's type
+    assert infer_plan_schema(plan).struct.types[-1].WhichOneof("kind") == kind
+
+
 def test_default_registry_is_reused():
     assert sub.default_registry() is sub.default_registry()
 

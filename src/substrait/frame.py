@@ -333,6 +333,39 @@ class DataFrame:
             _plan.fetch(self._plan, offset=lit(n, _type.i64()).unbound, count=None)
         )
 
+    def top_n(
+        self,
+        n: int,
+        by: Union[str, Expr, Iterable[Union[str, Expr]]],
+        *,
+        descending: Union[bool, "list[bool]"] = False,
+        nulls_last: Union[bool, "list[bool]"] = True,
+        offset: int = 0,
+        with_ties: bool = False,
+    ) -> "DataFrame":
+        """The top ``n`` rows ordered by ``by`` (a fused sort + fetch, TopNRel).
+
+        ``descending``/``nulls_last`` follow :meth:`sort`; ``with_ties`` keeps
+        rows tied with the n-th.
+        """
+        keys = [by] if isinstance(by, (str, Expr)) else list(by)
+        count = len(keys)
+        desc = _per_column(descending, count, "descending")
+        nulls = _per_column(nulls_last, count, "nulls_last")
+        sorts = [
+            (_unbound(c), _SORT_DIRECTIONS[(desc[i], nulls[i])])
+            for i, c in enumerate(keys)
+        ]
+        return self._next(
+            _plan.top_n(
+                self._plan,
+                sorts,
+                count=lit(n, _type.i64()).unbound,
+                offset=lit(offset, _type.i64()).unbound if offset else None,
+                with_ties=with_ties,
+            )
+        )
+
     def join(
         self,
         other: "DataFrame",

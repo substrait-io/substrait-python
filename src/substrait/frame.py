@@ -28,17 +28,19 @@ native frame; the two layers compose rather than compete.
 
 from __future__ import annotations
 
+import contextvars
 from itertools import combinations
 from typing import Any, Iterable, Optional, Union
 
 import substrait.algebra_pb2 as stalg
+import substrait.plan_pb2 as stpl
 import substrait.type_pb2 as stp
 
 from substrait.builders import plan as _plan
 from substrait.builders import type as _type
 from substrait.expr import Expr, Measure, col, lit
 from substrait.extension_registry import ExtensionRegistry
-from substrait.type_inference import infer_plan_schema
+from substrait.type_inference import infer_plan_schema, reference_subtrees
 
 # All 13 JoinRel.JoinType variants (SET_OP_UNSPECIFIED excluded). "single"
 # returns at most one right match per left row (runtime error on multiple);
@@ -122,6 +124,24 @@ def _split_measure(m: Union[Expr, Measure]):
     if isinstance(m, Measure):
         return _unbound(m.expr), _unbound(m.predicate)
     return _unbound(m), None
+
+
+class _CteContext:
+    """Collects shared subtrees while a plan with ``cache()`` is being built."""
+
+    __slots__ = ("subtrees", "names", "plans", "ordinal_by_token")
+
+    def __init__(self):
+        self.subtrees: "list[stalg.Rel]" = []  # indexed by subtree_ordinal
+        self.names: "list[list[str]]" = []
+        self.plans: "list[stpl.Plan]" = []  # the resolved subtree plans (extensions)
+        self.ordinal_by_token: dict = {}
+
+
+# Active while a DataFrame is being materialized; None otherwise.
+_cte_context: contextvars.ContextVar = contextvars.ContextVar(
+    "cte_context", default=None
+)
 
 
 _default_registry: Optional[ExtensionRegistry] = None
@@ -468,13 +488,68 @@ class DataFrame:
             )
         )
 
+    def cache(self) -> "DataFrame":
+        """Mark this DataFrame as a reusable common subplan (a CTE).
+
+        Every use of the returned frame in the same ``to_plan()`` emits the
+        subplan once as a shared subtree and references it (``ReferenceRel``),
+        instead of inlining a fresh copy each time.
+        """
+        inner = self._plan
+        token = object()  # identity for this cached node
+
+        def resolve(registry: ExtensionRegistry) -> stpl.Plan:
+            ctx = _cte_context.get(None)
+            if ctx is None:  # built without a context -> just inline
+                return inner(registry)
+            ordinal = ctx.ordinal_by_token.get(token)
+            if ordinal is None:
+                subplan = inner(registry)
+                ordinal = len(ctx.subtrees)
+                ctx.ordinal_by_token[token] = ordinal
+                ctx.subtrees.append(subplan.relations[-1].root.input)
+                ctx.names.append(list(subplan.relations[-1].root.names))
+                ctx.plans.append(subplan)
+            ref = stalg.Rel(reference=stalg.ReferenceRel(subtree_ordinal=ordinal))
+            return stpl.Plan(
+                version=_plan.default_version,
+                relations=[
+                    stpl.PlanRel(
+                        root=stalg.RelRoot(input=ref, names=ctx.names[ordinal])
+                    )
+                ],
+                # Propagate the subtree's extensions so builder merges carry them up.
+                **_plan._merge_extensions(ctx.plans[ordinal]),
+            )
+
+        return self._next(resolve)
+
+    def _materialize(self, registry: ExtensionRegistry) -> stpl.Plan:
+        ctx = _CteContext()
+        cte_token = _cte_context.set(ctx)
+        ref_token = reference_subtrees.set(ctx.subtrees)
+        try:
+            plan = self._plan(registry)
+        finally:
+            _cte_context.reset(cte_token)
+            reference_subtrees.reset(ref_token)
+        if not ctx.subtrees:
+            return plan
+        # Prepend the shared subtrees; ReferenceRel ordinals index into them.
+        subtree_rels = [stpl.PlanRel(rel=s) for s in ctx.subtrees]
+        return stpl.Plan(
+            version=_plan.default_version,
+            relations=[*subtree_rels, plan.relations[-1]],
+            **_plan._merge_extensions(plan, *ctx.plans),
+        )
+
     def to_plan(self):
         """Materialize to a ``substrait.proto.Plan``."""
-        return self._plan(self._registry)
+        return self._materialize(self._registry)
 
     # Kept for parity with the substrait.narwhals (Narwhals) wrapper's API.
     def to_substrait(self, registry: Optional[ExtensionRegistry] = None):
-        return self._plan(registry or self._registry)
+        return self._materialize(registry or self._registry)
 
 
 class GroupBy:

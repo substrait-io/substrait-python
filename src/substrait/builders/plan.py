@@ -611,19 +611,25 @@ def write_named_table(
     table_names: Union[str, Iterable[str]],
     input: PlanOrUnbound,
     create_mode: Union[stalg.WriteRel.CreateMode.ValueType, None] = None,
+    op: Union[stalg.WriteRel.WriteOp.ValueType, None] = None,
+    output_mode: Union[stalg.WriteRel.OutputMode.ValueType, None] = None,
 ) -> UnboundPlan:
     def resolve(registry: ExtensionRegistry) -> stp.Plan:
         bound_input = input if isinstance(input, stp.Plan) else input(registry)
         ns = infer_plan_schema(bound_input)
         _table_names = [table_names] if isinstance(table_names, str) else table_names
         _create_mode = create_mode or stalg.WriteRel.CREATE_MODE_ERROR_IF_EXISTS
+        _op = op if op is not None else stalg.WriteRel.WRITE_OP_CTAS
 
         write_rel = stalg.Rel(
             write=stalg.WriteRel(
                 input=bound_input.relations[-1].root.input,
                 table_schema=ns,
-                op=stalg.WriteRel.WRITE_OP_CTAS,
+                op=_op,
                 create_mode=_create_mode,
+                output=output_mode
+                if output_mode is not None
+                else stalg.WriteRel.OUTPUT_MODE_UNSPECIFIED,
                 named_table=stalg.NamedObjectWrite(names=_table_names),
             )
         )
@@ -632,6 +638,111 @@ def write_named_table(
                 stp.PlanRel(root=stalg.RelRoot(input=write_rel, names=ns.names))
             ],
             **_merge_extensions(bound_input),
+        )
+
+    return resolve
+
+
+def ddl(
+    names: Union[str, Iterable[str]],
+    object_type: stalg.DdlRel.DdlObject.ValueType,
+    op: stalg.DdlRel.DdlOp.ValueType,
+    table_schema: Optional[stt.NamedStruct] = None,
+    view_definition: Optional[PlanOrUnbound] = None,
+    extension: Optional[AdvancedExtension] = None,
+) -> UnboundPlan:
+    """Build a DdlRel (CREATE / DROP of a TABLE or VIEW).
+
+    ``table_schema`` is required for CREATE TABLE; for CREATE VIEW the schema is
+    inferred from ``view_definition`` when omitted. DROP needs neither.
+    """
+    _names = [names] if isinstance(names, str) else list(names)
+
+    def resolve(registry: ExtensionRegistry) -> stp.Plan:
+        merge_sources = []
+        view_rel = None
+        schema = table_schema
+        if view_definition is not None:
+            view_plan = (
+                view_definition
+                if isinstance(view_definition, stp.Plan)
+                else view_definition(registry)
+            )
+            view_rel = view_plan.relations[-1].root.input
+            merge_sources.append(view_plan)
+            if schema is None:
+                schema = infer_plan_schema(view_plan)
+
+        ddl_rel = stalg.Rel(
+            ddl=stalg.DdlRel(
+                named_object=stalg.NamedObjectWrite(names=_names),
+                table_schema=schema,
+                object=object_type,
+                op=op,
+                view_definition=view_rel,
+                advanced_extension=extension,
+            )
+        )
+        out_names = list(schema.names) if schema is not None else []
+        return stp.Plan(
+            version=default_version,
+            relations=[stp.PlanRel(root=stalg.RelRoot(input=ddl_rel, names=out_names))],
+            **_merge_extensions(*merge_sources),
+        )
+
+    return resolve
+
+
+def update(
+    table_names: Union[str, Iterable[str]],
+    table_schema: stt.NamedStruct,
+    transformations: Iterable[tuple[int, ExtendedExpressionOrUnbound]],
+    condition: Optional[ExtendedExpressionOrUnbound] = None,
+    extension: Optional[AdvancedExtension] = None,
+) -> UnboundPlan:
+    """Build an UpdateRel: set ``(column_index -> expression)`` where ``condition``."""
+    _names = [table_names] if isinstance(table_names, str) else list(table_names)
+
+    def resolve(registry: ExtensionRegistry) -> stp.Plan:
+        bound_condition = (
+            resolve_expression(condition, table_schema, registry)
+            if condition is not None
+            else None
+        )
+        transforms = []
+        merge_sources = []
+        for column_index, expression in transformations:
+            bound = resolve_expression(expression, table_schema, registry)
+            merge_sources.append(bound)
+            transforms.append(
+                stalg.UpdateRel.TransformExpression(
+                    column_target=column_index,
+                    transformation=bound.referred_expr[0].expression,
+                )
+            )
+        if bound_condition is not None:
+            merge_sources.append(bound_condition)
+
+        update_rel = stalg.UpdateRel(
+            table_schema=table_schema,
+            condition=bound_condition.referred_expr[0].expression
+            if bound_condition
+            else None,
+            transformations=transforms,
+        )
+        update_rel.named_table.names.extend(_names)
+
+        return stp.Plan(
+            version=default_version,
+            relations=[
+                stp.PlanRel(
+                    root=stalg.RelRoot(
+                        input=stalg.Rel(update=update_rel),
+                        names=list(table_schema.names),
+                    )
+                )
+            ],
+            **_merge_extensions(*merge_sources),
         )
 
     return resolve

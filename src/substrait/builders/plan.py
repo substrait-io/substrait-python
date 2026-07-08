@@ -295,7 +295,7 @@ def set(inputs: Iterable[PlanOrUnbound], op: stalg.SetRel.SetOp) -> UnboundPlan:
 def fetch(
     plan: PlanOrUnbound,
     offset: ExtendedExpressionOrUnbound,
-    count: ExtendedExpressionOrUnbound,
+    count: Optional[ExtendedExpressionOrUnbound],
     extension: Optional[AdvancedExtension] = None,
 ) -> UnboundPlan:
     def resolve(registry: ExtensionRegistry) -> stp.Plan:
@@ -303,7 +303,10 @@ def fetch(
         ns = infer_plan_schema(bound_plan)
 
         bound_offset = resolve_expression(offset, ns, registry) if offset else None
-        bound_count = resolve_expression(count, ns, registry)
+        # count=None means "all remaining rows" (FetchRel leaves count_expr unset).
+        bound_count = (
+            resolve_expression(count, ns, registry) if count is not None else None
+        )
 
         rel = stalg.Rel(
             fetch=stalg.FetchRel(
@@ -311,7 +314,9 @@ def fetch(
                 offset_expr=bound_offset.referred_expr[0].expression
                 if bound_offset
                 else None,
-                count_expr=bound_count.referred_expr[0].expression,
+                count_expr=bound_count.referred_expr[0].expression
+                if bound_count
+                else None,
                 advanced_extension=extension,
             )
         )
@@ -336,6 +341,7 @@ def join(
     right: PlanOrUnbound,
     expression: ExtendedExpressionOrUnbound,
     type: stalg.JoinRel.JoinType,
+    post_join_filter: Optional[ExtendedExpressionOrUnbound] = None,
     extension: Optional[AdvancedExtension] = None,
 ) -> UnboundPlan:
     def resolve(registry: ExtensionRegistry) -> stp.Plan:
@@ -354,12 +360,20 @@ def join(
         bound_expression: stee.ExtendedExpression = resolve_expression(
             expression, ns, registry
         )
+        bound_post = (
+            resolve_expression(post_join_filter, ns, registry)
+            if post_join_filter is not None
+            else None
+        )
 
         rel = stalg.Rel(
             join=stalg.JoinRel(
                 left=bound_left.relations[-1].root.input,
                 right=bound_right.relations[-1].root.input,
                 expression=bound_expression.referred_expr[0].expression,
+                post_join_filter=bound_post.referred_expr[0].expression
+                if bound_post
+                else None,
                 type=type,
                 advanced_extension=extension,
             )
@@ -368,7 +382,7 @@ def join(
         return stp.Plan(
             version=default_version,
             relations=[stp.PlanRel(root=stalg.RelRoot(input=rel, names=ns.names))],
-            **_merge_extensions(bound_left, bound_right, bound_expression),
+            **_merge_extensions(bound_left, bound_right, bound_expression, bound_post),
         )
 
     return resolve

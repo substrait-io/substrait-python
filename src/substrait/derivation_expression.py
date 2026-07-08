@@ -1,3 +1,4 @@
+import operator
 from typing import Optional
 
 from antlr4 import CommonTokenStream, InputStream
@@ -5,28 +6,49 @@ from substrait.type_pb2 import NamedStruct, Type
 from substrait_antlr.substrait_type.SubstraitTypeLexer import SubstraitTypeLexer
 from substrait_antlr.substrait_type.SubstraitTypeParser import SubstraitTypeParser
 
+# Binary operators keyed by the token text the grammar attaches to `op`.
+# (Integer division: type parameters like precision/scale are integers.)
+_BINARY_OPS = {
+    "*": operator.mul,
+    "/": operator.floordiv,
+    "+": operator.add,
+    "-": operator.sub,
+    "<": operator.lt,
+    ">": operator.gt,
+    "<=": operator.le,
+    ">=": operator.ge,
+    "=": operator.eq,
+    "!=": operator.ne,
+}
+
+# The 0.95 grammar split the single BinaryExpr rule into these per-operator rules.
+_BINARY_CONTEXTS = (
+    SubstraitTypeParser.MulDivContext,
+    SubstraitTypeParser.AddSubContext,
+    SubstraitTypeParser.ComparisonContext,
+    SubstraitTypeParser.EqualityContext,
+)
+
 
 def _evaluate(x, values: dict):
-    if isinstance(x, SubstraitTypeParser.BinaryExprContext):
+    if isinstance(x, _BINARY_CONTEXTS):
         left = _evaluate(x.left, values)
         right = _evaluate(x.right, values)
-
-        if x.op.text == "+":
-            return left + right
-        elif x.op.text == "-":
-            return left - right
-        elif x.op.text == "*":
-            return left * right
-        elif x.op.text == ">":
-            return left > right
-        elif x.op.text == ">=":
-            return left >= right
-        elif x.op.text == "<":
-            return left < right
-        elif x.op.text == "<=":
-            return left <= right
-        else:
-            raise Exception(f"Unknown binary op {x.op.text}")
+        return _BINARY_OPS[x.op.text](left, right)
+    elif isinstance(x, SubstraitTypeParser.AndContext):
+        return _evaluate(x.left, values) and _evaluate(x.right, values)
+    elif isinstance(x, SubstraitTypeParser.OrContext):
+        return _evaluate(x.left, values) or _evaluate(x.right, values)
+    elif isinstance(x, SubstraitTypeParser.NotExprContext):
+        return not _evaluate(x.expr(), values)
+    elif isinstance(
+        x, (SubstraitTypeParser.IfExprContext, SubstraitTypeParser.TernaryContext)
+    ):
+        return (
+            _evaluate(x.thenExpr, values)
+            if _evaluate(x.ifExpr, values)
+            else _evaluate(x.elseExpr, values)
+        )
     elif isinstance(x, SubstraitTypeParser.LiteralNumberContext):
         return int(x.Number().symbol.text)
     elif isinstance(x, SubstraitTypeParser.ParameterNameContext):
@@ -205,12 +227,6 @@ def _evaluate(x, values: dict):
             )
     elif isinstance(x, SubstraitTypeParser.NumericExpressionContext):
         return _evaluate(x.expr(), values)
-    elif isinstance(x, SubstraitTypeParser.TernaryContext):
-        ifExpr = _evaluate(x.ifExpr, values)
-        thenExpr = _evaluate(x.thenExpr, values)
-        elseExpr = _evaluate(x.elseExpr, values)
-
-        return thenExpr if ifExpr else elseExpr
     elif isinstance(x, SubstraitTypeParser.MultilineDefinitionContext):
         lines = zip(x.Identifier(), x.expr())
 

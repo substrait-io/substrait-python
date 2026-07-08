@@ -25,6 +25,7 @@ from decimal import Decimal as _Decimal
 from typing import Any, Union
 
 import substrait.algebra_pb2 as stalg
+import substrait.extended_expression_pb2 as stee
 import substrait.type_pb2 as stp
 
 from substrait.builders import type as _t
@@ -62,6 +63,7 @@ FUNCTIONS_ARITHMETIC = "extension:io.substrait:functions_arithmetic"
 FUNCTIONS_BOOLEAN = "extension:io.substrait:functions_boolean"
 FUNCTIONS_STRING = "extension:io.substrait:functions_string"
 FUNCTIONS_AGGREGATE_GENERIC = "extension:io.substrait:functions_aggregate_generic"
+FUNCTIONS_LIST = "extension:io.substrait:functions_list"
 
 
 def _decimal_type(value: _Decimal) -> stp.Type:
@@ -483,6 +485,82 @@ class Expr:
             )
 
         return self._append_segment(make)
+
+    # -- higher-order list functions --------------------------------------
+    def _higher_order(self, function: str, callback) -> "Expr":
+        """Apply a list higher-order function whose lambda ``callback`` receives
+        an :class:`Expr` bound to the current list element."""
+        list_unbound = self._unbound
+
+        def resolve(base_schema, registry):
+            bound_list = list_unbound(base_schema, registry)
+            element_type = (
+                infer_extended_expression_schema(bound_list).types[0].list.type
+            )
+            param_struct = stp.Type.Struct(
+                types=[element_type], nullability=stp.Type.NULLABILITY_REQUIRED
+            )
+            param_ns = stp.NamedStruct(names=["element"], struct=param_struct)
+            param_ref = stalg.Expression(
+                selection=stalg.Expression.FieldReference(
+                    lambda_parameter_reference=(
+                        stalg.Expression.FieldReference.LambdaParameterReference(
+                            steps_out=0
+                        )
+                    ),
+                    direct_reference=stalg.Expression.ReferenceSegment(
+                        struct_field=stalg.Expression.ReferenceSegment.StructField(
+                            field=0
+                        )
+                    ),
+                )
+            )
+            element = Expr(
+                lambda _bs, _r: stee.ExtendedExpression(
+                    referred_expr=[
+                        stee.ExpressionReference(
+                            expression=param_ref, output_names=["element"]
+                        )
+                    ],
+                    base_schema=param_ns,
+                )
+            )
+            body = Expr._coerce(callback(element))._unbound(param_ns, registry)
+            lambda_expr = stalg.Expression(
+                **{
+                    "lambda": stalg.Expression.Lambda(
+                        parameters=param_struct,
+                        body=body.referred_expr[0].expression,
+                    )
+                }
+            )
+            lambda_ee = stee.ExtendedExpression(
+                referred_expr=[
+                    stee.ExpressionReference(
+                        expression=lambda_expr, output_names=["lambda"]
+                    )
+                ],
+                base_schema=base_schema,
+                extension_urns=body.extension_urns,
+                extensions=body.extensions,
+            )
+            return scalar_function(
+                FUNCTIONS_LIST, function, expressions=[bound_list, lambda_ee]
+            )(base_schema, registry)
+
+        return Expr(resolve)
+
+    def list_transform(self, fn) -> "Expr":
+        """Map a function over each element of this list column (``transform``).
+
+        ``fn`` receives an ``Expr`` for the current element, e.g.
+        ``col("xs").list_transform(lambda x: x + 1)``.
+        """
+        return self._higher_order("transform", fn)
+
+    def list_filter(self, fn) -> "Expr":
+        """Keep list elements for which ``fn(element)`` is true (``filter``)."""
+        return self._higher_order("filter", fn)
 
     def switch(self, cases: dict, default: Any) -> "Expr":
         """Value-match CASE against literal keys::

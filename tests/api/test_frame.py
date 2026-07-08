@@ -970,6 +970,45 @@ def test_hint_annotates_common_and_is_advisory():
     assert list(plan.relations[-1].root.names) == ["id"]
 
 
+# -- Lambda / higher-order list functions ---------------------------------
+
+
+def _list_df():
+    return sub.read_named_table("t", {"arr": sub.list_(sub.i64.non_null)})
+
+
+@pytest.mark.parametrize(
+    "make",
+    [
+        lambda: sub.col("arr").list_transform(lambda x: x + 1),
+        lambda: sub.col("arr").list_filter(lambda x: x > 0),
+    ],
+)
+def test_higher_order_builds_lambda_arg(make):
+    proj = _list_df().select(make()).to_plan().relations[-1].root.input.project
+    fn = proj.expressions[0].scalar_function
+    assert fn.output_type.WhichOneof("kind") == "list"  # both return a list
+    lambda_arg = fn.arguments[1].value
+    assert lambda_arg.WhichOneof("rex_type") == "lambda"
+    # the lambda body references the element via a lambda-parameter reference
+    body = getattr(lambda_arg, "lambda").body
+    element = body.scalar_function.arguments[0].value
+    assert element.selection.HasField("lambda_parameter_reference")
+
+
+def test_list_transform_schema_inference():
+    from substrait.type_inference import infer_plan_schema
+
+    plan = (
+        _list_df()
+        .select(sub.col("arr").list_transform(lambda x: x + 1).alias("inc"))
+        .to_plan()
+    )
+    t = infer_plan_schema(plan).struct.types[0]
+    assert t.WhichOneof("kind") == "list"
+    assert t.list.type.WhichOneof("kind") == "i64"
+
+
 def test_default_registry_is_reused():
     assert sub.default_registry() is sub.default_registry()
 

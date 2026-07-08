@@ -551,6 +551,112 @@ def test_subquery_requires_dataframe():
         sub.scalar_subquery(sub.col("x"))
 
 
+# -- Phase 7: write op, DDL, update ---------------------------------------
+
+
+def test_write_insert_matches_builder():
+    fluent = people_df().write_named_table("t", op="insert", mode="append").to_plan()
+    raw = b_write(
+        "t",
+        b_read("people", people_ns()),
+        create_mode=stalg.WriteRel.CREATE_MODE_APPEND_IF_EXISTS,
+        op=stalg.WriteRel.WRITE_OP_INSERT,
+    )(registry)
+    assert fluent.SerializeToString() == raw.SerializeToString()
+
+
+def test_write_unknown_op_raises():
+    with pytest.raises(ValueError, match="unknown write op"):
+        people_df().write_named_table("t", op="banana")
+
+
+def test_create_table_ddl():
+    ddl = (
+        sub.create_table(["db", "t"], {"id": sub.i64, "v": sub.string}, replace=True)
+        .to_plan()
+        .relations[-1]
+        .root.input.ddl
+    )
+    assert ddl.object == stalg.DdlRel.DDL_OBJECT_TABLE
+    assert ddl.op == stalg.DdlRel.DDL_OP_CREATE_OR_REPLACE
+    assert list(ddl.named_object.names) == ["db", "t"]
+    assert list(ddl.table_schema.names) == ["id", "v"]
+
+
+def test_create_view_infers_schema_and_embeds_query():
+    query = people_df().select("id")
+    ddl = sub.create_view("v", query).to_plan().relations[-1].root.input.ddl
+    assert ddl.object == stalg.DdlRel.DDL_OBJECT_VIEW
+    assert ddl.HasField("view_definition")
+    assert ddl.view_definition == query.to_plan().relations[-1].root.input
+    assert list(ddl.table_schema.names) == ["id"]
+
+
+@pytest.mark.parametrize(
+    "make, op, obj",
+    [
+        (
+            lambda: sub.drop_table("t"),
+            stalg.DdlRel.DDL_OP_DROP,
+            stalg.DdlRel.DDL_OBJECT_TABLE,
+        ),
+        (
+            lambda: sub.drop_table("t", if_exists=True),
+            stalg.DdlRel.DDL_OP_DROP_IF_EXIST,
+            stalg.DdlRel.DDL_OBJECT_TABLE,
+        ),
+        (
+            lambda: sub.drop_view("v"),
+            stalg.DdlRel.DDL_OP_DROP,
+            stalg.DdlRel.DDL_OBJECT_VIEW,
+        ),
+    ],
+)
+def test_drop_ddl(make, op, obj):
+    ddl = make().to_plan().relations[-1].root.input.ddl
+    assert ddl.op == op
+    assert ddl.object == obj
+
+
+def test_update_table():
+    up = (
+        sub.update_table(
+            "accounts",
+            {"id": sub.i64, "balance": sub.fp64},
+            {"balance": sub.col("balance") + 100.0},
+            where=sub.col("id") == 1,
+        )
+        .to_plan()
+        .relations[-1]
+        .root.input.update
+    )
+    assert list(up.named_table.names) == ["accounts"]
+    assert len(up.transformations) == 1
+    assert up.transformations[0].column_target == 1  # "balance"
+    assert up.HasField("condition")
+
+
+def test_update_table_by_index_no_condition():
+    up = (
+        sub.update_table("t", {"a": sub.i64, "b": sub.i64}, {0: sub.lit(5)})
+        .to_plan()
+        .relations[-1]
+        .root.input.update
+    )
+    assert up.transformations[0].column_target == 0
+    assert not up.HasField("condition")
+
+
+def test_update_merges_transformation_extensions():
+    plan = sub.update_table(
+        "accounts",
+        {"id": sub.i64, "balance": sub.fp64},
+        {"balance": sub.col("balance") + 100.0},
+    ).to_plan()
+    urns = {u.urn for u in plan.extension_urns}
+    assert "extension:io.substrait:functions_arithmetic" in urns
+
+
 def test_default_registry_is_reused():
     assert sub.default_registry() is sub.default_registry()
 

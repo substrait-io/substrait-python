@@ -66,6 +66,14 @@ _CREATE_MODES = {
     "ignore": stalg.WriteRel.CREATE_MODE_IGNORE_IF_EXISTS,
 }
 
+# Write operations for the write sink.
+_WRITE_OPS = {
+    "ctas": stalg.WriteRel.WRITE_OP_CTAS,
+    "insert": stalg.WriteRel.WRITE_OP_INSERT,
+    "delete": stalg.WriteRel.WRITE_OP_DELETE,
+    "update": stalg.WriteRel.WRITE_OP_UPDATE,
+}
+
 # Sort direction keyed by (descending, nulls_last).
 _SORT_DIRECTIONS = {
     (False, False): stalg.SortField.SORT_DIRECTION_ASC_NULLS_FIRST,
@@ -406,13 +414,14 @@ class DataFrame:
         return GroupBy(self, tuple(group_by), None).agg(*measures)
 
     def write_named_table(
-        self, name: Union[str, Iterable[str]], *, mode: str = "error"
+        self, name: Union[str, Iterable[str]], *, mode: str = "error", op: str = "ctas"
     ) -> "DataFrame":
-        """Write these rows to a named table (a ``WriteRel`` sink, CTAS).
+        """Write these rows to a named table (a ``WriteRel`` sink).
 
-        ``mode`` selects the behavior when the table already exists: ``error``
-        (default), ``append``, ``replace`` or ``ignore``. The result is a
-        terminal DataFrame; call ``to_plan()`` to materialize.
+        ``op`` is the write operation: ``ctas`` (create-table-as-select,
+        default) or ``insert``. ``mode`` selects the behavior when the table
+        already exists: ``error`` (default), ``append``, ``replace`` or
+        ``ignore``. The result is a terminal DataFrame; call ``to_plan()``.
         """
         try:
             create_mode = _CREATE_MODES[mode]
@@ -420,8 +429,16 @@ class DataFrame:
             raise ValueError(
                 f"unknown write mode {mode!r}; expected one of {sorted(_CREATE_MODES)}"
             ) from None
+        try:
+            write_op = _WRITE_OPS[op]
+        except KeyError:
+            raise ValueError(
+                f"unknown write op {op!r}; expected one of {sorted(_WRITE_OPS)}"
+            ) from None
         return self._next(
-            _plan.write_named_table(name, self._plan, create_mode=create_mode)
+            _plan.write_named_table(
+                name, self._plan, create_mode=create_mode, op=write_op
+            )
         )
 
     def to_plan(self):
@@ -567,3 +584,84 @@ def read_extension_table(
 ) -> DataFrame:
     """Start a DataFrame from a custom source; ``detail`` is a ``google.protobuf.Any``."""
     return DataFrame(_plan.extension_table(_to_named_struct(schema), detail), registry)
+
+
+def create_table(
+    name: Union[str, Iterable[str]],
+    schema: Any,
+    *,
+    replace: bool = False,
+    registry: Optional[ExtensionRegistry] = None,
+) -> DataFrame:
+    """A ``CREATE TABLE`` DDL statement (``CREATE OR REPLACE`` when ``replace``)."""
+    op = (
+        stalg.DdlRel.DDL_OP_CREATE_OR_REPLACE if replace else stalg.DdlRel.DDL_OP_CREATE
+    )
+    return DataFrame(
+        _plan.ddl(
+            name,
+            stalg.DdlRel.DDL_OBJECT_TABLE,
+            op,
+            table_schema=_to_named_struct(schema),
+        ),
+        registry,
+    )
+
+
+def create_view(
+    name: Union[str, Iterable[str]],
+    query: DataFrame,
+    *,
+    replace: bool = False,
+    registry: Optional[ExtensionRegistry] = None,
+) -> DataFrame:
+    """A ``CREATE VIEW`` DDL statement backed by ``query`` (a DataFrame)."""
+    op = (
+        stalg.DdlRel.DDL_OP_CREATE_OR_REPLACE if replace else stalg.DdlRel.DDL_OP_CREATE
+    )
+    return DataFrame(
+        _plan.ddl(name, stalg.DdlRel.DDL_OBJECT_VIEW, op, view_definition=query._plan),
+        registry or query._registry,
+    )
+
+
+def drop_table(
+    name: Union[str, Iterable[str]],
+    *,
+    if_exists: bool = False,
+    registry: Optional[ExtensionRegistry] = None,
+) -> DataFrame:
+    """A ``DROP TABLE`` DDL statement (``DROP TABLE IF EXISTS`` when ``if_exists``)."""
+    op = stalg.DdlRel.DDL_OP_DROP_IF_EXIST if if_exists else stalg.DdlRel.DDL_OP_DROP
+    return DataFrame(_plan.ddl(name, stalg.DdlRel.DDL_OBJECT_TABLE, op), registry)
+
+
+def drop_view(
+    name: Union[str, Iterable[str]],
+    *,
+    if_exists: bool = False,
+    registry: Optional[ExtensionRegistry] = None,
+) -> DataFrame:
+    """A ``DROP VIEW`` DDL statement (``DROP VIEW IF EXISTS`` when ``if_exists``)."""
+    op = stalg.DdlRel.DDL_OP_DROP_IF_EXIST if if_exists else stalg.DdlRel.DDL_OP_DROP
+    return DataFrame(_plan.ddl(name, stalg.DdlRel.DDL_OBJECT_VIEW, op), registry)
+
+
+def update_table(
+    name: Union[str, Iterable[str]],
+    schema: Any,
+    assignments: dict,
+    *,
+    where: Union[Expr, Any, None] = None,
+    registry: Optional[ExtensionRegistry] = None,
+) -> DataFrame:
+    """An ``UPDATE`` statement: ``assignments`` maps a column (name or index) to a
+    new-value expression, applied where ``where`` holds (all rows if omitted)."""
+    ns = _to_named_struct(schema)
+    names_list = list(ns.names)
+    transformations = []
+    for target, expr in assignments.items():
+        index = target if isinstance(target, int) else names_list.index(target)
+        transformations.append((index, _unbound(expr)))
+    condition = _unbound(where) if where is not None else None
+    return DataFrame(_plan.update(name, ns, transformations, condition), registry)

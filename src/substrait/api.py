@@ -74,7 +74,11 @@ from substrait.expr import (
 from substrait.extension_registry import ExtensionRegistry
 from substrait.frame import (
     DataFrame,
+    create_table,
+    create_view,
     default_registry,
+    drop_table,
+    drop_view,
     from_records,
     read_arrow,
     read_csv,
@@ -82,6 +86,7 @@ from substrait.frame import (
     read_named_table,
     read_orc,
     read_parquet,
+    update_table,
 )
 from substrait.functions import f, functions_for
 
@@ -94,6 +99,11 @@ __all__ = [
     "read_orc",
     "read_arrow",
     "read_extension_table",
+    "create_table",
+    "create_view",
+    "drop_table",
+    "drop_view",
+    "update_table",
     "DataFrame",
     "col",
     "lit",

@@ -657,6 +657,91 @@ def test_update_merges_transformation_extensions():
     assert "extension:io.substrait:functions_arithmetic" in urns
 
 
+# -- Phase (no-bump): window functions ------------------------------------
+
+
+def _win_df():
+    return sub.read_named_table(
+        "sales", {"region": sub.string, "day": sub.i64, "amount": sub.fp64}
+    )
+
+
+def _win_expr(expr):
+    return (
+        _win_df().select(expr).to_plan().relations[-1].root.input.project.expressions[0]
+    )
+
+
+def test_window_partition_and_order():
+    e = _win_expr(sub.f.row_number().over(partition_by="region", order_by="day"))
+    assert e.WhichOneof("rex_type") == "window_function"
+    assert len(e.window_function.partitions) == 1
+    assert len(e.window_function.sorts) == 1
+    assert (
+        e.window_function.sorts[0].direction
+        == stalg.SortField.SORT_DIRECTION_ASC_NULLS_LAST
+    )
+
+
+def test_window_multiple_partitions_and_desc_order():
+    e = _win_expr(
+        sub.f.rank().over(
+            partition_by=["region", "day"], order_by="amount", descending=True
+        )
+    )
+    assert len(e.window_function.partitions) == 2
+    assert (
+        e.window_function.sorts[0].direction
+        == stalg.SortField.SORT_DIRECTION_DESC_NULLS_LAST
+    )
+
+
+@pytest.mark.parametrize(
+    "frame_kwargs, bounds_type, lower, upper",
+    [
+        (
+            {"rows": (None, 0)},
+            stalg.Expression.WindowFunction.BOUNDS_TYPE_ROWS,
+            "unbounded",
+            "current_row",
+        ),
+        (
+            {"rows": (-1, 1)},
+            stalg.Expression.WindowFunction.BOUNDS_TYPE_ROWS,
+            "preceding",
+            "following",
+        ),
+        (
+            {"range": (None, None)},
+            stalg.Expression.WindowFunction.BOUNDS_TYPE_RANGE,
+            "unbounded",
+            "unbounded",
+        ),
+    ],
+)
+def test_window_frame(frame_kwargs, bounds_type, lower, upper):
+    w = _win_expr(sub.f.rank().over(order_by="day", **frame_kwargs)).window_function
+    assert w.bounds_type == bounds_type
+    assert w.lower_bound.WhichOneof("kind") == lower
+    assert w.upper_bound.WhichOneof("kind") == upper
+
+
+def test_window_frame_offsets():
+    w = _win_expr(sub.f.rank().over(order_by="day", rows=(-2, 3))).window_function
+    assert w.lower_bound.preceding.offset == 2
+    assert w.upper_bound.following.offset == 3
+
+
+def test_window_rows_and_range_conflict_raises():
+    with pytest.raises(ValueError, match="at most one"):
+        sub.f.rank().over(rows=(None, 0), range=(None, 0))
+
+
+def test_over_on_non_window_raises():
+    with pytest.raises(TypeError, match="window functions"):
+        _win_df().select(sub.col("region").over(partition_by="day")).to_plan()
+
+
 def test_default_registry_is_reused():
     assert sub.default_registry() is sub.default_registry()
 

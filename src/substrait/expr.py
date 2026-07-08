@@ -222,6 +222,32 @@ def _sort_direction(descending: bool, nulls_last: bool):
     )
 
 
+def _merge_extensions_into(target, source):
+    """Append any extension URNs/declarations from ``source`` not already present."""
+    for urn in source.extension_urns:
+        if urn not in target.extension_urns:
+            target.extension_urns.append(urn)
+    for decl in source.extensions:
+        if decl not in target.extensions:
+            target.extensions.append(decl)
+
+
+def _window_bound(value):
+    """Map an int/None frame endpoint to a WindowFunction.Bound.
+
+    ``None`` -> unbounded, ``0`` -> current row, negative -> N preceding,
+    positive -> N following.
+    """
+    Bound = stalg.Expression.WindowFunction.Bound
+    if value is None:
+        return Bound(unbounded=Bound.Unbounded())
+    if value == 0:
+        return Bound(current_row=Bound.CurrentRow())
+    if value < 0:
+        return Bound(preceding=Bound.Preceding(offset=-value))
+    return Bound(following=Bound.Following(offset=value))
+
+
 class Expr:
     """A composable, unbound Substrait expression."""
 
@@ -513,12 +539,70 @@ class Expr:
                     )
                 )
                 # Carry over any extensions a (function-valued) sort key introduced.
-                for urn in bound_key.extension_urns:
-                    if urn not in bound.extension_urns:
-                        bound.extension_urns.append(urn)
-                for decl in bound_key.extensions:
-                    if decl not in bound.extensions:
-                        bound.extensions.append(decl)
+                _merge_extensions_into(bound, bound_key)
+            return bound
+
+        return Expr(resolve)
+
+    def over(
+        self,
+        partition_by: Any = (),
+        order_by: Any = (),
+        *,
+        descending: bool = False,
+        nulls_last: bool = True,
+        rows: Union[tuple, None] = None,
+        range: Union[tuple, None] = None,
+    ) -> "Expr":
+        """Turn a window function into a windowed expression (SQL ``OVER (...)``).
+
+        ``partition_by`` / ``order_by`` are a column name/expression or a list of
+        them; ``descending``/``nulls_last`` apply to the ordering. A frame may be
+        given as ``rows=(start, end)`` or ``range=(start, end)`` where each
+        endpoint is an int offset (negative = preceding, ``0`` = current row,
+        positive = following) or ``None`` = unbounded.
+        """
+        if rows is not None and range is not None:
+            raise ValueError("specify at most one of rows= or range=")
+        partitions = (
+            [partition_by]
+            if isinstance(partition_by, (str, Expr))
+            else list(partition_by)
+        )
+        order_keys = [order_by] if isinstance(order_by, (str, Expr)) else list(order_by)
+        direction = _sort_direction(descending, nulls_last)
+        inner = self._unbound
+
+        def resolve(base_schema, registry):
+            bound = inner(base_schema, registry)
+            expr = bound.referred_expr[0].expression
+            if expr.WhichOneof("rex_type") != "window_function":
+                raise TypeError("over() applies only to window functions")
+            wf = expr.window_function
+            for p in partitions:
+                key = p.unbound if isinstance(p, Expr) else column(p)
+                bound_p = resolve_expression(key, base_schema, registry)
+                wf.partitions.append(bound_p.referred_expr[0].expression)
+                _merge_extensions_into(bound, bound_p)
+            for k in order_keys:
+                key = k.unbound if isinstance(k, Expr) else column(k)
+                bound_k = resolve_expression(key, base_schema, registry)
+                wf.sorts.append(
+                    stalg.SortField(
+                        expr=bound_k.referred_expr[0].expression, direction=direction
+                    )
+                )
+                _merge_extensions_into(bound, bound_k)
+            frame = rows if rows is not None else range
+            if frame is not None:
+                wf.bounds_type = (
+                    stalg.Expression.WindowFunction.BOUNDS_TYPE_ROWS
+                    if rows is not None
+                    else stalg.Expression.WindowFunction.BOUNDS_TYPE_RANGE
+                )
+                lower, upper = frame
+                wf.lower_bound.CopyFrom(_window_bound(lower))
+                wf.upper_bound.CopyFrom(_window_bound(upper))
             return bound
 
         return Expr(resolve)

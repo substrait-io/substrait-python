@@ -840,3 +840,57 @@ def consistent_partition_window(
         )
 
     return resolve
+
+
+def expand(
+    plan: PlanOrUnbound,
+    fields: Iterable[tuple],
+    names: Iterable[str],
+) -> UnboundPlan:
+    """Build an ExpandRel (duplicate rows per the expand fields; UNPIVOT).
+
+    Each field is a ``(kind, payload)`` tuple: ``("switching", [exprs])`` for a
+    field that takes a different value in each duplicate, or ``("consistent",
+    expr)`` for one repeated across duplicates. ``names`` are the output column
+    names -- one per field plus a trailing name for the i32 duplicate index.
+    """
+
+    def resolve(registry: ExtensionRegistry) -> stp.Plan:
+        bound_input = plan if isinstance(plan, stp.Plan) else plan(registry)
+        ns = infer_plan_schema(bound_input)
+
+        expand_fields = []
+        merge_sources = [bound_input]
+        for kind, payload in fields:
+            if kind == "switching":
+                bounds = [resolve_expression(e, ns, registry) for e in payload]
+                merge_sources.extend(bounds)
+                expand_fields.append(
+                    stalg.ExpandRel.ExpandField(
+                        switching_field=stalg.ExpandRel.SwitchingField(
+                            duplicates=[b.referred_expr[0].expression for b in bounds]
+                        )
+                    )
+                )
+            else:  # "consistent"
+                bound = resolve_expression(payload, ns, registry)
+                merge_sources.append(bound)
+                expand_fields.append(
+                    stalg.ExpandRel.ExpandField(
+                        consistent_field=bound.referred_expr[0].expression
+                    )
+                )
+
+        rel = stalg.Rel(
+            expand=stalg.ExpandRel(
+                input=bound_input.relations[-1].root.input,
+                fields=expand_fields,
+            )
+        )
+        return stp.Plan(
+            version=default_version,
+            relations=[stp.PlanRel(root=stalg.RelRoot(input=rel, names=list(names)))],
+            **_merge_extensions(*merge_sources),
+        )
+
+    return resolve

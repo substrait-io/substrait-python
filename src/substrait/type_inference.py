@@ -356,6 +356,29 @@ def infer_rel_schema(rel: stalg.Rel) -> stt.Type.Struct:
             nullability=parent_schema.nullability,
         )
         (common, struct) = (rel.window.common, raw_schema)
+    elif rel_type == "expand":
+        parent_schema = infer_rel_schema(rel.expand.input)
+        field_types = []
+        for field in rel.expand.fields:
+            if field.HasField("consistent_field"):
+                field_types.append(
+                    infer_expression_type(field.consistent_field, parent_schema)
+                )
+            else:
+                field_types.append(
+                    infer_expression_type(
+                        field.switching_field.duplicates[0], parent_schema
+                    )
+                )
+        # Expand appends an i32 column with the index of the duplicate the row
+        # is derived from.
+        field_types.append(
+            stt.Type(i32=stt.Type.I32(nullability=stt.Type.NULLABILITY_REQUIRED))
+        )
+        raw_schema = stt.Type.Struct(
+            types=field_types, nullability=parent_schema.nullability
+        )
+        (common, struct) = (rel.expand.common, raw_schema)
     else:
         raise Exception(f"Unhandled rel_type {rel_type}")
 

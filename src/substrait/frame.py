@@ -436,6 +436,39 @@ class DataFrame:
         """Broadcast every row to all partitions (an ExchangeRel)."""
         return self._next(_plan.exchange(self._plan, broadcast=True))
 
+    def hint(
+        self,
+        *,
+        row_count: Optional[float] = None,
+        record_size: Optional[float] = None,
+        alias: Optional[str] = None,
+        output_names: Optional[Iterable[str]] = None,
+    ) -> "DataFrame":
+        """Attach non-semantic hints to the current relation (``RelCommon.Hint``).
+
+        ``row_count`` / ``record_size`` are optimizer statistics; ``alias`` names
+        the relation; ``output_names`` annotates its output column names. All are
+        optional and purely advisory (they don't change results).
+        """
+        inner = self._plan
+
+        def resolve(registry: ExtensionRegistry):
+            bound = inner(registry)
+            rel = bound.relations[-1].root.input
+            common = getattr(rel, rel.WhichOneof("rel_type")).common
+            if row_count is not None:
+                common.hint.stats.row_count = row_count
+            if record_size is not None:
+                common.hint.stats.record_size = record_size
+            if alias is not None:
+                common.hint.alias = alias
+            if output_names is not None:
+                del common.hint.output_names[:]
+                common.hint.output_names.extend(output_names)
+            return bound
+
+        return self._next(resolve)
+
     def union(self, *others: "DataFrame", distinct: bool = False) -> "DataFrame":
         """Concatenate rows of this DataFrame with ``others``.
 

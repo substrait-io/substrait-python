@@ -949,6 +949,27 @@ def test_execution_context_variable(make, variable, kind):
     assert infer_plan_schema(plan).struct.types[-1].WhichOneof("kind") == kind
 
 
+# -- Phase 9: hints -------------------------------------------------------
+
+
+def test_hint_annotates_common_and_is_advisory():
+    df = sub.read_named_table("t", {"id": sub.i64, "v": sub.i64})
+    plan = (
+        df.filter(sub.col("v") > 0)
+        .hint(row_count=1000, alias="big", output_names=["a", "b"])
+        .select("id")
+        .to_plan()
+    )
+    filt = plan.relations[-1].root.input.project.input.filter
+    hint = filt.common.hint
+    assert hint.stats.row_count == 1000
+    assert hint.alias == "big"
+    assert list(hint.output_names) == ["a", "b"]
+    # advisory only: the filter condition and the plan's output are unchanged
+    assert filt.HasField("condition")
+    assert list(plan.relations[-1].root.names) == ["id"]
+
+
 def test_default_registry_is_reused():
     assert sub.default_registry() is sub.default_registry()
 

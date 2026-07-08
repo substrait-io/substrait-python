@@ -424,13 +424,23 @@ def cross(
     return resolve
 
 
-# TODO grouping sets
 def aggregate(
     input: PlanOrUnbound,
     grouping_expressions: Iterable[ExtendedExpressionOrUnbound],
     measures: Iterable[ExtendedExpressionOrUnbound],
+    grouping_sets: Optional[Iterable[Iterable[int]]] = None,
+    filters: Optional[Iterable[Optional[ExtendedExpressionOrUnbound]]] = None,
     extension: Optional[AdvancedExtension] = None,
 ) -> UnboundPlan:
+    """Build an AggregateRel.
+
+    ``grouping_sets`` is an optional list of index lists into
+    ``grouping_expressions``; each becomes one ``Grouping`` (GROUPING SETS /
+    ROLLUP / CUBE). When omitted, a single grouping over every expression is
+    emitted. ``filters`` is an optional list, parallel to ``measures``, of
+    per-measure ``FILTER (WHERE ...)`` predicates (or ``None``).
+    """
+
     def resolve(registry: ExtensionRegistry) -> stp.Plan:
         bound_input = input if isinstance(input, stp.Plan) else input(registry)
         ns = infer_plan_schema(bound_input)
@@ -440,6 +450,21 @@ def aggregate(
         ]
         bound_measures = [resolve_expression(e, ns, registry) for e in measures]
 
+        _filters = (
+            list(filters) if filters is not None else [None] * len(bound_measures)
+        )
+        bound_filters = [
+            resolve_expression(f, ns, registry) if f is not None else None
+            for f in _filters
+        ]
+
+        # One Grouping per grouping set; default is a single set over all keys.
+        sets = (
+            [list(s) for s in grouping_sets]
+            if grouping_sets is not None
+            else [list(range(len(bound_grouping_expressions)))]
+        )
+
         rel = stalg.Rel(
             aggregate=stalg.AggregateRel(
                 input=bound_input.relations[-1].root.input,
@@ -448,16 +473,20 @@ def aggregate(
                 ],
                 groupings=[
                     stalg.AggregateRel.Grouping(
-                        expression_references=range(len(bound_grouping_expressions)),
+                        expression_references=refs,
                         grouping_expressions=[
-                            e.referred_expr[0].expression
-                            for e in bound_grouping_expressions
+                            bound_grouping_expressions[i].referred_expr[0].expression
+                            for i in refs
                         ],
                     )
+                    for refs in sets
                 ],
                 measures=[
-                    stalg.AggregateRel.Measure(measure=m.referred_expr[0].measure)
-                    for m in bound_measures
+                    stalg.AggregateRel.Measure(
+                        measure=m.referred_expr[0].measure,
+                        filter=bf.referred_expr[0].expression if bf else None,
+                    )
+                    for m, bf in zip(bound_measures, bound_filters)
                 ],
                 advanced_extension=extension,
             )
@@ -471,7 +500,10 @@ def aggregate(
             version=default_version,
             relations=[stp.PlanRel(root=stalg.RelRoot(input=rel, names=names))],
             **_merge_extensions(
-                bound_input, *bound_grouping_expressions, *bound_measures
+                bound_input,
+                *bound_grouping_expressions,
+                *bound_measures,
+                *[bf for bf in bound_filters if bf],
             ),
         )
 

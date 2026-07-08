@@ -428,14 +428,28 @@ def aggregate_function(
     function: str,
     expressions: Iterable[ExtendedExpressionOrUnbound],
     alias: Union[Iterable[str], str, None] = None,
+    invocation: Union[
+        "stalg.AggregateFunction.AggregationInvocation.ValueType", None
+    ] = None,
+    sorts: Iterable[
+        tuple[ExtendedExpressionOrUnbound, "stalg.SortField.SortDirection.ValueType"]
+    ] = (),
 ):
-    """Builds a resolver for ExtendedExpression containing a AggregateFunction measure"""
+    """Builds a resolver for ExtendedExpression containing a AggregateFunction measure.
+
+    ``invocation`` selects ALL vs DISTINCT (``COUNT(DISTINCT ...)``); ``sorts`` is
+    a list of ``(expression, SortDirection)`` pairs for order-sensitive aggregates.
+    """
 
     def resolve(
         base_schema: stp.NamedStruct, registry: ExtensionRegistry
     ) -> stee.ExtendedExpression:
         bound_expressions: Iterable[stee.ExtendedExpression] = [
             resolve_expression(e, base_schema, registry) for e in expressions
+        ]
+        bound_sorts = [
+            (resolve_expression(e, base_schema, registry), direction)
+            for e, direction in sorts
         ]
 
         expression_schemas = [
@@ -466,11 +480,15 @@ def aggregate_function(
         ]
 
         extension_urns = merge_extension_urns(
-            func_extension_urns, *[b.extension_urns for b in bound_expressions]
+            func_extension_urns,
+            *[b.extension_urns for b in bound_expressions],
+            *[s.extension_urns for s, _ in bound_sorts],
         )
 
         extensions = merge_extension_declarations(
-            func_extensions, *[b.extensions for b in bound_expressions]
+            func_extensions,
+            *[b.extensions for b in bound_expressions],
+            *[s.extensions for s, _ in bound_sorts],
         )
 
         return stee.ExtendedExpression(
@@ -483,6 +501,15 @@ def aggregate_function(
                             for e in bound_expressions
                         ],
                         output_type=func[1],
+                        invocation=invocation
+                        if invocation is not None
+                        else stalg.AggregateFunction.AGGREGATION_INVOCATION_UNSPECIFIED,
+                        sorts=[
+                            stalg.SortField(
+                                expr=s.referred_expr[0].expression, direction=direction
+                            )
+                            for s, direction in bound_sorts
+                        ],
                     ),
                     output_names=_alias_or_inferred(
                         alias,

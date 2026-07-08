@@ -569,13 +569,7 @@ def aggregate(
                     e.referred_expr[0].expression for e in bound_grouping_expressions
                 ],
                 groupings=[
-                    stalg.AggregateRel.Grouping(
-                        expression_references=refs,
-                        grouping_expressions=[
-                            bound_grouping_expressions[i].referred_expr[0].expression
-                            for i in refs
-                        ],
-                    )
+                    stalg.AggregateRel.Grouping(expression_references=refs)
                     for refs in sets
                 ],
                 measures=[

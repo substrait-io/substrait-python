@@ -39,12 +39,8 @@ def infer_literal_type(literal: stalg.Expression.Literal) -> stt.Type:
         return stt.Type(string=stt.Type.String(nullability=nullability))
     elif literal_type == "binary":
         return stt.Type(binary=stt.Type.Binary(nullability=nullability))
-    elif literal_type == "timestamp":
-        return stt.Type(timestamp=stt.Type.Timestamp(nullability=nullability))
     elif literal_type == "date":
         return stt.Type(date=stt.Type.Date(nullability=nullability))
-    elif literal_type == "time":
-        return stt.Type(time=stt.Type.Time(nullability=nullability))
     elif literal_type == "interval_year_to_month":
         return stt.Type(interval_year=stt.Type.IntervalYear(nullability=nullability))
     elif literal_type == "interval_day_to_second":
@@ -121,8 +117,6 @@ def infer_literal_type(literal: stalg.Expression.Literal) -> stt.Type:
                 nullability=nullability,
             )
         )
-    elif literal_type == "timestamp_tz":
-        return stt.Type(timestamp_tz=stt.Type.TimestampTZ(nullability=nullability))
     elif literal_type == "uuid":
         return stt.Type(uuid=stt.Type.UUID(nullability=nullability))
     elif literal_type == "null":

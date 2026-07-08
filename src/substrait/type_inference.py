@@ -233,6 +233,18 @@ def infer_expression_type(
             )  # can this be a null?
         else:
             raise Exception(f"Unknown subquery_type {subquery_type}")
+    elif rex_type == "execution_context_variable":
+        ecv = expression.execution_context_variable
+        variable = ecv.WhichOneof("execution_context_variable_type")
+        # Each variant carries the variable's own type.
+        if variable == "current_timestamp":
+            return stt.Type(precision_timestamp_tz=ecv.current_timestamp)
+        elif variable == "current_date":
+            return stt.Type(date=ecv.current_date)
+        elif variable == "current_timezone":
+            return stt.Type(string=ecv.current_timezone)
+        else:
+            raise Exception(f"Unknown execution context variable {variable}")
     else:
         raise Exception(f"Unknown rex_type {rex_type}")
 
@@ -415,6 +427,9 @@ def infer_rel_schema(rel: stalg.Rel) -> stt.Type.Struct:
     elif rel_type == "exchange":
         # Exchange redistributes rows without changing the schema.
         (common, struct) = (rel.exchange.common, infer_rel_schema(rel.exchange.input))
+    elif rel_type == "top_n":
+        # TopN is a fused sort+fetch; the schema is unchanged from the input.
+        (common, struct) = (rel.top_n.common, infer_rel_schema(rel.top_n.input))
     elif rel_type == "reference":
         subtrees = reference_subtrees.get()
         if subtrees is None:

@@ -978,3 +978,28 @@ def set_comparison(left, query, reduction_op, comparison_op, alias=None):
         )
 
     return resolve
+
+
+def execution_context_variable(variable: str, type_value, alias=None):
+    """A leaf expression for a runtime context value.
+
+    ``variable`` is one of ``current_timestamp`` / ``current_timezone`` /
+    ``current_date``; ``type_value`` is the matching ``Type.*`` message the
+    oneof carries (it also declares the variable's type).
+    """
+
+    def resolve(
+        base_schema: stp.NamedStruct, registry: ExtensionRegistry
+    ) -> stee.ExtendedExpression:
+        ecv = stalg.Expression.ExecutionContextVariable(**{variable: type_value})
+        return stee.ExtendedExpression(
+            referred_expr=[
+                stee.ExpressionReference(
+                    expression=stalg.Expression(execution_context_variable=ecv),
+                    output_names=[alias or variable],
+                )
+            ],
+            base_schema=base_schema,
+        )
+
+    return resolve

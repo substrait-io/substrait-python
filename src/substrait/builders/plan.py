@@ -970,3 +970,69 @@ def exchange(
         )
 
     return resolve
+
+
+def top_n(
+    plan: PlanOrUnbound,
+    sorts: Iterable[
+        tuple[ExtendedExpressionOrUnbound, stalg.SortField.SortDirection.ValueType]
+    ],
+    count: ExtendedExpressionOrUnbound,
+    offset: Optional[ExtendedExpressionOrUnbound] = None,
+    with_ties: bool = False,
+    extension: Optional[AdvancedExtension] = None,
+) -> UnboundPlan:
+    """A TopNRel: a fused sort + fetch (ORDER BY ... LIMIT).
+
+    ``with_ties`` selects ``FETCH_MODE_WITH_TIES`` (keep rows tied with the last)
+    over the default ``FETCH_MODE_ROWS_ONLY``.
+    """
+
+    def resolve(registry: ExtensionRegistry) -> stp.Plan:
+        bound_plan = plan if isinstance(plan, stp.Plan) else plan(registry)
+        ns = infer_plan_schema(bound_plan)
+        bound_sorts = [
+            (resolve_expression(e, ns, registry), direction) for e, direction in sorts
+        ]
+        bound_count = resolve_expression(count, ns, registry)
+        bound_offset = (
+            resolve_expression(offset, ns, registry) if offset is not None else None
+        )
+
+        rel = stalg.Rel(
+            top_n=stalg.TopNRel(
+                input=bound_plan.relations[-1].root.input,
+                sorts=[
+                    stalg.SortField(
+                        expr=s.referred_expr[0].expression, direction=direction
+                    )
+                    for s, direction in bound_sorts
+                ],
+                count=bound_count.referred_expr[0].expression,
+                offset=bound_offset.referred_expr[0].expression
+                if bound_offset
+                else None,
+                mode=stalg.FetchMode.FETCH_MODE_WITH_TIES
+                if with_ties
+                else stalg.FetchMode.FETCH_MODE_ROWS_ONLY,
+                advanced_extension=extension,
+            )
+        )
+        return stp.Plan(
+            version=default_version,
+            relations=[
+                stp.PlanRel(
+                    root=stalg.RelRoot(
+                        input=rel, names=bound_plan.relations[-1].root.names
+                    )
+                )
+            ],
+            **_merge_extensions(
+                bound_plan,
+                *[s for s, _ in bound_sorts],
+                bound_count,
+                bound_offset,
+            ),
+        )
+
+    return resolve

@@ -332,3 +332,45 @@ def test_when_requires_then_before_next_when():
 def test_coalesce_requires_an_argument():
     with pytest.raises(ValueError, match="at least one"):
         coalesce()
+
+
+# -- Phase 6: nested field access -----------------------------------------
+
+
+def _direct_ref(expr):
+    plan = _plan_from(expr.unbound)
+    return (
+        plan.relations[-1].root.input.project.expressions[0].selection.direct_reference
+    )
+
+
+def test_struct_field_appends_child_segment():
+    ref = _direct_ref(col("a").struct_field(2))
+    assert ref.struct_field.field == 0  # column "a"
+    assert ref.struct_field.child.struct_field.field == 2
+
+
+def test_list_element_via_getitem():
+    ref = _direct_ref(col("a")[3])
+    assert ref.struct_field.child.list_element.offset == 3
+
+
+def test_map_key_access():
+    ref = _direct_ref(col("a").map_key("k"))
+    assert ref.struct_field.child.map_key.map_key.string == "k"
+
+
+def test_chained_nested_access():
+    ref = _direct_ref(col("a").struct_field(1)[2])
+    assert ref.struct_field.child.struct_field.field == 1
+    assert ref.struct_field.child.struct_field.child.list_element.offset == 2
+
+
+def test_getitem_rejects_non_int():
+    with pytest.raises(TypeError, match="list element"):
+        col("a")["x"]
+
+
+def test_nested_access_on_non_reference_raises():
+    with pytest.raises(TypeError, match="direct field reference"):
+        _plan_from((col("a") + col("b")).struct_field(0).unbound)

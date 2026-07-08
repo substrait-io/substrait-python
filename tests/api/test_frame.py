@@ -456,6 +456,101 @@ def test_read_extension_table_matches_builder():
     assert fluent.SerializeToString() == raw.SerializeToString()
 
 
+# -- Phase 6: subqueries --------------------------------------------------
+
+
+def _outer():
+    return sub.read_named_table("o", {"x": sub.i64, "y": sub.i64})
+
+
+def _inner():
+    return sub.read_named_table("i", {"v": sub.i64})
+
+
+def _rel(df):
+    return df.to_plan().relations[-1].root.input
+
+
+def _filter_condition(df):
+    return _rel(df).filter.condition
+
+
+def test_scalar_subquery_embeds_inner_rel():
+    inner = _inner()
+    cond = _filter_condition(_outer().filter(sub.col("x") > sub.scalar_subquery(inner)))
+    sq = cond.scalar_function.arguments[1].value.subquery
+    assert sq.WhichOneof("subquery_type") == "scalar"
+    assert sq.scalar.input == _rel(inner)
+
+
+@pytest.mark.parametrize(
+    "make, op",
+    [
+        (sub.exists, stalg.Expression.Subquery.SetPredicate.PREDICATE_OP_EXISTS),
+        (sub.unique, stalg.Expression.Subquery.SetPredicate.PREDICATE_OP_UNIQUE),
+    ],
+)
+def test_set_predicate_subquery(make, op):
+    inner = _inner()
+    cond = _filter_condition(_outer().filter(make(inner)))
+    assert cond.subquery.WhichOneof("subquery_type") == "set_predicate"
+    assert cond.subquery.set_predicate.predicate_op == op
+    assert cond.subquery.set_predicate.tuples == _rel(inner)
+
+
+def test_in_subquery():
+    inner = _inner()
+    cond = _filter_condition(_outer().filter(sub.col("x").in_subquery(inner)))
+    in_pred = cond.subquery.in_predicate
+    assert cond.subquery.WhichOneof("subquery_type") == "in_predicate"
+    assert len(in_pred.needles) == 1
+    assert in_pred.needles[0].selection.direct_reference.struct_field.field == 0
+    assert in_pred.haystack == _rel(inner)
+
+
+@pytest.mark.parametrize(
+    "make, reduction, comparison",
+    [
+        (
+            lambda c, q: c > sub.any_(q),
+            stalg.Expression.Subquery.SetComparison.REDUCTION_OP_ANY,
+            stalg.Expression.Subquery.SetComparison.COMPARISON_OP_GT,
+        ),
+        (
+            lambda c, q: c <= sub.all_(q),
+            stalg.Expression.Subquery.SetComparison.REDUCTION_OP_ALL,
+            stalg.Expression.Subquery.SetComparison.COMPARISON_OP_LE,
+        ),
+        (
+            lambda c, q: c == sub.any_(q),
+            stalg.Expression.Subquery.SetComparison.REDUCTION_OP_ANY,
+            stalg.Expression.Subquery.SetComparison.COMPARISON_OP_EQ,
+        ),
+    ],
+)
+def test_set_comparison_subquery(make, reduction, comparison):
+    inner = _inner()
+    cond = _filter_condition(_outer().filter(make(sub.col("x"), inner)))
+    sc = cond.subquery.set_comparison
+    assert cond.subquery.WhichOneof("subquery_type") == "set_comparison"
+    assert sc.reduction_op == reduction
+    assert sc.comparison_op == comparison
+    assert sc.right == _rel(inner)
+
+
+def test_subquery_merges_inner_extensions():
+    # A function used inside the subquery must be declared in the outer plan.
+    inner = _inner().filter(sub.col("v") > 5)
+    plan = _outer().filter(sub.exists(inner)).to_plan()
+    urns = {u.urn for u in plan.extension_urns}
+    assert "extension:io.substrait:functions_comparison" in urns
+
+
+def test_subquery_requires_dataframe():
+    with pytest.raises(TypeError, match="expects a DataFrame"):
+        sub.scalar_subquery(sub.col("x"))
+
+
 def test_default_registry_is_reused():
     assert sub.default_registry() is sub.default_registry()
 

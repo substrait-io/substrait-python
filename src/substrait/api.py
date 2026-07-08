@@ -58,7 +58,19 @@ from substrait.dtypes import (
     string,
     uuid,
 )
-from substrait.expr import Expr, coalesce, col, infer_literal_type, lit, when
+from substrait.expr import (
+    Expr,
+    all_,
+    any_,
+    coalesce,
+    col,
+    exists,
+    infer_literal_type,
+    lit,
+    scalar_subquery,
+    unique,
+    when,
+)
 from substrait.extension_registry import ExtensionRegistry
 from substrait.frame import (
     DataFrame,
@@ -87,6 +99,11 @@ __all__ = [
     "lit",
     "when",
     "coalesce",
+    "scalar_subquery",
+    "exists",
+    "unique",
+    "any_",
+    "all_",
     "f",
     "functions_for",
     "Expr",

@@ -39,6 +39,18 @@ from substrait.builders.extended_expression import (
     singular_or_list,
     switch,
 )
+from substrait.builders.extended_expression import (
+    in_predicate as _in_predicate,
+)
+from substrait.builders.extended_expression import (
+    scalar_subquery as _scalar_subquery,
+)
+from substrait.builders.extended_expression import (
+    set_comparison as _set_comparison,
+)
+from substrait.builders.extended_expression import (
+    set_predicate as _set_predicate,
+)
 from substrait.type_inference import infer_extended_expression_schema
 
 # Standard Substrait function-extension URNs used by the operators below.
@@ -167,6 +179,35 @@ def _numeric_binary(
     return Expr(resolve)
 
 
+_COMPARISON_OPS = {
+    "lt": stalg.Expression.Subquery.SetComparison.COMPARISON_OP_LT,
+    "lte": stalg.Expression.Subquery.SetComparison.COMPARISON_OP_LE,
+    "gt": stalg.Expression.Subquery.SetComparison.COMPARISON_OP_GT,
+    "gte": stalg.Expression.Subquery.SetComparison.COMPARISON_OP_GE,
+    "equal": stalg.Expression.Subquery.SetComparison.COMPARISON_OP_EQ,
+    "not_equal": stalg.Expression.Subquery.SetComparison.COMPARISON_OP_NE,
+}
+
+
+class _SubqueryReduction:
+    """A subquery wrapped by :func:`any_` / :func:`all_`, consumed by a
+    comparison operator to build a ``left <op> ANY/ALL (subquery)`` expression."""
+
+    __slots__ = ("reduction_op", "plan")
+
+    def __init__(self, reduction_op, plan):
+        self.reduction_op = reduction_op
+        self.plan = plan
+
+
+def _plan_of(query: Any):
+    """Extract the underlying (unbound) plan from a DataFrame-like subquery arg."""
+    plan = getattr(query, "_plan", None)
+    if plan is None:
+        raise TypeError("a subquery expects a DataFrame")
+    return plan
+
+
 def _sort_direction(descending: bool, nulls_last: bool):
     if descending:
         return (
@@ -205,23 +246,33 @@ class Expr:
         return Expr(scalar_function(urn, fn, expressions=args))
 
     # -- comparison -------------------------------------------------------
+    def _compare(self, other: Any, fn: str) -> "Expr":
+        # `col <op> any_(df)/all_(df)` builds a SetComparison subquery instead.
+        if isinstance(other, _SubqueryReduction):
+            return Expr(
+                _set_comparison(
+                    self._unbound, other.plan, other.reduction_op, _COMPARISON_OPS[fn]
+                )
+            )
+        return _numeric_binary(self, other, FUNCTIONS_COMPARISON, fn)
+
     def __lt__(self, other: Any) -> "Expr":
-        return _numeric_binary(self, other, FUNCTIONS_COMPARISON, "lt")
+        return self._compare(other, "lt")
 
     def __le__(self, other: Any) -> "Expr":
-        return _numeric_binary(self, other, FUNCTIONS_COMPARISON, "lte")
+        return self._compare(other, "lte")
 
     def __gt__(self, other: Any) -> "Expr":
-        return _numeric_binary(self, other, FUNCTIONS_COMPARISON, "gt")
+        return self._compare(other, "gt")
 
     def __ge__(self, other: Any) -> "Expr":
-        return _numeric_binary(self, other, FUNCTIONS_COMPARISON, "gte")
+        return self._compare(other, "gte")
 
     def __eq__(self, other: Any) -> "Expr":  # type: ignore[override]
-        return _numeric_binary(self, other, FUNCTIONS_COMPARISON, "equal")
+        return self._compare(other, "equal")
 
     def __ne__(self, other: Any) -> "Expr":  # type: ignore[override]
-        return _numeric_binary(self, other, FUNCTIONS_COMPARISON, "not_equal")
+        return self._compare(other, "not_equal")
 
     # Operator-overloaded ``__eq__`` means an Expr is not a normal value; like
     # pandas/Polars expressions it is intentionally not hashable.
@@ -330,6 +381,79 @@ class Expr:
             raise TypeError("is_in expects a collection of values, not a string")
         bound = [Expr._coerce(o)._unbound for o in options]
         return Expr(singular_or_list(self._unbound, bound))
+
+    def in_subquery(self, subquery: Any, alias: Union[str, None] = None) -> "Expr":
+        """True when this expression is among a subquery's rows (``x IN (SELECT ...)``).
+
+        ``subquery`` is a DataFrame producing a single output column.
+        """
+        return Expr(_in_predicate([self._unbound], _plan_of(subquery), alias=alias))
+
+    # -- nested access ----------------------------------------------------
+    def _append_segment(self, make_segment) -> "Expr":
+        """Append a nested ReferenceSegment child to the deepest segment."""
+        inner = self._unbound
+
+        def resolve(base_schema, registry):
+            bound = inner(base_schema, registry)
+            expr = bound.referred_expr[0].expression
+            if expr.WhichOneof(
+                "rex_type"
+            ) != "selection" or not expr.selection.HasField("direct_reference"):
+                raise TypeError("nested access requires a direct field reference")
+            segment = expr.selection.direct_reference
+            while True:
+                holder = getattr(segment, segment.WhichOneof("reference_type"))
+                if holder.HasField("child"):
+                    segment = holder.child
+                else:
+                    holder.child.CopyFrom(make_segment(base_schema, registry))
+                    break
+            return bound
+
+        return Expr(resolve)
+
+    def struct_field(self, index: int) -> "Expr":
+        """Access a nested struct field by position."""
+        return self._append_segment(
+            lambda _s, _r: stalg.Expression.ReferenceSegment(
+                struct_field=stalg.Expression.ReferenceSegment.StructField(field=index)
+            )
+        )
+
+    def list_element(self, offset: int) -> "Expr":
+        """Access a list element by offset (also ``expr[offset]``)."""
+        return self._append_segment(
+            lambda _s, _r: stalg.Expression.ReferenceSegment(
+                list_element=stalg.Expression.ReferenceSegment.ListElement(
+                    offset=offset
+                )
+            )
+        )
+
+    def __getitem__(self, offset: int) -> "Expr":
+        if not isinstance(offset, int) or isinstance(offset, bool):
+            raise TypeError(
+                "indexing selects a list element by integer offset; "
+                "use struct_field(i) or map_key(k) for structs/maps"
+            )
+        return self.list_element(offset)
+
+    def map_key(self, key: Any) -> "Expr":
+        """Access a map value by key."""
+
+        def make(base_schema, registry):
+            key_lit = (
+                Expr._coerce(key)
+                ._unbound(base_schema, registry)
+                .referred_expr[0]
+                .expression.literal
+            )
+            return stalg.Expression.ReferenceSegment(
+                map_key=stalg.Expression.ReferenceSegment.MapKey(map_key=key_lit)
+            )
+
+        return self._append_segment(make)
 
     def switch(self, cases: dict, default: Any) -> "Expr":
         """Value-match CASE against literal keys::
@@ -504,6 +628,35 @@ def coalesce(*exprs: Any) -> Expr:
         raise ValueError("coalesce needs at least one expression")
     args = [Expr._coerce(e)._unbound for e in exprs]
     return Expr(scalar_function(FUNCTIONS_COMPARISON, "coalesce", expressions=args))
+
+
+def scalar_subquery(subquery: Any, alias: Union[str, None] = None) -> Expr:
+    """The single value of a one-row/one-column subquery (a DataFrame)."""
+    return Expr(_scalar_subquery(_plan_of(subquery), alias=alias))
+
+
+def exists(subquery: Any, alias: Union[str, None] = None) -> Expr:
+    """``EXISTS (subquery)`` -- true when the subquery returns any row."""
+    op = stalg.Expression.Subquery.SetPredicate.PREDICATE_OP_EXISTS
+    return Expr(_set_predicate(_plan_of(subquery), op, alias=alias))
+
+
+def unique(subquery: Any, alias: Union[str, None] = None) -> Expr:
+    """``UNIQUE (subquery)`` -- true when the subquery has no duplicate rows."""
+    op = stalg.Expression.Subquery.SetPredicate.PREDICATE_OP_UNIQUE
+    return Expr(_set_predicate(_plan_of(subquery), op, alias=alias))
+
+
+def any_(subquery: Any) -> _SubqueryReduction:
+    """Use in a comparison: ``col("x") > any_(df)`` (SQL ``> ANY (subquery)``)."""
+    op = stalg.Expression.Subquery.SetComparison.REDUCTION_OP_ANY
+    return _SubqueryReduction(op, _plan_of(subquery))
+
+
+def all_(subquery: Any) -> _SubqueryReduction:
+    """Use in a comparison: ``col("x") > all_(df)`` (SQL ``> ALL (subquery)``)."""
+    op = stalg.Expression.Subquery.SetComparison.REDUCTION_OP_ALL
+    return _SubqueryReduction(op, _plan_of(subquery))
 
 
 def col(name: Union[str, int]) -> Expr:

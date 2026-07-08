@@ -377,6 +377,32 @@ class DataFrame:
         right row)."""
         return self._next(_plan.cross(self._plan, other._plan))
 
+    def nested_loop_join(
+        self, other: "DataFrame", on: Union[Expr, Any], how: str = "inner"
+    ) -> "DataFrame":
+        """Physical nested-loop join: evaluate ``on`` over the Cartesian product.
+
+        ``how`` accepts the same values as :meth:`join`.
+        """
+        if how not in _JOIN_TYPES:
+            raise ValueError(
+                f"unknown join type {how!r}; expected one of {sorted(_JOIN_TYPES)}"
+            )
+        join_type = getattr(stalg.NestedLoopJoinRel, "JOIN_TYPE_" + how.upper())
+        return self._next(
+            _plan.nested_loop_join(
+                self._plan, other._plan, expression=_unbound(on), type=join_type
+            )
+        )
+
+    def repartition(self, n: int = 0) -> "DataFrame":
+        """Redistribute rows round-robin into ``n`` partitions (an ExchangeRel)."""
+        return self._next(_plan.exchange(self._plan, partition_count=n))
+
+    def broadcast(self) -> "DataFrame":
+        """Broadcast every row to all partitions (an ExchangeRel)."""
+        return self._next(_plan.exchange(self._plan, broadcast=True))
+
     def union(self, *others: "DataFrame", distinct: bool = False) -> "DataFrame":
         """Concatenate rows of this DataFrame with ``others``.
 

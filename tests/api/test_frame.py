@@ -845,6 +845,64 @@ def test_cache_merges_subtree_extensions():
     assert "extension:io.substrait:functions_comparison" in urns
 
 
+# -- Phase (core-ext): physical joins + exchange --------------------------
+
+
+def _ab():
+    left = sub.read_named_table("a", {"x": sub.i64, "y": sub.string})
+    right = sub.read_named_table("b", {"w": sub.i64, "z": sub.fp64})
+    return left, right
+
+
+def test_nested_loop_join_and_chaining():
+    left, right = _ab()
+    plan = (
+        left.nested_loop_join(right, on=sub.col("x") == sub.col("w"), how="inner")
+        .select("x", "z")
+        .to_plan()
+    )
+    root = plan.relations[-1].root
+    assert root.input.project.input.HasField("nested_loop_join")
+    assert list(root.names) == ["x", "z"]
+
+
+def test_nested_loop_semi_join_left_only_schema():
+    left, right = _ab()
+    # left_semi keeps only left columns; filtering on x proves the inferred schema.
+    plan = (
+        left.nested_loop_join(right, on=sub.col("x") == sub.col("w"), how="left_semi")
+        .filter(sub.col("x") > 0)
+        .to_plan()
+    )
+    assert plan.relations[-1].root.input.HasField("filter")
+
+
+def test_nested_loop_join_unknown_type_raises():
+    left, right = _ab()
+    with pytest.raises(ValueError, match="unknown join type"):
+        left.nested_loop_join(right, on=sub.col("x") == sub.col("w"), how="banana")
+
+
+@pytest.mark.parametrize(
+    "make, kind, count",
+    [
+        (lambda df: df.repartition(4), "round_robin", 4),
+        (lambda df: df.broadcast(), "broadcast", 0),
+    ],
+)
+def test_exchange(make, kind, count):
+    df = sub.read_named_table("a", {"x": sub.i64})
+    ex = make(df).to_plan().relations[-1].root.input.exchange
+    assert ex.WhichOneof("exchange_kind") == kind
+    assert ex.partition_count == count
+
+
+def test_exchange_preserves_schema_for_chaining():
+    df = sub.read_named_table("a", {"x": sub.i64, "y": sub.i64})
+    plan = df.repartition(2).filter(sub.col("y") > 0).to_plan()
+    assert plan.relations[-1].root.input.HasField("filter")
+
+
 def test_default_registry_is_reused():
     assert sub.default_registry() is sub.default_registry()
 

@@ -28,6 +28,7 @@ native frame; the two layers compose rather than compete.
 
 from __future__ import annotations
 
+from itertools import combinations
 from typing import Any, Iterable, Optional, Union
 
 import substrait.algebra_pb2 as stalg
@@ -35,7 +36,7 @@ import substrait.type_pb2 as stp
 
 from substrait.builders import plan as _plan
 from substrait.builders import type as _type
-from substrait.expr import Expr, col, lit
+from substrait.expr import Expr, Measure, col, lit
 from substrait.extension_registry import ExtensionRegistry
 from substrait.type_inference import infer_plan_schema
 
@@ -83,6 +84,36 @@ def _per_column(value: Any, n: int, name: str) -> "list[bool]":
             )
         return [bool(v) for v in value]
     return [bool(value)] * n
+
+
+def _normalize_grouping_sets(
+    keys: "tuple[Union[str, Expr], ...]", grouping_sets: Iterable[Iterable[Any]]
+) -> "list[list[int]]":
+    """Map each grouping set (of key names or positions) to index lists into ``keys``."""
+    name_to_index = {k: i for i, k in enumerate(keys) if isinstance(k, str)}
+    result = []
+    for gs in grouping_sets:
+        refs = []
+        for item in gs:
+            if isinstance(item, bool):  # bool is an int subclass; reject explicitly
+                raise ValueError(f"invalid grouping set item {item!r}")
+            elif isinstance(item, int):
+                if not 0 <= item < len(keys):
+                    raise ValueError(f"grouping set index {item} out of range")
+                refs.append(item)
+            elif isinstance(item, str) and item in name_to_index:
+                refs.append(name_to_index[item])
+            else:
+                raise ValueError(f"grouping set item {item!r} is not a group_by key")
+        result.append(refs)
+    return result
+
+
+def _split_measure(m: Union[Expr, Measure]):
+    """Return ``(unbound_measure, unbound_filter_or_None)`` for an agg input."""
+    if isinstance(m, Measure):
+        return _unbound(m.expr), _unbound(m.predicate)
+    return _unbound(m), None
 
 
 _default_registry: Optional[ExtensionRegistry] = None
@@ -332,25 +363,47 @@ class DataFrame:
         inputs = [self._plan, *(o._plan for o in others)]
         return self._next(_plan.set(inputs, op))
 
-    def group_by(self, *keys: Union[str, Expr]) -> "GroupBy":
-        """Begin an aggregation; follow with ``.agg(...)``."""
-        return GroupBy(self, keys)
+    def group_by(
+        self,
+        *keys: Union[str, Expr],
+        grouping_sets: Optional[Iterable[Iterable[Any]]] = None,
+    ) -> "GroupBy":
+        """Begin an aggregation; follow with ``.agg(...)``.
+
+        ``grouping_sets`` optionally supplies explicit GROUPING SETS as lists of
+        key names or positions into ``keys`` (e.g. ``[["a", "b"], ["a"], []]``);
+        see also ``rollup`` / ``cube``.
+        """
+        sets = (
+            _normalize_grouping_sets(keys, grouping_sets)
+            if grouping_sets is not None
+            else None
+        )
+        return GroupBy(self, keys, sets)
+
+    def rollup(self, *keys: Union[str, Expr]) -> "GroupBy":
+        """Aggregate over the ROLLUP of ``keys``: the grouping sets
+        ``(k0..kn), (k0..kn-1), ..., (k0), ()``."""
+        sets = [list(range(i)) for i in range(len(keys), -1, -1)]
+        return GroupBy(self, keys, sets)
+
+    def cube(self, *keys: Union[str, Expr]) -> "GroupBy":
+        """Aggregate over the CUBE of ``keys``: every subset of the keys."""
+        n = len(keys)
+        sets = [
+            list(combo) for r in range(n, -1, -1) for combo in combinations(range(n), r)
+        ]
+        return GroupBy(self, keys, sets)
 
     def aggregate(
         self,
         group_by: Union[str, Expr, Iterable[Union[str, Expr]]] = (),
-        *measures: Expr,
+        *measures: Union[Expr, Measure],
     ) -> "DataFrame":
         """One-shot aggregation. See also the fluent ``group_by().agg()``."""
         if isinstance(group_by, (str, Expr)):
             group_by = [group_by]
-        return self._next(
-            _plan.aggregate(
-                self._plan,
-                grouping_expressions=[_unbound(g) for g in group_by],
-                measures=[_unbound(m) for m in measures],
-            )
-        )
+        return GroupBy(self, tuple(group_by), None).agg(*measures)
 
     def write_named_table(
         self, name: Union[str, Iterable[str]], *, mode: str = "error"
@@ -383,16 +436,27 @@ class DataFrame:
 class GroupBy:
     """Intermediate returned by ``DataFrame.group_by``; call ``.agg(...)``."""
 
-    def __init__(self, df: DataFrame, keys: Iterable[Union[str, Expr]]):
+    def __init__(
+        self,
+        df: DataFrame,
+        keys: Iterable[Union[str, Expr]],
+        grouping_sets: Optional["list[list[int]]"] = None,
+    ):
         self._df = df
         self._keys = list(keys)
+        self._grouping_sets = grouping_sets
 
-    def agg(self, *measures: Expr) -> DataFrame:
+    def agg(self, *measures: Union[Expr, Measure]) -> DataFrame:
+        unbound, filters = (
+            zip(*(_split_measure(m) for m in measures)) if measures else ((), ())
+        )
         return self._df._next(
             _plan.aggregate(
                 self._df._plan,
                 grouping_expressions=[_unbound(k) for k in self._keys],
-                measures=[_unbound(m) for m in measures],
+                measures=list(unbound),
+                grouping_sets=self._grouping_sets,
+                filters=list(filters) if any(f is not None for f in filters) else None,
             )
         )
 

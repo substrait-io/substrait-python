@@ -24,6 +24,7 @@ from datetime import time as _time
 from decimal import Decimal as _Decimal
 from typing import Any, Union
 
+import substrait.algebra_pb2 as stalg
 import substrait.type_pb2 as stp
 
 from substrait.builders import type as _t
@@ -33,6 +34,7 @@ from substrait.builders.extended_expression import (
     column,
     if_then,
     literal,
+    resolve_expression,
     scalar_function,
     singular_or_list,
     switch,
@@ -163,6 +165,20 @@ def _numeric_binary(
         )
 
     return Expr(resolve)
+
+
+def _sort_direction(descending: bool, nulls_last: bool):
+    if descending:
+        return (
+            stalg.SortField.SORT_DIRECTION_DESC_NULLS_LAST
+            if nulls_last
+            else stalg.SortField.SORT_DIRECTION_DESC_NULLS_FIRST
+        )
+    return (
+        stalg.SortField.SORT_DIRECTION_ASC_NULLS_LAST
+        if nulls_last
+        else stalg.SortField.SORT_DIRECTION_ASC_NULLS_FIRST
+    )
 
 
 class Expr:
@@ -329,6 +345,70 @@ class Expr:
         ]
         return Expr(switch(self._unbound, ifs, Expr._coerce(default)._unbound))
 
+    def distinct(self) -> "Expr":
+        """Make this aggregate operate on distinct inputs (``COUNT(DISTINCT x)``).
+
+        Only meaningful on an aggregate measure (e.g. ``f.count(col("x")).distinct()``).
+        """
+        inner = self._unbound
+
+        def resolve(base_schema, registry):
+            bound = inner(base_schema, registry)
+            ref = bound.referred_expr[0]
+            if ref.WhichOneof("expr_type") != "measure":
+                raise TypeError("distinct() applies only to aggregate measures")
+            ref.measure.invocation = (
+                stalg.AggregateFunction.AGGREGATION_INVOCATION_DISTINCT
+            )
+            return bound
+
+        return Expr(resolve)
+
+    def order_by(
+        self, *keys: Any, descending: bool = False, nulls_last: bool = True
+    ) -> "Expr":
+        """Order the inputs to this aggregate (``string_agg(x ORDER BY ...)``).
+
+        ``keys`` are column names or expressions; ``descending``/``nulls_last``
+        apply to all of them. Only meaningful on an aggregate measure.
+        """
+        direction = _sort_direction(descending, nulls_last)
+        inner = self._unbound
+
+        def resolve(base_schema, registry):
+            bound = inner(base_schema, registry)
+            ref = bound.referred_expr[0]
+            if ref.WhichOneof("expr_type") != "measure":
+                raise TypeError("order_by() applies only to aggregate measures")
+            for k in keys:
+                unbound_key = k.unbound if isinstance(k, Expr) else column(k)
+                bound_key = resolve_expression(unbound_key, base_schema, registry)
+                ref.measure.sorts.append(
+                    stalg.SortField(
+                        expr=bound_key.referred_expr[0].expression, direction=direction
+                    )
+                )
+                # Carry over any extensions a (function-valued) sort key introduced.
+                for urn in bound_key.extension_urns:
+                    if urn not in bound.extension_urns:
+                        bound.extension_urns.append(urn)
+                for decl in bound_key.extensions:
+                    if decl not in bound.extensions:
+                        bound.extensions.append(decl)
+            return bound
+
+        return Expr(resolve)
+
+    def filter(self, predicate: Any) -> "Measure":
+        """Restrict this aggregate to rows where ``predicate`` holds
+        (SQL ``agg(x) FILTER (WHERE predicate)``).
+
+        Returns a :class:`Measure`, only meaningful inside ``group_by().agg(...)``::
+
+            f.sum(col("amount")).filter(col("status") == "paid")
+        """
+        return Measure(self, Expr._coerce(predicate))
+
     def cast(self, type: Any) -> "Expr":
         """Cast this expression to ``type`` (a proto.Type or a type builder).
 
@@ -354,6 +434,29 @@ class Expr:
 
     def __repr__(self) -> str:  # pragma: no cover - debugging aid
         return "Expr(<unbound>)"
+
+
+class Measure:
+    """An aggregate expression paired with a ``FILTER (WHERE ...)`` predicate.
+
+    Produced by :meth:`Expr.filter` and consumed by
+    ``DataFrame.group_by(...).agg(...)``; not a standalone expression.
+    """
+
+    __slots__ = ("expr", "predicate")
+
+    def __init__(self, expr: Expr, predicate: Expr):
+        self.expr = expr
+        self.predicate = predicate
+
+    def alias(self, name: str) -> "Measure":
+        return Measure(self.expr.alias(name), self.predicate)
+
+    def distinct(self) -> "Measure":
+        return Measure(self.expr.distinct(), self.predicate)
+
+    def order_by(self, *keys: Any, **kwargs: Any) -> "Measure":
+        return Measure(self.expr.order_by(*keys, **kwargs), self.predicate)
 
 
 class When:

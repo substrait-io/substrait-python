@@ -240,6 +240,144 @@ def test_group_by_agg_equals_aggregate_oneshot():
     assert via_groupby.SerializeToString() == via_aggregate.SerializeToString()
 
 
+# -- Phase 4: grouping sets / rollup / cube, FILTER, DISTINCT, ordered -----
+
+
+def _sales_ns():
+    return named_struct(
+        names=["region", "dept", "amount", "status"],
+        struct=struct(types=[string(), string(), fp64(), string()], nullable=False),
+    )
+
+
+def _sales_df():
+    return sub.read_named_table(
+        "sales",
+        {
+            "region": sub.string,
+            "dept": sub.string,
+            "amount": sub.fp64,
+            "status": sub.string,
+        },
+    )
+
+
+@pytest.mark.parametrize(
+    "group, sets",
+    [
+        (lambda df: df.rollup("region", "dept"), [[0, 1], [0], []]),
+        (lambda df: df.cube("region", "dept"), [[0, 1], [0], [1], []]),
+        (
+            lambda df: df.group_by(
+                "region", "dept", grouping_sets=[["region", "dept"], ["region"], []]
+            ),
+            [[0, 1], [0], []],
+        ),
+    ],
+)
+def test_grouping_sets_match_builder(group, sets):
+    fluent = group(_sales_df()).agg(sub.f.sum(sub.col("amount")).alias("t")).to_plan()
+    raw = b_aggregate(
+        b_read("sales", _sales_ns()),
+        grouping_expressions=[column("region"), column("dept")],
+        measures=[
+            aggregate_function(
+                ARITHMETIC, "sum", expressions=[column("amount")], alias="t"
+            )
+        ],
+        grouping_sets=sets,
+    )(registry)
+    assert fluent.SerializeToString() == raw.SerializeToString()
+
+
+def test_agg_filter_matches_builder():
+    fluent = (
+        _sales_df()
+        .group_by("region")
+        .agg(
+            sub.f.sum(sub.col("amount"))
+            .filter(sub.col("status") == "paid")
+            .alias("paid")
+        )
+        .to_plan()
+    )
+    raw = b_aggregate(
+        b_read("sales", _sales_ns()),
+        grouping_expressions=[column("region")],
+        measures=[
+            aggregate_function(
+                ARITHMETIC, "sum", expressions=[column("amount")], alias="paid"
+            )
+        ],
+        filters=[
+            scalar_function(
+                COMPARISON,
+                "equal",
+                expressions=[column("status"), literal("paid", string())],
+            )
+        ],
+    )(registry)
+    assert fluent.SerializeToString() == raw.SerializeToString()
+
+
+def test_agg_distinct_matches_builder():
+    fluent = (
+        _sales_df()
+        .group_by("region")
+        .agg(sub.f.sum(sub.col("amount")).distinct().alias("s"))
+        .to_plan()
+    )
+    raw = b_aggregate(
+        b_read("sales", _sales_ns()),
+        grouping_expressions=[column("region")],
+        measures=[
+            aggregate_function(
+                ARITHMETIC,
+                "sum",
+                expressions=[column("amount")],
+                alias="s",
+                invocation=stalg.AggregateFunction.AGGREGATION_INVOCATION_DISTINCT,
+            )
+        ],
+    )(registry)
+    assert fluent.SerializeToString() == raw.SerializeToString()
+
+
+def test_agg_order_by_matches_builder():
+    fluent = (
+        _sales_df()
+        .group_by("region")
+        .agg(sub.f.sum(sub.col("amount")).order_by("dept", descending=True).alias("s"))
+        .to_plan()
+    )
+    raw = b_aggregate(
+        b_read("sales", _sales_ns()),
+        grouping_expressions=[column("region")],
+        measures=[
+            aggregate_function(
+                ARITHMETIC,
+                "sum",
+                expressions=[column("amount")],
+                alias="s",
+                sorts=[
+                    (column("dept"), stalg.SortField.SORT_DIRECTION_DESC_NULLS_LAST)
+                ],
+            )
+        ],
+    )(registry)
+    assert fluent.SerializeToString() == raw.SerializeToString()
+
+
+def test_grouping_sets_unknown_key_raises():
+    with pytest.raises(ValueError, match="not a group_by key"):
+        _sales_df().group_by("region", grouping_sets=[["nope"]])
+
+
+def test_distinct_on_non_measure_raises():
+    with pytest.raises(TypeError, match="aggregate measures"):
+        _sales_df().select(sub.col("region").distinct()).to_plan()
+
+
 def test_default_registry_is_reused():
     assert sub.default_registry() is sub.default_registry()
 

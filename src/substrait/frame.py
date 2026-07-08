@@ -245,6 +245,33 @@ class DataFrame:
 
         return self._next(resolve)
 
+    def unpivot(
+        self,
+        on: Union[str, Iterable[str]],
+        index: Union[str, Iterable[str]] = (),
+        *,
+        variable_name: str = "variable",
+        value_name: str = "value",
+    ) -> "DataFrame":
+        """Unpivot ``on`` columns into ``variable``/``value`` rows (an ExpandRel).
+
+        ``index`` columns are repeated on every output row. The ``on`` columns
+        must share a type. Polars-style naming.
+        """
+        on = [on] if isinstance(on, str) else list(on)
+        index = [index] if isinstance(index, str) else list(index)
+        if not on:
+            raise ValueError("unpivot needs at least one column in `on`")
+
+        fields = [("consistent", col(c).unbound) for c in index]
+        fields.append(("switching", [lit(name, _type.string()).unbound for name in on]))
+        fields.append(("switching", [col(name).unbound for name in on]))
+        kept = [*index, variable_name, value_name]
+        # ExpandRel appends an i32 duplicate-index column; drop it for clean output.
+        names = [*kept, "__expand_index__"]
+        expanded = self._next(_plan.expand(self._plan, fields, names))
+        return expanded.select(*kept)
+
     def sort(
         self,
         *columns: Union[str, Expr],

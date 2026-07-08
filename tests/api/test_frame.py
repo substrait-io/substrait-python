@@ -742,6 +742,58 @@ def test_over_on_non_window_raises():
         _win_df().select(sub.col("region").over(partition_by="day")).to_plan()
 
 
+# -- Phase (core-ext): Expand / unpivot -----------------------------------
+
+
+def _wide_df():
+    return sub.read_named_table(
+        "sales",
+        {"region": sub.string, "q1": sub.fp64, "q2": sub.fp64, "q3": sub.fp64},
+    )
+
+
+def test_unpivot_structure():
+    plan = (
+        _wide_df()
+        .unpivot(
+            ["q1", "q2", "q3"],
+            index="region",
+            variable_name="quarter",
+            value_name="amount",
+        )
+        .to_plan()
+    )
+    root = plan.relations[-1].root
+    assert list(root.names) == ["region", "quarter", "amount"]  # index col dropped
+    expand = root.input.project.input.expand
+    assert [f.WhichOneof("field_type") for f in expand.fields] == [
+        "consistent_field",
+        "switching_field",
+        "switching_field",
+    ]
+    assert [d.literal.string for d in expand.fields[1].switching_field.duplicates] == [
+        "q1",
+        "q2",
+        "q3",
+    ]
+
+
+def test_unpivot_schema_inference_allows_chaining():
+    # Filtering after unpivot exercises infer_rel_schema for the expand relation.
+    plan = (
+        _wide_df()
+        .unpivot(["q1", "q2", "q3"], index="region", value_name="amount")
+        .filter(sub.col("amount") > 0.0)
+        .to_plan()
+    )
+    assert plan.relations[-1].root.input.HasField("filter")
+
+
+def test_unpivot_requires_on():
+    with pytest.raises(ValueError, match="at least one column"):
+        _wide_df().unpivot([], index="region")
+
+
 def test_default_registry_is_reused():
     assert sub.default_registry() is sub.default_registry()
 

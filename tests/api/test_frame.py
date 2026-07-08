@@ -16,13 +16,16 @@ from substrait.builders.extended_expression import (
 )
 from substrait.builders.plan import aggregate as b_aggregate
 from substrait.builders.plan import cross as b_cross
+from substrait.builders.plan import extension_table as b_extension_table
 from substrait.builders.plan import fetch as b_fetch
 from substrait.builders.plan import filter as b_filter
 from substrait.builders.plan import join as b_join
+from substrait.builders.plan import local_files as b_local_files
 from substrait.builders.plan import read_named_table as b_read
 from substrait.builders.plan import select as b_select
 from substrait.builders.plan import set as b_set
 from substrait.builders.plan import sort as b_sort
+from substrait.builders.plan import virtual_table as b_virtual_table
 from substrait.builders.plan import write_named_table as b_write
 from substrait.builders.type import fp64, i64, named_struct, string, struct
 from substrait.extension_registry import ExtensionRegistry
@@ -376,6 +379,81 @@ def test_grouping_sets_unknown_key_raises():
 def test_distinct_on_non_measure_raises():
     with pytest.raises(TypeError, match="aggregate measures"):
         _sales_df().select(sub.col("region").distinct()).to_plan()
+
+
+# -- Phase 5: read sources (virtual table, local files, extension table) --
+
+
+def test_from_records_matches_builder():
+    ns = named_struct(
+        names=["id", "name"], struct=struct(types=[i64(), string()], nullable=False)
+    )
+    fluent = sub.from_records(
+        [{"id": 1, "name": "a"}, {"id": 2, "name": "b"}],
+        {"id": sub.i64, "name": sub.string},
+    ).to_plan()
+    raw = b_virtual_table(
+        [
+            [literal(1, i64()), literal("a", string())],
+            [literal(2, i64()), literal("b", string())],
+        ],
+        ns,
+    )(registry)
+    assert fluent.SerializeToString() == raw.SerializeToString()
+
+
+def test_from_records_positional_matches_dict():
+    schema = {"id": sub.i64, "name": sub.string}
+    by_dict = sub.from_records([{"id": 1, "name": "a"}], schema).to_plan()
+    by_tuple = sub.from_records([(1, "a")], schema).to_plan()
+    assert by_dict.SerializeToString() == by_tuple.SerializeToString()
+
+
+def test_from_records_null_is_typed_null():
+    plan = sub.from_records([{"id": None}], {"id": sub.i64}).to_plan()
+    lit0 = plan.relations[-1].root.input.read.virtual_table.expressions[0].fields[0]
+    assert lit0.literal.WhichOneof("literal_type") == "null"
+
+
+def test_from_records_row_length_mismatch_raises():
+    with pytest.raises(ValueError, match="but schema has"):
+        sub.from_records([(1, 2)], {"id": sub.i64})
+
+
+def test_read_parquet_matches_builder():
+    ns = named_struct(names=["id"], struct=struct(types=[i64()], nullable=False))
+    fof = stalg.ReadRel.LocalFiles.FileOrFiles
+    fluent = sub.read_parquet("f.parquet", {"id": sub.i64}).to_plan()
+    raw = b_local_files(
+        ns, [fof(uri_file="f.parquet", parquet=fof.ParquetReadOptions())]
+    )(registry)
+    assert fluent.SerializeToString() == raw.SerializeToString()
+
+
+def test_read_csv_matches_builder():
+    ns = named_struct(names=["id"], struct=struct(types=[i64()], nullable=False))
+    fof = stalg.ReadRel.LocalFiles.FileOrFiles
+    fluent = sub.read_csv(
+        ["a.csv", "b.csv"], {"id": sub.i64}, delimiter=";", header_lines_to_skip=2
+    ).to_plan()
+    text = fof.DelimiterSeparatedTextReadOptions(
+        field_delimiter=";", header_lines_to_skip=2
+    )
+    raw = b_local_files(
+        ns,
+        [fof(uri_file="a.csv", text=text), fof(uri_file="b.csv", text=text)],
+    )(registry)
+    assert fluent.SerializeToString() == raw.SerializeToString()
+
+
+def test_read_extension_table_matches_builder():
+    from google.protobuf.any_pb2 import Any
+
+    ns = named_struct(names=["id"], struct=struct(types=[i64()], nullable=False))
+    detail = Any(type_url="example.com/Foo", value=b"payload")
+    fluent = sub.read_extension_table({"id": sub.i64}, detail).to_plan()
+    raw = b_extension_table(ns, detail)(registry)
+    assert fluent.SerializeToString() == raw.SerializeToString()
 
 
 def test_default_registry_is_reused():

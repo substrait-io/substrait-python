@@ -473,3 +473,97 @@ def read_named_table(
     """
     names = [name] if isinstance(name, str) else list(name)
     return DataFrame(_plan.read_named_table(names, _to_named_struct(schema)), registry)
+
+
+def from_records(
+    data: Iterable[Any],
+    schema: Any,
+    registry: Optional[ExtensionRegistry] = None,
+) -> DataFrame:
+    """Start a DataFrame from inline rows (a ``VirtualTable`` / VALUES clause).
+
+    ``data`` is an iterable of rows, each either a ``{column: value}`` dict or a
+    positional sequence aligned to ``schema``. Values are typed per the schema
+    column (``None`` becomes a typed null).
+    """
+    ns = _to_named_struct(schema)
+    types = list(ns.struct.types)
+    rows = []
+    for record in data:
+        if isinstance(record, dict):
+            values = [record.get(n) for n in ns.names]
+        else:
+            values = list(record)
+            if len(values) != len(ns.names):
+                raise ValueError(
+                    f"row has {len(values)} values but schema has {len(ns.names)} columns"
+                )
+        rows.append([lit(v, types[i]).unbound for i, v in enumerate(values)])
+    return DataFrame(_plan.virtual_table(rows, ns), registry)
+
+
+def _read_local_files(
+    paths: Union[str, Iterable[str]],
+    schema: Any,
+    registry: Optional[ExtensionRegistry],
+    **file_format: Any,
+) -> DataFrame:
+    ns = _to_named_struct(schema)
+    path_list = [paths] if isinstance(paths, str) else list(paths)
+    file_or_files = stalg.ReadRel.LocalFiles.FileOrFiles
+    items = [file_or_files(uri_file=p, **file_format) for p in path_list]
+    return DataFrame(_plan.local_files(ns, items), registry)
+
+
+def read_parquet(
+    paths: Union[str, Iterable[str]],
+    schema: Any,
+    registry: Optional[ExtensionRegistry] = None,
+) -> DataFrame:
+    """Read one or more Parquet files into a DataFrame."""
+    opts = stalg.ReadRel.LocalFiles.FileOrFiles.ParquetReadOptions()
+    return _read_local_files(paths, schema, registry, parquet=opts)
+
+
+def read_orc(
+    paths: Union[str, Iterable[str]],
+    schema: Any,
+    registry: Optional[ExtensionRegistry] = None,
+) -> DataFrame:
+    """Read one or more ORC files into a DataFrame."""
+    opts = stalg.ReadRel.LocalFiles.FileOrFiles.OrcReadOptions()
+    return _read_local_files(paths, schema, registry, orc=opts)
+
+
+def read_arrow(
+    paths: Union[str, Iterable[str]],
+    schema: Any,
+    registry: Optional[ExtensionRegistry] = None,
+) -> DataFrame:
+    """Read one or more Arrow IPC files into a DataFrame."""
+    opts = stalg.ReadRel.LocalFiles.FileOrFiles.ArrowReadOptions()
+    return _read_local_files(paths, schema, registry, arrow=opts)
+
+
+def read_csv(
+    paths: Union[str, Iterable[str]],
+    schema: Any,
+    *,
+    delimiter: str = ",",
+    header_lines_to_skip: int = 1,
+    registry: Optional[ExtensionRegistry] = None,
+) -> DataFrame:
+    """Read one or more delimiter-separated text files (CSV/TSV) into a DataFrame."""
+    opts = stalg.ReadRel.LocalFiles.FileOrFiles.DelimiterSeparatedTextReadOptions(
+        field_delimiter=delimiter, header_lines_to_skip=header_lines_to_skip
+    )
+    return _read_local_files(paths, schema, registry, text=opts)
+
+
+def read_extension_table(
+    schema: Any,
+    detail: Any,
+    registry: Optional[ExtensionRegistry] = None,
+) -> DataFrame:
+    """Start a DataFrame from a custom source; ``detail`` is a ``google.protobuf.Any``."""
+    return DataFrame(_plan.extension_table(_to_named_struct(schema), detail), registry)

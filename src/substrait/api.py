@@ -60,12 +60,28 @@ from substrait.dtypes import (
 )
 from substrait.expr import Expr, coalesce, col, infer_literal_type, lit, when
 from substrait.extension_registry import ExtensionRegistry
-from substrait.frame import DataFrame, default_registry, read_named_table
+from substrait.frame import (
+    DataFrame,
+    default_registry,
+    from_records,
+    read_arrow,
+    read_csv,
+    read_extension_table,
+    read_named_table,
+    read_orc,
+    read_parquet,
+)
 from substrait.functions import f, functions_for
 
 __all__ = [
     # entry points
     "read_named_table",
+    "from_records",
+    "read_parquet",
+    "read_csv",
+    "read_orc",
+    "read_arrow",
+    "read_extension_table",
     "DataFrame",
     "col",
     "lit",

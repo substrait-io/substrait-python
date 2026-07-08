@@ -37,15 +37,53 @@ from substrait.builders import plan as _plan
 from substrait.builders import type as _type
 from substrait.expr import Expr, col, lit
 from substrait.extension_registry import ExtensionRegistry
+from substrait.type_inference import infer_plan_schema
 
+# All 13 JoinRel.JoinType variants (SET_OP_UNSPECIFIED excluded). "single"
+# returns at most one right match per left row (runtime error on multiple);
+# "mark" appends a nullable-boolean column flagging whether a partner exists.
 _JOIN_TYPES = {
     "inner": stalg.JoinRel.JOIN_TYPE_INNER,
+    "outer": stalg.JoinRel.JOIN_TYPE_OUTER,
     "left": stalg.JoinRel.JOIN_TYPE_LEFT,
     "right": stalg.JoinRel.JOIN_TYPE_RIGHT,
-    "outer": stalg.JoinRel.JOIN_TYPE_OUTER,
     "left_semi": stalg.JoinRel.JOIN_TYPE_LEFT_SEMI,
+    "right_semi": stalg.JoinRel.JOIN_TYPE_RIGHT_SEMI,
     "left_anti": stalg.JoinRel.JOIN_TYPE_LEFT_ANTI,
+    "right_anti": stalg.JoinRel.JOIN_TYPE_RIGHT_ANTI,
+    "left_single": stalg.JoinRel.JOIN_TYPE_LEFT_SINGLE,
+    "right_single": stalg.JoinRel.JOIN_TYPE_RIGHT_SINGLE,
+    "left_mark": stalg.JoinRel.JOIN_TYPE_LEFT_MARK,
+    "right_mark": stalg.JoinRel.JOIN_TYPE_RIGHT_MARK,
 }
+
+# Write create-modes: what to do when the target table already exists.
+_CREATE_MODES = {
+    "error": stalg.WriteRel.CREATE_MODE_ERROR_IF_EXISTS,
+    "append": stalg.WriteRel.CREATE_MODE_APPEND_IF_EXISTS,
+    "replace": stalg.WriteRel.CREATE_MODE_REPLACE_IF_EXISTS,
+    "ignore": stalg.WriteRel.CREATE_MODE_IGNORE_IF_EXISTS,
+}
+
+# Sort direction keyed by (descending, nulls_last).
+_SORT_DIRECTIONS = {
+    (False, False): stalg.SortField.SORT_DIRECTION_ASC_NULLS_FIRST,
+    (False, True): stalg.SortField.SORT_DIRECTION_ASC_NULLS_LAST,
+    (True, False): stalg.SortField.SORT_DIRECTION_DESC_NULLS_FIRST,
+    (True, True): stalg.SortField.SORT_DIRECTION_DESC_NULLS_LAST,
+}
+
+
+def _per_column(value: Any, n: int, name: str) -> "list[bool]":
+    """Broadcast a bool, or validate a per-column list of bools, to length ``n``."""
+    if isinstance(value, (list, tuple)):
+        if len(value) != n:
+            raise ValueError(
+                f"{name} has {len(value)} entries but {n} sort columns were given"
+            )
+        return [bool(v) for v in value]
+    return [bool(value)] * n
+
 
 _default_registry: Optional[ExtensionRegistry] = None
 
@@ -128,13 +166,66 @@ class DataFrame:
         expressions += [Expr._coerce(v).alias(k).unbound for k, v in named.items()]
         return self._next(_plan.project(self._plan, expressions=expressions))
 
-    def sort(self, *columns: Union[str, Expr], descending: bool = False) -> "DataFrame":
-        direction = (
-            stalg.SortField.SORT_DIRECTION_DESC_NULLS_LAST
-            if descending
-            else stalg.SortField.SORT_DIRECTION_ASC_NULLS_LAST
-        )
-        expressions = [(_unbound(c), direction) for c in columns]
+    def rename(self, mapping: dict) -> "DataFrame":
+        """Rename columns via a ``{old: new}`` mapping; others pass through.
+
+        Implemented as a projection selecting every column, aliasing the renamed
+        ones. Resolves the input schema, so unknown source columns raise.
+        """
+        inner = self._plan
+
+        def resolve(registry: ExtensionRegistry):
+            bound = inner(registry)
+            names = list(infer_plan_schema(bound).names)
+            unknown = set(mapping) - set(names)
+            if unknown:
+                raise ValueError(f"rename got unknown columns: {sorted(unknown)}")
+            expressions = [
+                (col(n).alias(mapping[n]) if n in mapping else col(n)).unbound
+                for n in names
+            ]
+            return _plan.select(bound, expressions=expressions)(registry)
+
+        return self._next(resolve)
+
+    def drop(self, *columns: str) -> "DataFrame":
+        """Drop the named columns, keeping the rest in their original order."""
+        drop_set = set(columns)
+        inner = self._plan
+
+        def resolve(registry: ExtensionRegistry):
+            bound = inner(registry)
+            names = list(infer_plan_schema(bound).names)
+            unknown = drop_set - set(names)
+            if unknown:
+                raise ValueError(f"drop got unknown columns: {sorted(unknown)}")
+            expressions = [col(n).unbound for n in names if n not in drop_set]
+            if not expressions:
+                raise ValueError("drop would remove every column")
+            return _plan.select(bound, expressions=expressions)(registry)
+
+        return self._next(resolve)
+
+    def sort(
+        self,
+        *columns: Union[str, Expr],
+        descending: Union[bool, "list[bool]"] = False,
+        nulls_last: Union[bool, "list[bool]"] = True,
+    ) -> "DataFrame":
+        """Order rows by one or more columns.
+
+        ``descending`` and ``nulls_last`` are each either a single bool applied
+        to every column, or a per-column list matching ``columns``. Together
+        they select the four asc/desc x nulls-first/last ``SortDirection``
+        values; ``nulls_last`` defaults to ``True``.
+        """
+        n = len(columns)
+        desc = _per_column(descending, n, "descending")
+        nulls = _per_column(nulls_last, n, "nulls_last")
+        expressions = [
+            (_unbound(c), _SORT_DIRECTIONS[(desc[i], nulls[i])])
+            for i, c in enumerate(columns)
+        ]
         return self._next(_plan.sort(self._plan, expressions=expressions))
 
     def limit(self, n: int, offset: int = 0) -> "DataFrame":
@@ -146,18 +237,36 @@ class DataFrame:
             )
         )
 
+    def head(self, n: int = 5) -> "DataFrame":
+        """The first ``n`` rows (alias for ``limit(n)``)."""
+        return self.limit(n)
+
+    def offset(self, n: int) -> "DataFrame":
+        """Skip the first ``n`` rows, keeping all the rest."""
+        return self._next(
+            _plan.fetch(self._plan, offset=lit(n, _type.i64()).unbound, count=None)
+        )
+
     def join(
         self,
         other: "DataFrame",
         on: Union[Expr, Any],
         how: str = "inner",
+        *,
+        post_filter: Union[Expr, Any, None] = None,
     ) -> "DataFrame":
         """Join with another DataFrame.
 
         ``on`` is an expression evaluated against the concatenation of the left
         and right schemas (columns are referenced by name across both inputs).
-        ``how`` is one of ``inner``, ``left``, ``right``, ``outer``,
-        ``left_semi`` or ``left_anti``.
+        ``how`` is one of ``inner``, ``outer``, ``left``, ``right``,
+        ``left_semi``, ``right_semi``, ``left_anti``, ``right_anti``,
+        ``left_single``, ``right_single``, ``left_mark`` or ``right_mark``.
+        ``post_filter`` is an optional predicate applied to the join output.
+
+        Overlapping column names from the two inputs are kept as-is (Substrait
+        references columns positionally). Disambiguate them explicitly with
+        ``rename``/``drop`` on either input before joining, or on the result.
         """
         try:
             join_type = _JOIN_TYPES[how]
@@ -166,8 +275,62 @@ class DataFrame:
                 f"unknown join type {how!r}; expected one of {sorted(_JOIN_TYPES)}"
             ) from None
         return self._next(
-            _plan.join(self._plan, other._plan, expression=_unbound(on), type=join_type)
+            _plan.join(
+                self._plan,
+                other._plan,
+                expression=_unbound(on),
+                type=join_type,
+                post_join_filter=(
+                    _unbound(post_filter) if post_filter is not None else None
+                ),
+            )
         )
+
+    def cross_join(self, other: "DataFrame") -> "DataFrame":
+        """Cartesian product with ``other`` (every left row paired with every
+        right row)."""
+        return self._next(_plan.cross(self._plan, other._plan))
+
+    def union(self, *others: "DataFrame", distinct: bool = False) -> "DataFrame":
+        """Concatenate rows of this DataFrame with ``others``.
+
+        Defaults to keeping duplicates (``UNION ALL``); pass ``distinct=True``
+        for set ``UNION``. All inputs must share this DataFrame's schema.
+        """
+        op = (
+            stalg.SetRel.SET_OP_UNION_DISTINCT
+            if distinct
+            else stalg.SetRel.SET_OP_UNION_ALL
+        )
+        return self._set(others, op)
+
+    def intersect(self, *others: "DataFrame", distinct: bool = True) -> "DataFrame":
+        """Rows present in this DataFrame and in every ``other`` (SQL
+        ``INTERSECT``). Pass ``distinct=False`` for ``INTERSECT ALL``."""
+        op = (
+            stalg.SetRel.SET_OP_INTERSECTION_MULTISET
+            if distinct
+            else stalg.SetRel.SET_OP_INTERSECTION_MULTISET_ALL
+        )
+        return self._set(others, op)
+
+    def except_(self, *others: "DataFrame", distinct: bool = True) -> "DataFrame":
+        """Rows in this DataFrame excluding any found in ``others`` (SQL
+        ``EXCEPT``). Pass ``distinct=False`` for ``EXCEPT ALL``."""
+        op = (
+            stalg.SetRel.SET_OP_MINUS_PRIMARY
+            if distinct
+            else stalg.SetRel.SET_OP_MINUS_PRIMARY_ALL
+        )
+        return self._set(others, op)
+
+    def _set(
+        self, others: "tuple[DataFrame, ...]", op: "stalg.SetRel.SetOp"
+    ) -> "DataFrame":
+        if not others:
+            raise ValueError("a set operation needs at least one other DataFrame")
+        inputs = [self._plan, *(o._plan for o in others)]
+        return self._next(_plan.set(inputs, op))
 
     def group_by(self, *keys: Union[str, Expr]) -> "GroupBy":
         """Begin an aggregation; follow with ``.agg(...)``."""
@@ -187,6 +350,25 @@ class DataFrame:
                 grouping_expressions=[_unbound(g) for g in group_by],
                 measures=[_unbound(m) for m in measures],
             )
+        )
+
+    def write_named_table(
+        self, name: Union[str, Iterable[str]], *, mode: str = "error"
+    ) -> "DataFrame":
+        """Write these rows to a named table (a ``WriteRel`` sink, CTAS).
+
+        ``mode`` selects the behavior when the table already exists: ``error``
+        (default), ``append``, ``replace`` or ``ignore``. The result is a
+        terminal DataFrame; call ``to_plan()`` to materialize.
+        """
+        try:
+            create_mode = _CREATE_MODES[mode]
+        except KeyError:
+            raise ValueError(
+                f"unknown write mode {mode!r}; expected one of {sorted(_CREATE_MODES)}"
+            ) from None
+        return self._next(
+            _plan.write_named_table(name, self._plan, create_mode=create_mode)
         )
 
     def to_plan(self):

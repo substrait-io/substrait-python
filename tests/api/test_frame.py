@@ -15,14 +15,18 @@ from substrait.builders.extended_expression import (
     scalar_function,
 )
 from substrait.builders.plan import aggregate as b_aggregate
+from substrait.builders.plan import cross as b_cross
 from substrait.builders.plan import fetch as b_fetch
 from substrait.builders.plan import filter as b_filter
 from substrait.builders.plan import join as b_join
 from substrait.builders.plan import read_named_table as b_read
 from substrait.builders.plan import select as b_select
+from substrait.builders.plan import set as b_set
 from substrait.builders.plan import sort as b_sort
+from substrait.builders.plan import write_named_table as b_write
 from substrait.builders.type import fp64, i64, named_struct, string, struct
 from substrait.extension_registry import ExtensionRegistry
+from substrait.frame import _JOIN_TYPES
 
 registry = ExtensionRegistry(load_default_extensions=True)
 
@@ -86,6 +90,47 @@ def test_sort_descending_matches_builder():
     assert fluent.SerializeToString() == raw.SerializeToString()
 
 
+@pytest.mark.parametrize(
+    "descending, nulls_last, direction",
+    [
+        (False, False, stalg.SortField.SORT_DIRECTION_ASC_NULLS_FIRST),
+        (False, True, stalg.SortField.SORT_DIRECTION_ASC_NULLS_LAST),
+        (True, False, stalg.SortField.SORT_DIRECTION_DESC_NULLS_FIRST),
+        (True, True, stalg.SortField.SORT_DIRECTION_DESC_NULLS_LAST),
+    ],
+)
+def test_sort_direction_combinations_match_builder(descending, nulls_last, direction):
+    fluent = (
+        people_df().sort("age", descending=descending, nulls_last=nulls_last).to_plan()
+    )
+    raw = b_sort(
+        b_read("people", people_ns()),
+        expressions=[(column("age"), direction)],
+    )(registry)
+    assert fluent.SerializeToString() == raw.SerializeToString()
+
+
+def test_sort_per_column_directions_match_builder():
+    fluent = (
+        people_df()
+        .sort("age", "id", descending=[True, False], nulls_last=[True, False])
+        .to_plan()
+    )
+    raw = b_sort(
+        b_read("people", people_ns()),
+        expressions=[
+            (column("age"), stalg.SortField.SORT_DIRECTION_DESC_NULLS_LAST),
+            (column("id"), stalg.SortField.SORT_DIRECTION_ASC_NULLS_FIRST),
+        ],
+    )(registry)
+    assert fluent.SerializeToString() == raw.SerializeToString()
+
+
+def test_sort_per_column_length_mismatch_raises():
+    with pytest.raises(ValueError, match="but 2 sort columns"):
+        people_df().sort("age", "id", descending=[True])
+
+
 def test_limit_matches_builder_fetch():
     fluent = people_df().limit(5).to_plan()
     raw = b_fetch(
@@ -133,6 +178,34 @@ def test_join_unknown_type_raises():
         left.join(right, on=sub.col("x") == sub.col("x"), how="banana")
 
 
+@pytest.mark.parametrize("how, join_type", sorted(_JOIN_TYPES.items()))
+def test_join_all_types_match_builder(how, join_type):
+    left_ns = named_struct(
+        names=["cust_id", "name"],
+        struct=struct(types=[i64(), string()], nullable=False),
+    )
+    right_ns = named_struct(
+        names=["order_id", "cust_ref", "amount"],
+        struct=struct(types=[i64(), i64(), fp64()], nullable=False),
+    )
+    left = sub.read_named_table("customers", {"cust_id": sub.i64, "name": sub.string})
+    right = sub.read_named_table(
+        "orders", {"order_id": sub.i64, "cust_ref": sub.i64, "amount": sub.fp64}
+    )
+    fluent = left.join(
+        right, on=sub.col("cust_id") == sub.col("cust_ref"), how=how
+    ).to_plan()
+    raw = b_join(
+        b_read("customers", left_ns),
+        b_read("orders", right_ns),
+        expression=scalar_function(
+            COMPARISON, "equal", expressions=[column("cust_id"), column("cust_ref")]
+        ),
+        type=join_type,
+    )(registry)
+    assert fluent.SerializeToString() == raw.SerializeToString()
+
+
 def test_group_by_agg_matches_builder():
     ns = named_struct(
         names=["region", "amount"],
@@ -177,3 +250,180 @@ def test_to_substrait_registry_override():
     # Should not raise and should honor the explicit registry.
     plan = df.filter(sub.col("age") > 25).to_substrait(registry=custom)
     assert plan.relations
+
+
+# -- Phase 1: set ops, cross join, write sink -----------------------------
+
+
+@pytest.mark.parametrize(
+    "call, op",
+    [
+        (lambda a, b: a.union(b), stalg.SetRel.SET_OP_UNION_ALL),
+        (lambda a, b: a.union(b, distinct=True), stalg.SetRel.SET_OP_UNION_DISTINCT),
+        (
+            lambda a, b: a.intersect(b),
+            stalg.SetRel.SET_OP_INTERSECTION_MULTISET,
+        ),
+        (
+            lambda a, b: a.intersect(b, distinct=False),
+            stalg.SetRel.SET_OP_INTERSECTION_MULTISET_ALL,
+        ),
+        (lambda a, b: a.except_(b), stalg.SetRel.SET_OP_MINUS_PRIMARY),
+        (
+            lambda a, b: a.except_(b, distinct=False),
+            stalg.SetRel.SET_OP_MINUS_PRIMARY_ALL,
+        ),
+    ],
+)
+def test_set_ops_match_builder(call, op):
+    cols = {"id": sub.i64, "age": sub.i64, "name": sub.string}
+    fluent = call(
+        sub.read_named_table("a", cols), sub.read_named_table("b", cols)
+    ).to_plan()
+    raw = b_set([b_read("a", people_ns()), b_read("b", people_ns())], op)(registry)
+    assert fluent.SerializeToString() == raw.SerializeToString()
+
+
+def test_union_nary_matches_builder():
+    cols = {"id": sub.i64, "age": sub.i64, "name": sub.string}
+    fluent = (
+        sub.read_named_table("a", cols)
+        .union(sub.read_named_table("b", cols), sub.read_named_table("c", cols))
+        .to_plan()
+    )
+    raw = b_set(
+        [b_read("a", people_ns()), b_read("b", people_ns()), b_read("c", people_ns())],
+        stalg.SetRel.SET_OP_UNION_ALL,
+    )(registry)
+    assert fluent.SerializeToString() == raw.SerializeToString()
+
+
+def test_union_without_others_raises():
+    with pytest.raises(ValueError, match="at least one other"):
+        people_df().union()
+
+
+def test_cross_join_matches_builder():
+    left_ns = named_struct(
+        names=["cust_id", "name"],
+        struct=struct(types=[i64(), string()], nullable=False),
+    )
+    right_ns = named_struct(
+        names=["order_id", "amount"],
+        struct=struct(types=[i64(), fp64()], nullable=False),
+    )
+    left = sub.read_named_table("customers", {"cust_id": sub.i64, "name": sub.string})
+    right = sub.read_named_table("orders", {"order_id": sub.i64, "amount": sub.fp64})
+    fluent = left.cross_join(right).to_plan()
+    raw = b_cross(b_read("customers", left_ns), b_read("orders", right_ns))(registry)
+    assert fluent.SerializeToString() == raw.SerializeToString()
+
+
+def test_write_named_table_matches_builder():
+    fluent = people_df().write_named_table("people_copy").to_plan()
+    raw = b_write("people_copy", b_read("people", people_ns()))(registry)
+    assert fluent.SerializeToString() == raw.SerializeToString()
+
+
+def test_write_replace_mode_matches_builder():
+    fluent = people_df().write_named_table("people_copy", mode="replace").to_plan()
+    raw = b_write(
+        "people_copy",
+        b_read("people", people_ns()),
+        create_mode=stalg.WriteRel.CREATE_MODE_REPLACE_IF_EXISTS,
+    )(registry)
+    assert fluent.SerializeToString() == raw.SerializeToString()
+
+
+def test_write_unknown_mode_raises():
+    with pytest.raises(ValueError, match="unknown write mode"):
+        people_df().write_named_table("t", mode="banana")
+
+
+# -- Phase 3 (finish): post_filter, head/offset, rename/drop --------------
+
+
+def test_join_post_filter_matches_builder():
+    left_ns = named_struct(
+        names=["cust_id", "name"],
+        struct=struct(types=[i64(), string()], nullable=False),
+    )
+    right_ns = named_struct(
+        names=["order_id", "cust_ref", "amount"],
+        struct=struct(types=[i64(), i64(), fp64()], nullable=False),
+    )
+    left = sub.read_named_table("customers", {"cust_id": sub.i64, "name": sub.string})
+    right = sub.read_named_table(
+        "orders", {"order_id": sub.i64, "cust_ref": sub.i64, "amount": sub.fp64}
+    )
+    fluent = left.join(
+        right,
+        on=sub.col("cust_id") == sub.col("cust_ref"),
+        post_filter=sub.col("amount") > 100.0,
+    ).to_plan()
+    raw = b_join(
+        b_read("customers", left_ns),
+        b_read("orders", right_ns),
+        expression=scalar_function(
+            COMPARISON, "equal", expressions=[column("cust_id"), column("cust_ref")]
+        ),
+        type=stalg.JoinRel.JOIN_TYPE_INNER,
+        post_join_filter=scalar_function(
+            COMPARISON, "gt", expressions=[column("amount"), literal(100.0, fp64())]
+        ),
+    )(registry)
+    assert fluent.SerializeToString() == raw.SerializeToString()
+
+
+def test_head_matches_limit():
+    assert (
+        people_df().head(3).to_plan().SerializeToString()
+        == people_df().limit(3).to_plan().SerializeToString()
+    )
+
+
+def test_offset_matches_builder():
+    fluent = people_df().offset(2).to_plan()
+    raw = b_fetch(b_read("people", people_ns()), offset=literal(2, i64()), count=None)(
+        registry
+    )
+    assert fluent.SerializeToString() == raw.SerializeToString()
+    # count_expr is left unset -> "all remaining rows".
+    assert not fluent.relations[-1].root.input.fetch.HasField("count_expr")
+
+
+def test_rename_matches_builder():
+    fluent = people_df().rename({"age": "years"}).to_plan()
+    raw = b_select(
+        b_read("people", people_ns()),
+        expressions=[
+            column("id"),
+            column("age", alias="years"),
+            column("name"),
+        ],
+    )(registry)
+    assert fluent.SerializeToString() == raw.SerializeToString()
+
+
+def test_drop_matches_builder():
+    fluent = people_df().drop("age").to_plan()
+    raw = b_select(
+        b_read("people", people_ns()),
+        expressions=[column("id"), column("name")],
+    )(registry)
+    assert fluent.SerializeToString() == raw.SerializeToString()
+
+
+def test_rename_unknown_column_raises():
+    with pytest.raises(ValueError, match="unknown columns"):
+        people_df().rename({"nope": "x"}).to_plan()
+
+
+def test_drop_unknown_column_raises():
+    with pytest.raises(ValueError, match="unknown columns"):
+        people_df().drop("nope").to_plan()
+
+
+def test_drop_all_columns_raises():
+    with pytest.raises(ValueError, match="every column"):
+        people_df().drop("id", "age", "name").to_plan()

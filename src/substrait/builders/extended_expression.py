@@ -885,3 +885,96 @@ def cast(
         )
 
     return resolve
+
+
+# -- subqueries -----------------------------------------------------------
+# These embed an inner query's Rel. ``query`` is a Plan or an UnboundPlan
+# (a ``registry -> Plan`` callable) -- e.g. a DataFrame's underlying plan.
+
+
+def _subquery(subquery, base_schema, output_name, *extension_sources):
+    return stee.ExtendedExpression(
+        referred_expr=[
+            stee.ExpressionReference(
+                expression=stalg.Expression(subquery=subquery),
+                output_names=[output_name],
+            )
+        ],
+        base_schema=base_schema,
+        extension_urns=merge_extension_urns(
+            *[s.extension_urns for s in extension_sources]
+        ),
+        extensions=merge_extension_declarations(
+            *[s.extensions for s in extension_sources]
+        ),
+    )
+
+
+def _inner_rel(query, registry: ExtensionRegistry):
+    plan = query(registry) if callable(query) else query
+    return plan, plan.relations[-1].root.input
+
+
+def scalar_subquery(query, alias: Union[str, None] = None):
+    """A scalar (one-row, one-column) subquery expression."""
+
+    def resolve(base_schema, registry):
+        plan, rel = _inner_rel(query, registry)
+        subquery = stalg.Expression.Subquery(
+            scalar=stalg.Expression.Subquery.Scalar(input=rel)
+        )
+        return _subquery(subquery, base_schema, alias or "subquery", plan)
+
+    return resolve
+
+
+def set_predicate(query, op, alias: Union[str, None] = None):
+    """An EXISTS / UNIQUE subquery predicate."""
+
+    def resolve(base_schema, registry):
+        plan, rel = _inner_rel(query, registry)
+        subquery = stalg.Expression.Subquery(
+            set_predicate=stalg.Expression.Subquery.SetPredicate(
+                predicate_op=op, tuples=rel
+            )
+        )
+        return _subquery(subquery, base_schema, alias or "exists", plan)
+
+    return resolve
+
+
+def in_predicate(needles, query, alias: Union[str, None] = None):
+    """A ``needles IN (subquery)`` predicate."""
+
+    def resolve(base_schema, registry):
+        plan, rel = _inner_rel(query, registry)
+        bound = [resolve_expression(n, base_schema, registry) for n in needles]
+        subquery = stalg.Expression.Subquery(
+            in_predicate=stalg.Expression.Subquery.InPredicate(
+                needles=[b.referred_expr[0].expression for b in bound], haystack=rel
+            )
+        )
+        return _subquery(subquery, base_schema, alias or "in_subquery", plan, *bound)
+
+    return resolve
+
+
+def set_comparison(left, query, reduction_op, comparison_op, alias=None):
+    """A ``left <op> ANY/ALL (subquery)`` predicate."""
+
+    def resolve(base_schema, registry):
+        plan, rel = _inner_rel(query, registry)
+        bound_left = resolve_expression(left, base_schema, registry)
+        subquery = stalg.Expression.Subquery(
+            set_comparison=stalg.Expression.Subquery.SetComparison(
+                reduction_op=reduction_op,
+                comparison_op=comparison_op,
+                left=bound_left.referred_expr[0].expression,
+                right=rel,
+            )
+        )
+        return _subquery(
+            subquery, base_schema, alias or "set_comparison", plan, bound_left
+        )
+
+    return resolve

@@ -85,6 +85,103 @@ def read_named_table(
     return resolve
 
 
+def _require_schema(named_struct: stt.NamedStruct) -> stt.NamedStruct:
+    """A read's base schema must be a required (non-nullable) struct."""
+    if named_struct.struct.nullability is stt.Type.NULLABILITY_NULLABLE:
+        raise Exception("NamedStruct must not contain a nullable struct")
+    if named_struct.struct.nullability is stt.Type.NULLABILITY_UNSPECIFIED:
+        named_struct.struct.nullability = stt.Type.NULLABILITY_REQUIRED
+    return named_struct
+
+
+def _read_plan(named_struct: stt.NamedStruct, read_rel: stalg.ReadRel) -> stp.Plan:
+    return stp.Plan(
+        version=default_version,
+        relations=[
+            stp.PlanRel(
+                root=stalg.RelRoot(
+                    input=stalg.Rel(read=read_rel), names=named_struct.names
+                )
+            )
+        ],
+    )
+
+
+def virtual_table(
+    rows: Iterable[Iterable[ExtendedExpressionOrUnbound]],
+    named_struct: stt.NamedStruct,
+    extension: Optional[AdvancedExtension] = None,
+) -> UnboundPlan:
+    """A ReadRel over inline rows (the VALUES clause).
+
+    ``rows`` is an iterable of rows, each an iterable of expressions (typically
+    literals) aligned to ``named_struct``.
+    """
+    _require_schema(named_struct)
+
+    def resolve(registry: ExtensionRegistry) -> stp.Plan:
+        structs = [
+            stalg.Expression.Nested.Struct(
+                fields=[
+                    resolve_expression(e, named_struct, registry)
+                    .referred_expr[0]
+                    .expression
+                    for e in row
+                ]
+            )
+            for row in rows
+        ]
+        read_rel = stalg.ReadRel(
+            common=stalg.RelCommon(direct=stalg.RelCommon.Direct()),
+            base_schema=named_struct,
+            virtual_table=stalg.ReadRel.VirtualTable(expressions=structs),
+            advanced_extension=extension,
+        )
+        return _read_plan(named_struct, read_rel)
+
+    return resolve
+
+
+def local_files(
+    named_struct: stt.NamedStruct,
+    items: Iterable[stalg.ReadRel.LocalFiles.FileOrFiles],
+    extension: Optional[AdvancedExtension] = None,
+) -> UnboundPlan:
+    """A ReadRel over local/remote files; ``items`` are pre-built FileOrFiles."""
+    _require_schema(named_struct)
+
+    def resolve(registry: ExtensionRegistry) -> stp.Plan:
+        read_rel = stalg.ReadRel(
+            common=stalg.RelCommon(direct=stalg.RelCommon.Direct()),
+            base_schema=named_struct,
+            local_files=stalg.ReadRel.LocalFiles(items=list(items)),
+            advanced_extension=extension,
+        )
+        return _read_plan(named_struct, read_rel)
+
+    return resolve
+
+
+def extension_table(
+    named_struct: stt.NamedStruct,
+    detail,
+    extension: Optional[AdvancedExtension] = None,
+) -> UnboundPlan:
+    """A ReadRel over a custom source; ``detail`` is a ``google.protobuf.Any``."""
+    _require_schema(named_struct)
+
+    def resolve(registry: ExtensionRegistry) -> stp.Plan:
+        read_rel = stalg.ReadRel(
+            common=stalg.RelCommon(direct=stalg.RelCommon.Direct()),
+            base_schema=named_struct,
+            extension_table=stalg.ReadRel.ExtensionTable(detail=detail),
+            advanced_extension=extension,
+        )
+        return _read_plan(named_struct, read_rel)
+
+    return resolve
+
+
 def project(
     plan: PlanOrUnbound,
     expressions: Iterable[ExtendedExpressionOrUnbound],

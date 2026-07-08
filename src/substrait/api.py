@@ -58,7 +58,7 @@ from substrait.dtypes import (
     string,
     uuid,
 )
-from substrait.expr import Expr, col, infer_literal_type, lit
+from substrait.expr import Expr, coalesce, col, infer_literal_type, lit, when
 from substrait.extension_registry import ExtensionRegistry
 from substrait.frame import DataFrame, default_registry, read_named_table
 from substrait.functions import f, functions_for
@@ -69,6 +69,8 @@ __all__ = [
     "DataFrame",
     "col",
     "lit",
+    "when",
+    "coalesce",
     "f",
     "functions_for",
     "Expr",

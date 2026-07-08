@@ -31,8 +31,11 @@ from substrait.builders.extended_expression import (
     UnboundExtendedExpression,
     cast,
     column,
+    if_then,
     literal,
     scalar_function,
+    singular_or_list,
+    switch,
 )
 from substrait.type_inference import infer_extended_expression_schema
 
@@ -233,6 +236,18 @@ class Expr:
     def __rtruediv__(self, other: Any) -> "Expr":
         return _numeric_binary(self, other, FUNCTIONS_ARITHMETIC, "divide", swap=True)
 
+    def __mod__(self, other: Any) -> "Expr":
+        return _numeric_binary(self, other, FUNCTIONS_ARITHMETIC, "modulus")
+
+    def __rmod__(self, other: Any) -> "Expr":
+        return _numeric_binary(self, other, FUNCTIONS_ARITHMETIC, "modulus", swap=True)
+
+    def __pow__(self, other: Any) -> "Expr":
+        return _numeric_binary(self, other, FUNCTIONS_ARITHMETIC, "power")
+
+    def __rpow__(self, other: Any) -> "Expr":
+        return _numeric_binary(self, other, FUNCTIONS_ARITHMETIC, "power", swap=True)
+
     def __neg__(self) -> "Expr":
         return Expr(
             scalar_function(FUNCTIONS_ARITHMETIC, "negate", expressions=[self._unbound])
@@ -244,6 +259,9 @@ class Expr:
 
     def __or__(self, other: Any) -> "Expr":
         return self._scalar(FUNCTIONS_BOOLEAN, "or", other)
+
+    def __xor__(self, other: Any) -> "Expr":
+        return self._scalar(FUNCTIONS_BOOLEAN, "xor", other)
 
     def __invert__(self) -> "Expr":
         return Expr(
@@ -264,6 +282,52 @@ class Expr:
                 FUNCTIONS_COMPARISON, "is_not_null", expressions=[self._unbound]
             )
         )
+
+    def is_nan(self) -> "Expr":
+        return Expr(
+            scalar_function(FUNCTIONS_COMPARISON, "is_nan", expressions=[self._unbound])
+        )
+
+    def is_distinct_from(self, other: Any) -> "Expr":
+        """Null-safe inequality (``NULL`` distinct from a value / from ``NULL``)."""
+        return self._scalar(FUNCTIONS_COMPARISON, "is_distinct_from", other)
+
+    def is_not_distinct_from(self, other: Any) -> "Expr":
+        """Null-safe equality (``NULL`` equals ``NULL``)."""
+        return self._scalar(FUNCTIONS_COMPARISON, "is_not_distinct_from", other)
+
+    def between(self, low: Any, high: Any) -> "Expr":
+        """Inclusive range test, ``low <= self <= high``.
+
+        Like the ``f.*`` helpers, the bounds are not coerced to this column's
+        numeric type; pass matching literals or ``lit(..., type)`` when needed.
+        """
+        return self._scalar(FUNCTIONS_COMPARISON, "between", low, high)
+
+    def is_in(self, options: Any) -> "Expr":
+        """True when this expression equals any value in ``options`` (SQL ``IN``).
+
+        ``options`` is a collection of values or expressions, e.g.
+        ``col("status").is_in(["active", "pending"])``.
+        """
+        if isinstance(options, (str, bytes)):
+            raise TypeError("is_in expects a collection of values, not a string")
+        bound = [Expr._coerce(o)._unbound for o in options]
+        return Expr(singular_or_list(self._unbound, bound))
+
+    def switch(self, cases: dict, default: Any) -> "Expr":
+        """Value-match CASE against literal keys::
+
+            col("code").switch({1: "one", 2: "two"}, default="other")
+
+        Keys must be Python scalars (they become literals); each value may be an
+        ``Expr`` or a scalar.
+        """
+        ifs = [
+            (Expr._coerce(k)._unbound, Expr._coerce(v)._unbound)
+            for k, v in cases.items()
+        ]
+        return Expr(switch(self._unbound, ifs, Expr._coerce(default)._unbound))
 
     def cast(self, type: Any) -> "Expr":
         """Cast this expression to ``type`` (a proto.Type or a type builder).
@@ -290,6 +354,53 @@ class Expr:
 
     def __repr__(self) -> str:  # pragma: no cover - debugging aid
         return "Expr(<unbound>)"
+
+
+class When:
+    """Intermediate for building a CASE expression; see :func:`when`."""
+
+    __slots__ = ("_clauses", "_pending")
+
+    def __init__(self, clauses: list, pending: Union[Expr, None]):
+        self._clauses = clauses  # list[(cond Expr, value Expr)] completed
+        self._pending = pending  # a condition Expr awaiting .then(), or None
+
+    def when(self, condition: Any) -> "When":
+        if self._pending is not None:
+            raise ValueError("call .then(...) before starting another .when(...)")
+        return When(self._clauses, Expr._coerce(condition))
+
+    def then(self, value: Any) -> "When":
+        if self._pending is None:
+            raise ValueError(".then(...) must follow a .when(...)")
+        return When(self._clauses + [(self._pending, Expr._coerce(value))], None)
+
+    def otherwise(self, default: Any) -> Expr:
+        if self._pending is not None:
+            raise ValueError("call .then(...) before .otherwise(...)")
+        if not self._clauses:
+            raise ValueError("a CASE needs at least one when(...).then(...)")
+        ifs = [(c._unbound, v._unbound) for c, v in self._clauses]
+        return Expr(if_then(ifs, Expr._coerce(default)._unbound))
+
+
+def when(condition: Any) -> When:
+    """Begin a CASE expression, PySpark/Polars-style::
+
+        when(col("x") > 0).then("pos").when(col("x") < 0).then("neg").otherwise("zero")
+
+    Chain ``.then(value)`` after each ``.when(condition)`` and finish with
+    ``.otherwise(default)``, which returns the :class:`Expr`.
+    """
+    return When([], Expr._coerce(condition))
+
+
+def coalesce(*exprs: Any) -> Expr:
+    """First non-null among ``exprs`` (SQL ``COALESCE``)."""
+    if not exprs:
+        raise ValueError("coalesce needs at least one expression")
+    args = [Expr._coerce(e)._unbound for e in exprs]
+    return Expr(scalar_function(FUNCTIONS_COMPARISON, "coalesce", expressions=args))
 
 
 def col(name: Union[str, int]) -> Expr:

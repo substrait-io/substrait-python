@@ -6,16 +6,25 @@ the equivalent hand-written scalar_function builder call.
 
 import pytest
 
-from substrait.builders.extended_expression import column, literal, scalar_function
+from substrait.builders.extended_expression import (
+    column,
+    if_then,
+    literal,
+    scalar_function,
+    singular_or_list,
+    switch,
+)
 from substrait.builders.plan import read_named_table, select
 from substrait.builders.type import fp64, i64, named_struct, string, struct
 from substrait.expr import (
     FUNCTIONS_ARITHMETIC,
     FUNCTIONS_BOOLEAN,
     FUNCTIONS_COMPARISON,
+    coalesce,
     col,
     infer_literal_type,
     lit,
+    when,
 )
 from substrait.extension_registry import ExtensionRegistry
 
@@ -54,6 +63,8 @@ def _same(lhs_unbound, rhs_unbound):
         (col("a") - col("b"), FUNCTIONS_ARITHMETIC, "subtract"),
         (col("a") * col("b"), FUNCTIONS_ARITHMETIC, "multiply"),
         (col("a") / col("b"), FUNCTIONS_ARITHMETIC, "divide"),
+        (col("a") % col("b"), FUNCTIONS_ARITHMETIC, "modulus"),
+        (col("a") ** col("b"), FUNCTIONS_ARITHMETIC, "power"),
     ],
 )
 def test_binary_operator_matches_builder(op_result, urn, fn):
@@ -174,3 +185,150 @@ def test_arithmetic_overload_resolves_and_types_output():
     )(registry)
     fn = plan.relations[-1].root.input.project.expressions[0].scalar_function
     assert fn.output_type.WhichOneof("kind") == "fp64"
+
+
+# -- Phase 2: reflected %/**, xor, helpers, IN, CASE ----------------------
+
+
+@pytest.mark.parametrize(
+    "expr, fn",
+    [
+        (10 % col("a"), "modulus"),
+        (2 ** col("a"), "power"),
+    ],
+)
+def test_reflected_mod_pow_put_literal_on_left(expr, fn):
+    expected = scalar_function(
+        FUNCTIONS_ARITHMETIC,
+        fn,
+        expressions=[literal(10 if fn == "modulus" else 2, i64()), column("a")],
+    )
+    assert _same(expr.unbound, expected)
+
+
+def test_xor_matches_builder():
+    expr = (col("a") < col("b")) ^ (col("a") > col("b"))
+    expected = scalar_function(
+        FUNCTIONS_BOOLEAN,
+        "xor",
+        expressions=[
+            scalar_function(
+                FUNCTIONS_COMPARISON, "lt", expressions=[column("a"), column("b")]
+            ),
+            scalar_function(
+                FUNCTIONS_COMPARISON, "gt", expressions=[column("a"), column("b")]
+            ),
+        ],
+    )
+    assert _same(expr.unbound, expected)
+
+
+def test_is_distinct_from_matches_builder():
+    expr = col("a").is_distinct_from(col("b"))
+    expected = scalar_function(
+        FUNCTIONS_COMPARISON, "is_distinct_from", expressions=[column("a"), column("b")]
+    )
+    assert _same(expr.unbound, expected)
+
+
+def test_between_matches_builder():
+    expr = col("a").between(0, 10)
+    expected = scalar_function(
+        FUNCTIONS_COMPARISON,
+        "between",
+        expressions=[column("a"), literal(0, i64()), literal(10, i64())],
+    )
+    assert _same(expr.unbound, expected)
+
+
+def test_coalesce_matches_builder():
+    expr = coalesce(col("a"), col("b"), 0)
+    expected = scalar_function(
+        FUNCTIONS_COMPARISON,
+        "coalesce",
+        expressions=[column("a"), column("b"), literal(0, i64())],
+    )
+    assert _same(expr.unbound, expected)
+
+
+def test_is_nan_matches_builder():
+    ns = named_struct(
+        names=["x"], struct=struct(types=[fp64(nullable=False)], nullable=False)
+    )
+    fluent = select(read_named_table("t", ns), expressions=[col("x").is_nan().unbound])(
+        registry
+    )
+    raw = select(
+        read_named_table("t", ns),
+        expressions=[
+            scalar_function(FUNCTIONS_COMPARISON, "is_nan", expressions=[column("x")])
+        ],
+    )(registry)
+    assert fluent.SerializeToString() == raw.SerializeToString()
+
+
+def test_is_in_matches_builder():
+    expr = col("a").is_in([1, 2, 3])
+    expected = singular_or_list(
+        column("a"), [literal(1, i64()), literal(2, i64()), literal(3, i64())]
+    )
+    assert _same(expr.unbound, expected)
+
+
+def test_is_in_rejects_string():
+    with pytest.raises(TypeError, match="collection of values"):
+        col("a").is_in("abc")
+
+
+def test_when_otherwise_matches_if_then_builder():
+    expr = when(col("a") > 0).then(1).when(col("a") < 0).then(-1).otherwise(0)
+    expected = if_then(
+        [
+            (
+                scalar_function(
+                    FUNCTIONS_COMPARISON,
+                    "gt",
+                    expressions=[column("a"), literal(0, i64())],
+                ),
+                literal(1, i64()),
+            ),
+            (
+                scalar_function(
+                    FUNCTIONS_COMPARISON,
+                    "lt",
+                    expressions=[column("a"), literal(0, i64())],
+                ),
+                literal(-1, i64()),
+            ),
+        ],
+        literal(0, i64()),
+    )
+    assert _same(expr.unbound, expected)
+
+
+def test_switch_matches_builder():
+    expr = col("a").switch({1: "one", 2: "two"}, "other")
+    expected = switch(
+        column("a"),
+        [
+            (literal(1, i64()), literal("one", string())),
+            (literal(2, i64()), literal("two", string())),
+        ],
+        literal("other", string()),
+    )
+    assert _same(expr.unbound, expected)
+
+
+def test_when_requires_then_before_otherwise():
+    with pytest.raises(ValueError, match="before .otherwise"):
+        when(col("a") > 0).otherwise(0)
+
+
+def test_when_requires_then_before_next_when():
+    with pytest.raises(ValueError, match="before starting another"):
+        when(col("a") > 0).when(col("b") > 0)
+
+
+def test_coalesce_requires_an_argument():
+    with pytest.raises(ValueError, match="at least one"):
+        coalesce()

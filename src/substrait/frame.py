@@ -484,10 +484,23 @@ class DataFrame:
     def extension(self, detail: Any) -> "DataFrame":
         """Apply a custom single-input relation (ExtensionSingleRel).
 
-        ``detail`` is a ``google.protobuf.Any``. Schema is assumed unchanged
-        from the input (the detail is opaque to schema inference).
+        ``detail`` is an
+        :class:`~substrait.extension_relations.ExtensionSingleDetail` (its
+        ``derive_schema`` defines the output) or a raw ``google.protobuf.Any``
+        (the input schema is then assumed to pass through). Register the detail
+        class via ``ExtensionRegistry.register_extension_relation`` for schema
+        inference to follow it.
         """
         return self._next(_plan.extension_single(self._plan, detail))
+
+    def extension_multi(
+        self, others: Iterable["DataFrame"], detail: Any
+    ) -> "DataFrame":
+        """A custom multi-input relation (ExtensionMultiRel) over this frame and
+        ``others``; ``detail`` is an
+        :class:`~substrait.extension_relations.ExtensionMultiDetail`."""
+        inputs = [self._plan, *(o._plan for o in others)]
+        return self._next(_plan.extension_multi(inputs, detail))
 
     def hint(
         self,
@@ -723,6 +736,18 @@ class GroupBy:
                 filters=list(filters) if any(f is not None for f in filters) else None,
             )
         )
+
+
+def extension_leaf(
+    detail: Any, registry: Optional[ExtensionRegistry] = None
+) -> DataFrame:
+    """Start a DataFrame from a custom leaf relation (ExtensionLeafRel).
+
+    ``detail`` is an
+    :class:`~substrait.extension_relations.ExtensionLeafDetail`; its
+    ``derive_schema`` defines the source's output columns.
+    """
+    return DataFrame(_plan.extension_leaf(detail), registry)
 
 
 def read_named_table(

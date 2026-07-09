@@ -77,6 +77,11 @@ from substrait.expr import (
     when,
 )
 from substrait.extension_registry import ExtensionRegistry
+from substrait.extension_relations import (
+    ExtensionLeafDetail,
+    ExtensionMultiDetail,
+    ExtensionSingleDetail,
+)
 from substrait.frame import (
     DataFrame,
     create_table,
@@ -84,6 +89,7 @@ from substrait.frame import (
     default_registry,
     drop_table,
     drop_view,
+    extension_leaf,
     from_records,
     read_arrow,
     read_csv,
@@ -104,6 +110,10 @@ __all__ = [
     "read_orc",
     "read_arrow",
     "read_extension_table",
+    "extension_leaf",
+    "ExtensionLeafDetail",
+    "ExtensionSingleDetail",
+    "ExtensionMultiDetail",
     "create_table",
     "create_view",
     "drop_table",

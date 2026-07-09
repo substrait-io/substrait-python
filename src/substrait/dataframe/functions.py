@@ -4,15 +4,16 @@
 extensions -- scalar, aggregate and window -- so anything the specification
 ships is reachable by name and hides the extension-URN / signature plumbing::
 
-    import substrait.api as sub
+    import substrait.dataframe as sub
 
     sub.f.sum(sub.col("amount"))
     sub.f.substring(sub.col("name"), 1, 3)
     sub.f.coalesce(sub.col("a"), sub.col("b"))
     sub.f.row_number()
 
-Each helper returns an :class:`~substrait.expr.Expr`. The namespace is built
-lazily on first attribute access from :func:`substrait.frame.default_registry`,
+Each helper returns an :class:`~substrait.dataframe.expr.Expr`. The namespace is
+built lazily on first attribute access from
+:func:`substrait.dataframe.frame.default_registry`,
 and supports ``dir(sub.f)`` for discovery/tab-completion.
 
 Some function names appear in more than one extension (e.g. ``add`` in
@@ -40,7 +41,7 @@ from substrait.builders.extended_expression import (
     scalar_function,
     window_function,
 )
-from substrait.expr import Expr
+from substrait.dataframe.expr import Expr
 from substrait.extension_registry.function_entry import FunctionType
 from substrait.type_inference import infer_extended_expression_schema
 
@@ -141,7 +142,7 @@ class _FunctionNamespace:
         if self._fns is None:
             registry = self._registry
             if registry is None:
-                from substrait.frame import default_registry
+                from substrait.dataframe.frame import default_registry
 
                 registry = default_registry()
             object.__setattr__(self, "_fns", _build_functions(registry))

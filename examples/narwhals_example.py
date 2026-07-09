@@ -2,8 +2,8 @@
 # construction through Narwhals (`nw.from_native`), so backend-agnostic Narwhals
 # code compiles to a Substrait plan.
 #
-# For building plans directly (without Narwhals), see `api_example.py`, which
-# uses the Substrait-native DataFrame in `substrait.api` / `substrait.frame`.
+# For building plans directly (without Narwhals), see `dataframe_example.py`,
+# which uses the Substrait-native DataFrame in `substrait.dataframe`.
 #
 # /// script
 # dependencies = [

@@ -53,7 +53,7 @@ class ExtensionRegistry:
         Enables schema inference for ``ExtensionLeaf/Single/MultiRel`` built with
         an instance of ``detail_cls``: inference reconstructs the detail from the
         plan's ``Any`` and calls its ``derive_schema``. See
-        :mod:`substrait.extension_relations`. Registration is process-global
+        :mod:`substrait.dataframe.extension_relations`. Registration is process-global
         (type_urls are globally unique), so inference works on any plan.
         """
         from substrait.type_inference import register_extension_relation

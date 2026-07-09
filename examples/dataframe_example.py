@@ -1,10 +1,10 @@
-"""Example usage of the ergonomic `substrait.api` facade.
+"""Example usage of the ergonomic `substrait.dataframe` facade.
 
 Compare this with `builder_example.py`, which builds the same kinds of plans
 with the lower-level `substrait.builders.*` functions.
 """
 
-import substrait.api as sub
+import substrait.dataframe as sub
 from substrait.utils.display import pretty_print_plan
 
 

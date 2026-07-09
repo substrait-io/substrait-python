@@ -5,10 +5,10 @@ to build a Substrait plan in Python (analogous to how ``daft.DataFrame`` is
 Daft's own native frame). It is a thin, chainable wrapper over the
 ``substrait.builders.plan`` functions: it carries an ``ExtensionRegistry`` so it
 does not have to be threaded through every call, and it takes
-:class:`~substrait.expr.Expr` objects (or bare column names / Python scalars)
-rather than raw ``scalar_function`` invocations::
+:class:`~substrait.dataframe.expr.Expr` objects (or bare column names / Python
+scalars) rather than raw ``scalar_function`` invocations::
 
-    import substrait.api as sub
+    import substrait.dataframe as sub
 
     plan = (
         sub.read_named_table("people", {"id": sub.i64, "age": sub.i64})
@@ -38,7 +38,7 @@ import substrait.type_pb2 as stp
 
 from substrait.builders import plan as _plan
 from substrait.builders import type as _type
-from substrait.expr import Expr, Measure, col, lit
+from substrait.dataframe.expr import Expr, Measure, col, lit
 from substrait.extension_registry import ExtensionRegistry
 from substrait.type_inference import infer_plan_schema, reference_subtrees
 
@@ -204,7 +204,7 @@ class DataFrame:
         """
         cached = getattr(self, "_functions_ns", None)
         if cached is None:
-            from substrait.functions import functions_for
+            from substrait.dataframe.functions import functions_for
 
             cached = functions_for(self._registry)
             self._functions_ns = cached
@@ -485,7 +485,7 @@ class DataFrame:
         """Apply a custom single-input relation (ExtensionSingleRel).
 
         ``detail`` is an
-        :class:`~substrait.extension_relations.ExtensionSingleDetail` (its
+        :class:`~substrait.dataframe.extension_relations.ExtensionSingleDetail` (its
         ``derive_schema`` defines the output) or a raw ``google.protobuf.Any``
         (the input schema is then assumed to pass through). Register the detail
         class via ``ExtensionRegistry.register_extension_relation`` for schema
@@ -498,7 +498,7 @@ class DataFrame:
     ) -> "DataFrame":
         """A custom multi-input relation (ExtensionMultiRel) over this frame and
         ``others``; ``detail`` is an
-        :class:`~substrait.extension_relations.ExtensionMultiDetail`."""
+        :class:`~substrait.dataframe.extension_relations.ExtensionMultiDetail`."""
         inputs = [self._plan, *(o._plan for o in others)]
         return self._next(_plan.extension_multi(inputs, detail))
 
@@ -754,7 +754,7 @@ def extension_leaf(
     """Start a DataFrame from a custom leaf relation (ExtensionLeafRel).
 
     ``detail`` is an
-    :class:`~substrait.extension_relations.ExtensionLeafDetail`; its
+    :class:`~substrait.dataframe.extension_relations.ExtensionLeafDetail`; its
     ``derive_schema`` defines the source's output columns.
     """
     return DataFrame(_plan.extension_leaf(detail), registry)

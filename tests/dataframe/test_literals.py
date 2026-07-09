@@ -12,7 +12,7 @@ from decimal import Decimal
 import pytest
 import substrait.type_pb2 as stt
 
-import substrait.api as sub
+import substrait.dataframe as sub
 from substrait.builders import type as t
 from substrait.builders.extended_expression import _make_literal
 from substrait.type_inference import infer_literal_type

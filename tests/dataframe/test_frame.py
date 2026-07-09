@@ -1,4 +1,4 @@
-"""Tests for the fluent DataFrame facade (substrait.frame / substrait.api).
+"""Tests for the fluent DataFrame facade (substrait.dataframe.frame / substrait.dataframe).
 
 Each fluent chain is checked against the equivalent raw builder pipeline for
 byte-identical protobuf output.
@@ -7,7 +7,7 @@ byte-identical protobuf output.
 import pytest
 import substrait.algebra_pb2 as stalg
 
-import substrait.api as sub
+import substrait.dataframe as sub
 from substrait.builders.extended_expression import (
     aggregate_function,
     column,
@@ -29,7 +29,7 @@ from substrait.builders.plan import virtual_table as b_virtual_table
 from substrait.builders.plan import write_named_table as b_write
 from substrait.builders.type import fp64, i64, named_struct, string, struct
 from substrait.extension_registry import ExtensionRegistry
-from substrait.frame import _JOIN_TYPES
+from substrait.dataframe.frame import _JOIN_TYPES
 
 registry = ExtensionRegistry(load_default_extensions=True)
 

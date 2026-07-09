@@ -1,14 +1,14 @@
-"""Tests for nullability control (substrait.dtypes) and literal coercion."""
+"""Tests for nullability control (substrait.dataframe.dtypes) and literal coercion."""
 
 import pytest
 import substrait.type_pb2 as stt
 
-import substrait.api as sub
+import substrait.dataframe as sub
 from substrait.builders.plan import read_named_table as b_read
 from substrait.builders.plan import select
 from substrait.builders.type import fp64, i32, i64, named_struct, string, struct
-from substrait.dtypes import DataType
-from substrait.expr import col
+from substrait.dataframe.dtypes import DataType
+from substrait.dataframe.expr import col
 from substrait.extension_registry import ExtensionRegistry
 
 registry = ExtensionRegistry(load_default_extensions=True)
@@ -82,7 +82,7 @@ _EXCLUDED_KINDS = {
     "user_defined_type_reference",
     "alias",
 }
-# proto kind -> name exported on substrait.api
+# proto kind -> name exported on substrait.dataframe
 _KIND_TO_API = {"bool": "boolean", "varchar": "varchar", "list": "list_", "map": "map_"}
 
 
@@ -98,7 +98,7 @@ def test_every_concrete_type_is_reachable_on_api():
         name = _KIND_TO_API.get(kind, kind)
         if name not in sub.__all__:
             missing.append(kind)
-    assert missing == [], f"Substrait types not exposed on substrait.api: {missing}"
+    assert missing == [], f"Substrait types not exposed on substrait.dataframe: {missing}"
 
 
 def test_no_arg_types_are_datatypes_with_nullability():

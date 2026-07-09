@@ -2,7 +2,7 @@
 
 A single, shallow import that gets you productive::
 
-    import substrait.api as sub
+    import substrait.dataframe as sub
 
     plan = (
         sub.read_named_table("people", {"id": sub.i64, "age": sub.i64, "name": sub.string})
@@ -12,10 +12,16 @@ A single, shallow import that gets you productive::
         .to_plan()
     )
 
-This lives as a *submodule* (``substrait.api``) rather than the package root on
-purpose: ``substrait`` is a PEP 420 namespace package shared with the
-``substrait-protobuf`` distribution, so adding ``substrait/__init__.py`` would
-shadow ``substrait.algebra_pb2`` and friends.
+This is the Substrait-*native* fluent DataFrame/Expr API -- the higher-level
+counterpart to the lower-level ``substrait.builders`` layer, and a sibling to
+the other entry points (``substrait.sql``, ``substrait.narwhals``). It lives in
+its own subpackage rather than at the ``substrait`` package root because
+``substrait`` is a PEP 420 namespace package shared with the
+``substrait-protobuf`` distribution: an ``substrait/__init__.py`` would shadow
+``substrait.algebra_pb2`` and friends, and scattering ``expr`` / ``frame`` /
+... at the shared namespace root would risk colliding with the sibling
+distributions. Grouping them under ``substrait.dataframe`` keeps a single,
+clearly owned import surface.
 
 Everything here is an additive facade over the existing ``substrait.builders``,
 ``substrait.extension_registry`` and ``substrait.proto`` layers, which remain
@@ -44,7 +50,7 @@ from substrait.builders.type import var_char as varchar  # spec spelling
 
 # Primitive / no-argument type shortcuts as nullability-aware DataType objects
 # (sub.i64 -> nullable; sub.i64.non_null -> required; sub.i64() still callable).
-from substrait.dtypes import (
+from substrait.dataframe.dtypes import (
     DataType,
     binary,
     boolean,
@@ -59,7 +65,7 @@ from substrait.dtypes import (
     string,
     uuid,
 )
-from substrait.expr import (
+from substrait.dataframe.expr import (
     Expr,
     all_,
     any_,
@@ -78,12 +84,12 @@ from substrait.expr import (
     when,
 )
 from substrait.extension_registry import ExtensionRegistry
-from substrait.extension_relations import (
+from substrait.dataframe.extension_relations import (
     ExtensionLeafDetail,
     ExtensionMultiDetail,
     ExtensionSingleDetail,
 )
-from substrait.frame import (
+from substrait.dataframe.frame import (
     DataFrame,
     create_table,
     create_view,
@@ -100,7 +106,7 @@ from substrait.frame import (
     read_parquet,
     update_table,
 )
-from substrait.functions import f, functions_for
+from substrait.dataframe.functions import f, functions_for
 
 __all__ = [
     # entry points

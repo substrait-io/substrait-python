@@ -9,7 +9,7 @@ import pytest
 import substrait.type_pb2 as stt
 from google.protobuf.any_pb2 import Any
 
-import substrait.api as sub
+import substrait.dataframe as sub
 from substrait.type_inference import infer_plan_schema
 
 _BOOL = stt.Type(bool=stt.Type.Boolean(nullability=stt.Type.NULLABILITY_REQUIRED))

@@ -1,4 +1,4 @@
-"""Tests for the ergonomic Expr wrapper (substrait.expr).
+"""Tests for the ergonomic Expr wrapper (substrait.dataframe.expr).
 
 The central contract: an operator expression must produce the *same* proto as
 the equivalent hand-written scalar_function builder call.
@@ -16,7 +16,7 @@ from substrait.builders.extended_expression import (
 )
 from substrait.builders.plan import read_named_table, select
 from substrait.builders.type import fp64, i64, named_struct, string, struct
-from substrait.expr import (
+from substrait.dataframe.expr import (
     FUNCTIONS_ARITHMETIC,
     FUNCTIONS_BOOLEAN,
     FUNCTIONS_COMPARISON,

@@ -5,12 +5,13 @@ Substrait plan construction via ``nw.from_native(...)`` by exposing the backend
 hooks (``__narwhals_lazyframe__`` / ``__narwhals_namespace__``) and translating
 Narwhals calls into Substrait plan builders.
 
-It is distinct from :mod:`substrait.frame`, which is the Substrait-*native*
-fluent DataFrame you can call directly without Narwhals. This layer sits on top
-of that native machinery; the two compose rather than compete.
+It is distinct from :mod:`substrait.dataframe.frame`, which is the
+Substrait-*native* fluent DataFrame you can call directly without Narwhals. This
+layer sits on top of that native machinery; the two compose rather than compete.
 
 Status: experimental / minimal -- it currently implements only a subset of the
-Narwhals compliant protocol, to be built out on top of :mod:`substrait.frame`.
+Narwhals compliant protocol, to be built out on top of
+:mod:`substrait.dataframe.frame`.
 """
 
 from typing import Iterable, Union
@@ -24,7 +25,7 @@ class DataFrame:
     """Narwhals-compliant wrapper around a Substrait plan.
 
     Presents as a Narwhals ``LazyFrame`` backend. For direct, non-Narwhals plan
-    building use :class:`substrait.frame.DataFrame` instead.
+    building use :class:`substrait.dataframe.frame.DataFrame` instead.
     """
 
     def __init__(self, plan):

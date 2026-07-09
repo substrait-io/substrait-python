@@ -1,15 +1,15 @@
-"""Tests for the generated function namespace (substrait.functions)."""
+"""Tests for the generated function namespace (substrait.dataframe.functions)."""
 
 import keyword
 
 import pytest
 
-import substrait.api as sub
+import substrait.dataframe as sub
 from substrait.builders.plan import consistent_partition_window
 from substrait.builders.plan import read_named_table as b_read
 from substrait.builders.type import fp64, i64, named_struct, string, struct
 from substrait.extension_registry import ExtensionRegistry
-from substrait.functions import _safe_name
+from substrait.dataframe.functions import _safe_name
 
 registry = ExtensionRegistry(load_default_extensions=True)
 

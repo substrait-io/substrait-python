@@ -521,7 +521,17 @@ class DataFrame:
         def resolve(registry: ExtensionRegistry):
             bound = inner(registry)
             rel = bound.relations[-1].root.input
-            common = getattr(rel, rel.WhichOneof("rel_type")).common
+            rel_inner = getattr(rel, rel.WhichOneof("rel_type"))
+            # A few relations (ReferenceRel from .cache(), UpdateRel) carry no
+            # RelCommon and so cannot hold a hint -- fail with a clear message
+            # rather than an opaque AttributeError on `.common`.
+            if "common" not in rel_inner.DESCRIPTOR.fields_by_name:
+                raise TypeError(
+                    f"cannot attach a hint to a {rel_inner.DESCRIPTOR.name} "
+                    "(e.g. a cached/reference relation); apply .hint(...) before "
+                    ".cache()"
+                )
+            common = rel_inner.common
             if row_count is not None:
                 common.hint.stats.row_count = row_count
             if record_size is not None:

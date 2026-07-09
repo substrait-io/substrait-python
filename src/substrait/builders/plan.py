@@ -19,7 +19,7 @@ from substrait.builders.extended_expression import (
     resolve_expression,
 )
 from substrait.extension_registry import ExtensionRegistry
-from substrait.type_inference import infer_plan_schema
+from substrait.type_inference import infer_plan_schema, join_output_names
 from substrait.utils import (
     merge_extension_declarations,
     merge_extension_urns,
@@ -438,6 +438,7 @@ def join(
     right: PlanOrUnbound,
     expression: ExtendedExpressionOrUnbound,
     type: stalg.JoinRel.JoinType,
+    *,
     post_join_filter: Optional[ExtendedExpressionOrUnbound] = None,
     extension: Optional[AdvancedExtension] = None,
 ) -> UnboundPlan:
@@ -476,9 +477,15 @@ def join(
             )
         )
 
+        # The join condition resolves against the combined left+right schema, but
+        # the output names must match the columns the join type actually emits
+        # (semi/anti drop a side, mark appends a boolean).
+        out_names = join_output_names(
+            stalg.JoinRel.JoinType.Name(type), left_ns.names, right_ns.names
+        )
         return stp.Plan(
             version=default_version,
-            relations=[stp.PlanRel(root=stalg.RelRoot(input=rel, names=ns.names))],
+            relations=[stp.PlanRel(root=stalg.RelRoot(input=rel, names=out_names))],
             **_merge_extensions(bound_left, bound_right, bound_expression, bound_post),
         )
 
@@ -525,6 +532,7 @@ def aggregate(
     input: PlanOrUnbound,
     grouping_expressions: Iterable[ExtendedExpressionOrUnbound],
     measures: Iterable[ExtendedExpressionOrUnbound],
+    *,
     grouping_sets: Optional[Iterable[Iterable[int]]] = None,
     filters: Optional[Iterable[Optional[ExtendedExpressionOrUnbound]]] = None,
     extension: Optional[AdvancedExtension] = None,
@@ -923,9 +931,14 @@ def nested_loop_join(
                 advanced_extension=extension,
             )
         )
+        out_names = join_output_names(
+            stalg.NestedLoopJoinRel.JoinType.Name(type),
+            left_ns.names,
+            right_ns.names,
+        )
         return stp.Plan(
             version=default_version,
-            relations=[stp.PlanRel(root=stalg.RelRoot(input=rel, names=ns.names))],
+            relations=[stp.PlanRel(root=stalg.RelRoot(input=rel, names=out_names))],
             **_merge_extensions(bound_left, bound_right, bound_expression),
         )
 
@@ -979,7 +992,9 @@ def _physical_equi_join(rel_name, rel_cls):
             keys = _comparison_join_keys(
                 list(left_keys), list(right_keys), left_ns, right_ns, registry
             )
-            names = list(left_ns.names) + list(right_ns.names)
+            names = join_output_names(
+                rel_cls.JoinType.Name(type), left_ns.names, right_ns.names
+            )
             rel = stalg.Rel(
                 **{
                     rel_name: rel_cls(

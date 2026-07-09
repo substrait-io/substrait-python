@@ -84,3 +84,17 @@ def test_expand_schema_inference():
     kinds = [t.WhichOneof("kind") for t in schema.struct.types]
     # region (string), value (fp64), and the appended i32 duplicate index.
     assert kinds == ["string", "fp64", "i32"]
+
+
+def test_expand_empty_switching_field_raises_clear_error():
+    # An empty switching field has no expression to derive a type from; schema
+    # inference must raise a clear error rather than an opaque IndexError.
+    import pytest
+
+    plan = expand(
+        _read(),
+        fields=[("switching", [])],
+        names=["value", "idx"],
+    )(None)
+    with pytest.raises(ValueError, match="no duplicate expressions"):
+        infer_plan_schema(plan)

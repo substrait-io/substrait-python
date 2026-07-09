@@ -195,3 +195,34 @@ def test_lit_decimal_infers_scale_and_precision():
     ee = sub.lit(Decimal("1.250")).unbound(stt.NamedStruct(), sub.default_registry())
     dec_type = infer_literal_type(ee.referred_expr[0].expression.literal).decimal
     assert dec_type.scale == 3  # "1.250" has 3 fractional digits
+
+
+@pytest.mark.parametrize(
+    "value, scale, precision",
+    [
+        (Decimal("1E3"), 0, 4),  # unscaled 1000 -> needs precision 4, not 1
+        (Decimal("5E2"), 0, 3),  # unscaled 500
+        (Decimal("2E1"), 0, 2),  # unscaled 20
+        (Decimal("123.45"), 2, 5),  # unscaled 12345
+        (Decimal("100"), 0, 3),
+    ],
+)
+def test_lit_decimal_precision_covers_unscaled_value(value, scale, precision):
+    # Positive-exponent Decimals (scientific notation) have trailing zeros that
+    # are absent from as_tuple().digits; the inferred precision must still count
+    # them so it is not smaller than the encoded unscaled value.
+    ee = sub.lit(value).unbound(stt.NamedStruct(), sub.default_registry())
+    dec_type = infer_literal_type(ee.referred_expr[0].expression.literal).decimal
+    assert dec_type.scale == scale
+    assert dec_type.precision == precision
+
+
+def test_lit_struct_requires_matching_arity():
+    struct_t = t.struct([t.i64(nullable=False), t.i64(nullable=False)])
+    # Right arity is fine.
+    _built((1, 2), struct_t)
+    # Too few / too many values must raise rather than silently truncate.
+    with pytest.raises(ValueError, match="declares 2 field"):
+        _built((1,), struct_t)
+    with pytest.raises(ValueError, match="declares 2 field"):
+        _built((1, 2, 3), struct_t)

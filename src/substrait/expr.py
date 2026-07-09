@@ -77,7 +77,12 @@ def _decimal_type(value: _Decimal) -> stp.Type:
     if not isinstance(exponent, int):  # NaN / Infinity have symbolic exponents
         raise TypeError("cannot infer a decimal literal type from a non-finite Decimal")
     scale = -exponent if exponent < 0 else 0
-    precision = max(len(value.as_tuple().digits), scale, 1)
+    # Precision counts the digits of the *unscaled* integer. For a positive
+    # exponent (e.g. Decimal("1E3") -> unscaled 1000) the trailing zeros are not
+    # in as_tuple().digits, so add them back; otherwise the declared precision is
+    # too small for the encoded value.
+    digits = len(value.as_tuple().digits) + max(exponent, 0)
+    precision = max(digits, scale, 1)
     return _t.decimal(scale, precision)
 
 

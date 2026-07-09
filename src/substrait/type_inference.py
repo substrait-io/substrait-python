@@ -279,19 +279,32 @@ def infer_expression_type(
     elif rex_type == "subquery":
         subquery_type = expression.subquery.WhichOneof("subquery_type")
 
-        if subquery_type == "scalar":
-            scalar_rel = infer_rel_schema(expression.subquery.scalar.input)
-            return scalar_rel.types[0]
-        elif (
-            subquery_type == "in_predicate"
-            or subquery_type == "set_comparison"
-            or subquery_type == "set_predicate"
-        ):
-            stt.Type.Boolean(
-                nullability=stt.Type.Nullability.NULLABILITY_NULLABLE
-            )  # can this be a null?
-        else:
-            raise Exception(f"Unknown subquery_type {subquery_type}")
+        # The subquery's inner plan may contain OuterReferences (correlated
+        # columns) that resolve against this enclosing query's schema. Push it so
+        # inferring the inner rel resolves them -- this makes inference
+        # self-contained rather than relying on the build-time push in
+        # extended_expression._inner_rel (which is gone by the time a downstream
+        # verb re-infers the enclosing plan's schema).
+        stack = outer_schemas.get()
+        token = outer_schemas.set((*stack, stt.NamedStruct(struct=parent_schema)))
+        try:
+            if subquery_type == "scalar":
+                scalar_rel = infer_rel_schema(expression.subquery.scalar.input)
+                return scalar_rel.types[0]
+            elif (
+                subquery_type == "in_predicate"
+                or subquery_type == "set_comparison"
+                or subquery_type == "set_predicate"
+            ):
+                return stt.Type(
+                    bool=stt.Type.Boolean(
+                        nullability=stt.Type.Nullability.NULLABILITY_NULLABLE
+                    )
+                )
+            else:
+                raise Exception(f"Unknown subquery_type {subquery_type}")
+        finally:
+            outer_schemas.reset(token)
     elif rex_type == "dynamic_parameter":
         return expression.dynamic_parameter.type
     elif rex_type == "execution_context_variable":
@@ -321,17 +334,50 @@ def infer_extended_expression_schema(ee: stee.ExtendedExpression) -> stt.Type.St
     )
 
 
+# Name of the extra boolean column a mark join appends to its output.
+JOIN_MARK_COLUMN_NAME = "mark"
+
+
+def _join_column_shape(type_name: str) -> str:
+    """Which columns a join emits, by join-type NAME (shared across all join
+    relations, whose enum integer values differ): ``left`` / ``right`` only for
+    semi/anti, ``both+mark`` for mark joins, ``both`` otherwise. Single source of
+    truth for both the inferred type list and the RelRoot names."""
+    if type_name in ("JOIN_TYPE_LEFT_SEMI", "JOIN_TYPE_LEFT_ANTI"):
+        return "left"
+    if type_name in ("JOIN_TYPE_RIGHT_SEMI", "JOIN_TYPE_RIGHT_ANTI"):
+        return "right"
+    if type_name in ("JOIN_TYPE_LEFT_MARK", "JOIN_TYPE_RIGHT_MARK"):
+        return "both+mark"
+    return "both"  # inner / outer / left / right / single
+
+
+def join_output_names(type_name: str, left_names, right_names) -> list:
+    """RelRoot output names for a join, matching the columns
+    :func:`_join_output_struct` emits so names and inferred types never disagree
+    in count."""
+    shape = _join_column_shape(type_name)
+    if shape == "left":
+        return list(left_names)
+    if shape == "right":
+        return list(right_names)
+    if shape == "both+mark":
+        return list(left_names) + list(right_names) + [JOIN_MARK_COLUMN_NAME]
+    return list(left_names) + list(right_names)
+
+
 def _join_output_struct(type_name: str, left_rel, right_rel) -> stt.Type.Struct:
-    """Join output columns by join-type NAME (shared across all join relations,
-    whose enum integer values differ)."""
+    """Join output column types by join-type NAME (shared across all join
+    relations, whose enum integer values differ)."""
     left = infer_rel_schema(left_rel)
     right = infer_rel_schema(right_rel)
     required = stt.Type.Nullability.NULLABILITY_REQUIRED
-    if type_name in ("JOIN_TYPE_LEFT_SEMI", "JOIN_TYPE_LEFT_ANTI"):
+    shape = _join_column_shape(type_name)
+    if shape == "left":
         types = list(left.types)
-    elif type_name in ("JOIN_TYPE_RIGHT_SEMI", "JOIN_TYPE_RIGHT_ANTI"):
+    elif shape == "right":
         types = list(right.types)
-    elif type_name in ("JOIN_TYPE_LEFT_MARK", "JOIN_TYPE_RIGHT_MARK"):
+    elif shape == "both+mark":
         types = (
             list(left.types)
             + list(right.types)
@@ -341,7 +387,7 @@ def _join_output_struct(type_name: str, left_rel, right_rel) -> stt.Type.Struct:
                 )
             ]
         )
-    else:  # inner / outer / left / right / single
+    else:
         types = list(left.types) + list(right.types)
     return stt.Type.Struct(types=types, nullability=required)
 
@@ -401,52 +447,11 @@ def infer_rel_schema(rel: stalg.Rel) -> stt.Type.Struct:
 
         (common, struct) = (rel.cross.common, raw_schema)
     elif rel_type == "join":
-        if rel.join.type in [
-            stalg.JoinRel.JOIN_TYPE_INNER,
-            stalg.JoinRel.JOIN_TYPE_OUTER,
-            stalg.JoinRel.JOIN_TYPE_LEFT,
-            stalg.JoinRel.JOIN_TYPE_RIGHT,
-            stalg.JoinRel.JOIN_TYPE_LEFT_SINGLE,
-            stalg.JoinRel.JOIN_TYPE_RIGHT_SINGLE,
-        ]:
-            raw_schema = stt.Type.Struct(
-                types=list(infer_rel_schema(rel.join.left).types)
-                + list(infer_rel_schema(rel.join.right).types),
-                nullability=stt.Type.Nullability.NULLABILITY_REQUIRED,
-            )
-        elif rel.join.type in [
-            stalg.JoinRel.JOIN_TYPE_LEFT_ANTI,
-            stalg.JoinRel.JOIN_TYPE_LEFT_SEMI,
-        ]:
-            raw_schema = stt.Type.Struct(
-                types=infer_rel_schema(rel.join.left).types,
-                nullability=stt.Type.Nullability.NULLABILITY_REQUIRED,
-            )
-        elif rel.join.type in [
-            stalg.JoinRel.JOIN_TYPE_RIGHT_ANTI,
-            stalg.JoinRel.JOIN_TYPE_RIGHT_SEMI,
-        ]:
-            raw_schema = stt.Type.Struct(
-                types=infer_rel_schema(rel.join.right).types,
-                nullability=stt.Type.Nullability.NULLABILITY_REQUIRED,
-            )
-        elif rel.join.type in [
-            stalg.JoinRel.JOIN_TYPE_LEFT_MARK,
-            stalg.JoinRel.JOIN_TYPE_RIGHT_MARK,
-        ]:
-            raw_schema = stt.Type.Struct(
-                types=list(infer_rel_schema(rel.join.left).types)
-                + list(infer_rel_schema(rel.join.right).types)
-                + [
-                    stt.Type(
-                        bool=stt.Type.Boolean(nullability=stt.Type.NULLABILITY_NULLABLE)
-                    )
-                ],
-                nullability=stt.Type.Nullability.NULLABILITY_REQUIRED,
-            )
-        else:
-            raise Exception(f"Unhandled join_type {rel.join.type}")
-
+        raw_schema = _join_output_struct(
+            stalg.JoinRel.JoinType.Name(rel.join.type),
+            rel.join.left,
+            rel.join.right,
+        )
         (common, struct) = (rel.join.common, raw_schema)
     elif rel_type == "window":
         parent_schema = infer_rel_schema(rel.window.input)
@@ -465,11 +470,15 @@ def infer_rel_schema(rel: stalg.Rel) -> stt.Type.Struct:
                     infer_expression_type(field.consistent_field, parent_schema)
                 )
             else:
-                field_types.append(
-                    infer_expression_type(
-                        field.switching_field.duplicates[0], parent_schema
+                duplicates = field.switching_field.duplicates
+                if not duplicates:
+                    raise ValueError(
+                        "expand switching field has no duplicate expressions; its "
+                        "output type cannot be inferred"
                     )
-                )
+                # All duplicates of a switching field share one type; the first
+                # determines the output column type.
+                field_types.append(infer_expression_type(duplicates[0], parent_schema))
         # Expand appends an i32 column with the index of the duplicate the row
         # is derived from.
         field_types.append(

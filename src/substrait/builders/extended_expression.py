@@ -246,9 +246,16 @@ def _make_literal(value: Any, type: stp.Type) -> stalg.Expression.Literal:
     elif kind == "uuid":
         return Literal(uuid=_encode_uuid(value), nullable=nullable)
     elif kind == "struct":
+        values = list(value)
+        field_types = list(type.struct.types)
+        if len(values) != len(field_types):
+            raise ValueError(
+                f"struct literal has {len(values)} value(s) but its type declares "
+                f"{len(field_types)} field(s)"
+            )
         return Literal(
             struct=Literal.Struct(
-                fields=[_make_literal(v, t) for v, t in zip(value, type.struct.types)]
+                fields=[_make_literal(v, t) for v, t in zip(values, field_types)]
             ),
             nullable=nullable,
         )

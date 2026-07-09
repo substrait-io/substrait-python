@@ -1144,6 +1144,79 @@ def test_outer_outside_subquery_raises():
         df.filter(sub.col("x") == sub.outer("x")).to_plan()
 
 
+def test_correlated_subquery_projecting_outer_column_then_chaining():
+    # Regression: a correlated subquery whose *output* is the outer column forces
+    # the enclosing plan's schema inference to resolve the OuterReference. This
+    # must not depend on the build-time outer-schema stack (which is gone by the
+    # time a downstream verb re-infers the enclosing schema).
+    from substrait.type_inference import infer_plan_schema
+
+    outer = sub.read_named_table("o", {"k": sub.i64, "v": sub.i64})
+    inner = sub.read_named_table("i", {"k": sub.i64, "w": sub.i64})
+    correlated = inner.select(sub.outer("k").alias("ok"))
+    plan = (
+        outer.with_columns(x=sub.scalar_subquery(correlated))
+        .filter(sub.col("v") > 0)
+        .to_plan()
+    )
+    # Schema inference over the whole plan must succeed.
+    infer_plan_schema(plan)
+
+
+@pytest.mark.parametrize(
+    "make",
+    [
+        lambda inner: sub.exists(inner),
+        lambda inner: sub.unique(inner),
+        lambda inner: sub.col("x").in_subquery(inner),
+        lambda inner: sub.col("x") > sub.any_(inner),
+        lambda inner: sub.col("x") <= sub.all_(inner),
+    ],
+)
+def test_set_predicate_subquery_projected_infers_bool(make):
+    # Regression: projecting a set-predicate subquery (EXISTS / IN / ANY / ALL)
+    # must infer a boolean output type -- previously the branch built a Boolean
+    # but did not return it, yielding None and a TypeError in the Struct build.
+    from substrait.type_inference import infer_plan_schema
+
+    outer = _outer()
+    plan = outer.with_columns(flag=make(_inner())).to_plan()
+    last = infer_plan_schema(plan).struct.types[-1]
+    assert last.WhichOneof("kind") == "bool"
+
+
+def test_semi_join_output_names_match_types():
+    # Regression: a semi join emits only the left side, so RelRoot names must not
+    # carry the right side's names (which would leave more names than types).
+    from substrait.type_inference import infer_plan_schema
+
+    left, right = _ab()
+    plan = left.hash_join(right, "x", "w", how="left_semi").to_plan()
+    ns = infer_plan_schema(plan)
+    assert list(ns.names) == ["x", "y"]
+    assert len(ns.names) == len(ns.struct.types)
+
+
+def test_mark_join_output_names_match_types():
+    from substrait.type_inference import infer_plan_schema
+
+    left, right = _ab()
+    plan = left.hash_join(right, "x", "w", how="left_mark").to_plan()
+    ns = infer_plan_schema(plan)
+    # left + right + a trailing boolean mark column.
+    assert list(ns.names) == ["x", "y", "w", "z", "mark"]
+    assert len(ns.names) == len(ns.struct.types)
+    assert ns.struct.types[-1].WhichOneof("kind") == "bool"
+
+
+def test_hint_after_cache_raises_clear_error():
+    # Regression: a ReferenceRel (from .cache()) has no RelCommon, so hint() must
+    # fail with a clear message rather than an opaque AttributeError.
+    df = sub.read_named_table("t", {"a": sub.i64})
+    with pytest.raises(TypeError, match="cannot attach a hint"):
+        df.cache().hint(row_count=100).to_plan()
+
+
 def test_default_registry_is_reused():
     assert sub.default_registry() is sub.default_registry()
 

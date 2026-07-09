@@ -11,6 +11,32 @@ reference_subtrees: contextvars.ContextVar = contextvars.ContextVar(
     "reference_subtrees", default=None
 )
 
+# Registered extension-relation detail classes ({type_url: class}) so an
+# extension relation's schema can be derived by reconstructing the user's detail
+# object from the plan's opaque Any. Populated via register_extension_relation
+# (also reachable as ExtensionRegistry.register_extension_relation).
+_extension_relation_derivers: dict = {}
+
+
+def register_extension_relation(detail_cls) -> None:
+    """Register an extension-relation detail class by its ``type_url``."""
+    _extension_relation_derivers[detail_cls.type_url] = detail_cls
+
+
+def _derive_extension_schema(detail, inputs):
+    """Derive a registered extension relation's output NamedStruct, or None.
+
+    ``inputs`` is ``None`` (leaf), a single ``Type.Struct`` (single), or a list
+    of ``Type.Struct`` (multi).
+    """
+    detail_cls = _extension_relation_derivers.get(detail.type_url)
+    if detail_cls is None:
+        return None
+    reconstructed = detail_cls.from_any(detail)
+    if inputs is None:
+        return reconstructed.derive_schema()
+    return reconstructed.derive_schema(inputs)
+
 
 def infer_literal_type(literal: stalg.Expression.Literal) -> stt.Type:
     literal_type = literal.WhichOneof("literal_type")
@@ -456,12 +482,31 @@ def infer_rel_schema(rel: stalg.Rel) -> stt.Type.Struct:
     elif rel_type == "top_n":
         # TopN is a fused sort+fetch; the schema is unchanged from the input.
         (common, struct) = (rel.top_n.common, infer_rel_schema(rel.top_n.input))
+    elif rel_type == "extension_leaf":
+        derived = _derive_extension_schema(rel.extension_leaf.detail, None)
+        if derived is None:
+            raise Exception(
+                "no schema deriver registered for extension leaf relation "
+                f"{rel.extension_leaf.detail.type_url!r}"
+            )
+        (common, struct) = (rel.extension_leaf.common, derived.struct)
     elif rel_type == "extension_single":
-        # The detail is opaque; assume the extension preserves the input schema.
+        input_struct = infer_rel_schema(rel.extension_single.input)
+        derived = _derive_extension_schema(rel.extension_single.detail, input_struct)
+        # Fall back to a pass-through schema when no deriver is registered.
         (common, struct) = (
             rel.extension_single.common,
-            infer_rel_schema(rel.extension_single.input),
+            derived.struct if derived is not None else input_struct,
         )
+    elif rel_type == "extension_multi":
+        input_structs = [infer_rel_schema(i) for i in rel.extension_multi.inputs]
+        derived = _derive_extension_schema(rel.extension_multi.detail, input_structs)
+        if derived is None:
+            raise Exception(
+                "no schema deriver registered for extension multi relation "
+                f"{rel.extension_multi.detail.type_url!r}"
+            )
+        (common, struct) = (rel.extension_multi.common, derived.struct)
     elif rel_type == "reference":
         subtrees = reference_subtrees.get()
         if subtrees is None:

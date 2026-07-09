@@ -1006,30 +1006,81 @@ hash_join = _physical_equi_join("hash_join", stalg.HashJoinRel)
 merge_join = _physical_equi_join("merge_join", stalg.MergeJoinRel)
 
 
-def extension_single(plan: PlanOrUnbound, detail) -> UnboundPlan:
-    """An ExtensionSingleRel wrapping ``input`` with a custom ``detail`` (Any).
+def _detail_any(detail):
+    """A detail object's serialized Any, or the Any itself if already one."""
+    return detail.to_any() if hasattr(detail, "to_any") else detail
 
-    The output schema is assumed to match the input (the detail is opaque to
-    schema inference).
+
+def extension_leaf(detail, names: Optional[Iterable[str]] = None) -> UnboundPlan:
+    """An ExtensionLeafRel (a custom source) from an ExtensionLeafDetail.
+
+    Output names come from the detail's ``derive_schema`` (or ``names`` when a
+    raw ``Any`` is passed instead of a detail object).
+    """
+
+    def resolve(registry: ExtensionRegistry) -> stp.Plan:
+        out_names = (
+            list(detail.derive_schema().names)
+            if hasattr(detail, "derive_schema")
+            else list(names or [])
+        )
+        rel = stalg.Rel(
+            extension_leaf=stalg.ExtensionLeafRel(detail=_detail_any(detail))
+        )
+        return stp.Plan(
+            version=default_version,
+            relations=[stp.PlanRel(root=stalg.RelRoot(input=rel, names=out_names))],
+        )
+
+    return resolve
+
+
+def extension_single(plan: PlanOrUnbound, detail) -> UnboundPlan:
+    """An ExtensionSingleRel wrapping ``input``.
+
+    ``detail`` is an ``ExtensionSingleDetail`` (its ``derive_schema`` defines the
+    output) or a raw ``google.protobuf.Any`` (the input schema is assumed to pass
+    through, since the detail is then opaque to inference).
     """
 
     def resolve(registry: ExtensionRegistry) -> stp.Plan:
         bound_plan = plan if isinstance(plan, stp.Plan) else plan(registry)
+        if hasattr(detail, "derive_schema"):
+            input_struct = infer_plan_schema(bound_plan).struct
+            names = list(detail.derive_schema(input_struct).names)
+        else:
+            names = list(bound_plan.relations[-1].root.names)
         rel = stalg.Rel(
             extension_single=stalg.ExtensionSingleRel(
-                input=bound_plan.relations[-1].root.input, detail=detail
+                input=bound_plan.relations[-1].root.input, detail=_detail_any(detail)
             )
         )
         return stp.Plan(
             version=default_version,
-            relations=[
-                stp.PlanRel(
-                    root=stalg.RelRoot(
-                        input=rel, names=bound_plan.relations[-1].root.names
-                    )
-                )
-            ],
+            relations=[stp.PlanRel(root=stalg.RelRoot(input=rel, names=names))],
             **_merge_extensions(bound_plan),
+        )
+
+    return resolve
+
+
+def extension_multi(inputs: Iterable[PlanOrUnbound], detail) -> UnboundPlan:
+    """An ExtensionMultiRel over ``inputs`` from an ExtensionMultiDetail."""
+
+    def resolve(registry: ExtensionRegistry) -> stp.Plan:
+        bound_inputs = [i if isinstance(i, stp.Plan) else i(registry) for i in inputs]
+        input_structs = [infer_plan_schema(b).struct for b in bound_inputs]
+        names = list(detail.derive_schema(input_structs).names)
+        rel = stalg.Rel(
+            extension_multi=stalg.ExtensionMultiRel(
+                inputs=[b.relations[-1].root.input for b in bound_inputs],
+                detail=_detail_any(detail),
+            )
+        )
+        return stp.Plan(
+            version=default_version,
+            relations=[stp.PlanRel(root=stalg.RelRoot(input=rel, names=names))],
+            **_merge_extensions(*bound_inputs),
         )
 
     return resolve

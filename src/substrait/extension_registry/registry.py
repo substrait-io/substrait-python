@@ -25,6 +25,9 @@ class ExtensionRegistry:
         self._urn_id_generator = itertools.count(1)
         self._function_mapping: dict = defaultdict(lambda: defaultdict(list))
         self._id_generator = itertools.count(1)
+        # {type_url: detail class} for user-defined extension relations, so an
+        # extension relation's output schema can be derived during inference.
+        self._extension_relations: dict = {}
         if load_default_extensions:
             for fpath in importlib_files("substrait_extensions.extensions").glob(  # type: ignore
                 "functions*.yaml"
@@ -43,6 +46,20 @@ class ExtensionRegistry:
         with open(fname) as f:  # type: ignore
             extension_definitions = yaml.safe_load(f)
         self.register_extension_dict(extension_definitions)
+
+    def register_extension_relation(self, detail_cls) -> None:
+        """Register an extension-relation detail class (by its ``type_url``).
+
+        Enables schema inference for ``ExtensionLeaf/Single/MultiRel`` built with
+        an instance of ``detail_cls``: inference reconstructs the detail from the
+        plan's ``Any`` and calls its ``derive_schema``. See
+        :mod:`substrait.extension_relations`. Registration is process-global
+        (type_urls are globally unique), so inference works on any plan.
+        """
+        from substrait.type_inference import register_extension_relation
+
+        self._extension_relations[detail_cls.type_url] = detail_cls
+        register_extension_relation(detail_cls)
 
     def register_extension_dict(self, definitions: dict) -> None:
         """Register extensions from a dictionary (parsed YAML).

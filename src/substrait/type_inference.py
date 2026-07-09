@@ -11,6 +11,14 @@ reference_subtrees: contextvars.ContextVar = contextvars.ContextVar(
     "reference_subtrees", default=None
 )
 
+# Stack of enclosing-query schemas (NamedStruct) for correlated subqueries, so a
+# field reference with an OuterReference root resolves against the right level.
+# Pushed by the subquery builders while resolving their inner plan.
+outer_schemas: contextvars.ContextVar = contextvars.ContextVar(
+    "outer_schemas", default=()
+)
+
+
 # Registered extension-relation detail classes ({type_url: class}) so an
 # extension relation's schema can be derived by reconstructing the user's detail
 # object from the plan's opaque Any. Populated via register_extension_relation
@@ -207,9 +215,20 @@ def infer_expression_type(
     rex_type = expression.WhichOneof("rex_type")
     if rex_type == "selection":
         root_type = expression.selection.WhichOneof("root_type")
-        # A lambda parameter reference resolves against the lambda's parameter
-        # struct (passed in as parent_schema); otherwise against the input row.
-        assert root_type in ("root_reference", "lambda_parameter_reference")
+        # An OuterReference resolves against an enclosing query's schema (from
+        # the correlated-subquery stack); a lambda parameter reference against
+        # the lambda's parameter struct; otherwise against the input row.
+        if root_type == "outer_reference":
+            stack = outer_schemas.get()
+            steps = expression.selection.outer_reference.steps_out
+            if steps >= len(stack):
+                raise Exception(
+                    "outer reference outside an enclosing (correlated) query"
+                )
+            schema = stack[len(stack) - 1 - steps].struct
+        else:
+            assert root_type in ("root_reference", "lambda_parameter_reference")
+            schema = parent_schema
 
         reference_type = expression.selection.WhichOneof("reference_type")
 
@@ -219,7 +238,7 @@ def infer_expression_type(
             segment_reference_type = segment.WhichOneof("reference_type")
 
             if segment_reference_type == "struct_field":
-                return parent_schema.types[segment.struct_field.field]
+                return schema.types[segment.struct_field.field]
             else:
                 raise Exception(f"Unknown reference_type {reference_type}")
         else:

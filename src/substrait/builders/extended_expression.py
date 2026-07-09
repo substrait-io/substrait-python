@@ -11,7 +11,7 @@ import substrait.extensions.extensions_pb2 as ste
 import substrait.type_pb2 as stp
 
 from substrait.extension_registry import ExtensionRegistry
-from substrait.type_inference import infer_extended_expression_schema
+from substrait.type_inference import infer_extended_expression_schema, outer_schemas
 from substrait.utils import (
     merge_extension_declarations,
     merge_extension_urns,
@@ -299,6 +299,45 @@ def literal(
                 stee.ExpressionReference(
                     expression=stalg.Expression(literal=_make_literal(value, type)),
                     output_names=_alias_or_inferred(alias, "Literal", [str(value)]),
+                )
+            ],
+            base_schema=base_schema,
+        )
+
+    return resolve
+
+
+def outer_reference(field: Union[str, int], steps_out: int = 0):
+    """A field reference to an enclosing query's column (a correlated reference).
+
+    Only valid inside a subquery; ``steps_out`` counts query-nesting levels
+    outward (0 = the immediately enclosing query). ``field`` is resolved against
+    that enclosing query's schema.
+    """
+
+    def resolve(
+        base_schema: stp.NamedStruct, registry: ExtensionRegistry
+    ) -> stee.ExtendedExpression:
+        stack = outer_schemas.get()
+        if steps_out >= len(stack):
+            raise Exception("outer() is only valid inside a correlated subquery")
+        outer_ns = stack[len(stack) - 1 - steps_out]
+        # Resolve the column against the enclosing schema, then re-root it as an
+        # outer reference (keeping the resolved struct-field segment).
+        resolved = column(field)(outer_ns, registry).referred_expr[0]
+        segment = resolved.expression.selection.direct_reference
+        expr = stalg.Expression(
+            selection=stalg.Expression.FieldReference(
+                outer_reference=stalg.Expression.FieldReference.OuterReference(
+                    steps_out=steps_out
+                ),
+                direct_reference=segment,
+            )
+        )
+        return stee.ExtendedExpression(
+            referred_expr=[
+                stee.ExpressionReference(
+                    expression=expr, output_names=resolved.output_names
                 )
             ],
             base_schema=base_schema,
@@ -934,8 +973,15 @@ def _subquery(subquery, base_schema, output_name, *extension_sources):
     )
 
 
-def _inner_rel(query, registry: ExtensionRegistry):
-    plan = query(registry) if callable(query) else query
+def _inner_rel(query, registry: ExtensionRegistry, base_schema):
+    # Push the enclosing schema so field references inside the subquery that use
+    # an OuterReference (i.e. correlated columns) resolve against it.
+    stack = outer_schemas.get()
+    token = outer_schemas.set((*stack, base_schema))
+    try:
+        plan = query(registry) if callable(query) else query
+    finally:
+        outer_schemas.reset(token)
     return plan, plan.relations[-1].root.input
 
 
@@ -943,7 +989,7 @@ def scalar_subquery(query, alias: Union[str, None] = None):
     """A scalar (one-row, one-column) subquery expression."""
 
     def resolve(base_schema, registry):
-        plan, rel = _inner_rel(query, registry)
+        plan, rel = _inner_rel(query, registry, base_schema)
         subquery = stalg.Expression.Subquery(
             scalar=stalg.Expression.Subquery.Scalar(input=rel)
         )
@@ -956,7 +1002,7 @@ def set_predicate(query, op, alias: Union[str, None] = None):
     """An EXISTS / UNIQUE subquery predicate."""
 
     def resolve(base_schema, registry):
-        plan, rel = _inner_rel(query, registry)
+        plan, rel = _inner_rel(query, registry, base_schema)
         subquery = stalg.Expression.Subquery(
             set_predicate=stalg.Expression.Subquery.SetPredicate(
                 predicate_op=op, tuples=rel
@@ -971,7 +1017,7 @@ def in_predicate(needles, query, alias: Union[str, None] = None):
     """A ``needles IN (subquery)`` predicate."""
 
     def resolve(base_schema, registry):
-        plan, rel = _inner_rel(query, registry)
+        plan, rel = _inner_rel(query, registry, base_schema)
         bound = [resolve_expression(n, base_schema, registry) for n in needles]
         subquery = stalg.Expression.Subquery(
             in_predicate=stalg.Expression.Subquery.InPredicate(
@@ -987,7 +1033,7 @@ def set_comparison(left, query, reduction_op, comparison_op, alias=None):
     """A ``left <op> ANY/ALL (subquery)`` predicate."""
 
     def resolve(base_schema, registry):
-        plan, rel = _inner_rel(query, registry)
+        plan, rel = _inner_rel(query, registry, base_schema)
         bound_left = resolve_expression(left, base_schema, registry)
         subquery = stalg.Expression.Subquery(
             set_comparison=stalg.Expression.Subquery.SetComparison(

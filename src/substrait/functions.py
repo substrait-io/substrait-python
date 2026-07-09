@@ -62,15 +62,17 @@ def _urn_priority(urn: str) -> int:
 
 
 def _single_urn_helper(builder, urn: str, name: str):
-    def helper(*args: Any, alias: str | None = None) -> Expr:
+    def helper(*args: Any, alias: str | None = None, **options: Any) -> Expr:
         exprs = [Expr._coerce(a).unbound for a in args]
-        return Expr(builder(urn, name, expressions=exprs, alias=alias))
+        return Expr(
+            builder(urn, name, expressions=exprs, alias=alias, options=options or None)
+        )
 
     return helper
 
 
 def _multi_urn_helper(builder, urns: list[str], name: str):
-    def helper(*args: Any, alias: str | None = None) -> Expr:
+    def helper(*args: Any, alias: str | None = None, **options: Any) -> Expr:
         exprs = [Expr._coerce(a).unbound for a in args]
 
         def resolve(base_schema, registry):
@@ -80,9 +82,13 @@ def _multi_urn_helper(builder, urns: list[str], name: str):
             ]
             for urn in urns:
                 if registry.lookup_function(urn, name, signature):
-                    return builder(urn, name, expressions=bound, alias=alias)(
-                        base_schema, registry
-                    )
+                    return builder(
+                        urn,
+                        name,
+                        expressions=bound,
+                        alias=alias,
+                        options=options or None,
+                    )(base_schema, registry)
             kinds = [t.WhichOneof("kind") for t in signature]
             raise Exception(
                 f"No matching overload for '{name}' across {urns} "

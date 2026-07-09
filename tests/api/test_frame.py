@@ -1009,6 +1009,92 @@ def test_list_transform_schema_inference():
     assert t.list.type.WhichOneof("kind") == "i64"
 
 
+# -- Niche close-out: equi-joins, params, UDT, options, extension ---------
+
+
+def test_hash_join_and_chaining():
+    left = sub.read_named_table("l", {"id": sub.i64, "name": sub.string})
+    right = sub.read_named_table("r", {"rid": sub.i64, "amt": sub.fp64})
+    plan = (
+        left.hash_join(right, "id", "rid", how="left").select("name", "amt").to_plan()
+    )
+    hj = plan.relations[-1].root.input.project.input.hash_join
+    assert hj.type == stalg.HashJoinRel.JOIN_TYPE_LEFT
+    assert len(hj.keys) == 1
+    assert (
+        hj.keys[0].comparison.simple
+        == stalg.ComparisonJoinKey.SIMPLE_COMPARISON_TYPE_EQ
+    )
+    assert list(plan.relations[-1].root.names) == ["name", "amt"]
+
+
+def test_merge_join_default_right_on():
+    left = sub.read_named_table("l", {"id": sub.i64})
+    right = sub.read_named_table("r", {"id": sub.i64})
+    mj = left.merge_join(right, "id").to_plan().relations[-1].root.input.merge_join
+    assert mj.type == stalg.MergeJoinRel.JOIN_TYPE_INNER
+    assert len(mj.keys) == 1
+
+
+def test_dynamic_parameter():
+    from substrait.type_inference import infer_plan_schema
+
+    df = sub.read_named_table("t", {"id": sub.i64})
+    plan = df.with_columns(p=sub.parameter(1, sub.string)).to_plan()
+    dp = plan.relations[-1].root.input.project.expressions[0].dynamic_parameter
+    assert dp.parameter_reference == 1
+    assert dp.type.WhichOneof("kind") == "string"
+    assert infer_plan_schema(plan).struct.types[-1].WhichOneof("kind") == "string"
+
+
+def test_user_defined_type_in_schema():
+    plan = sub.read_named_table(
+        "u", {"x": sub.user_defined(7, nullable=False)}
+    ).to_plan()
+    col_t = plan.relations[-1].root.input.read.base_schema.struct.types[0]
+    assert col_t.WhichOneof("kind") == "user_defined"
+    assert col_t.user_defined.type_reference == 7
+
+
+def test_function_options():
+    df = sub.read_named_table("t", {"x": sub.i64})
+    fn = (
+        df.select(sub.f.add(sub.col("x"), 2, overflow="ERROR").alias("s"))
+        .to_plan()
+        .relations[-1]
+        .root.input.project.expressions[0]
+        .scalar_function
+    )
+    assert [o.name for o in fn.options] == ["overflow"]
+    assert list(fn.options[0].preference) == ["ERROR"]
+
+
+def test_function_without_options_has_none():
+    df = sub.read_named_table("t", {"x": sub.i64})
+    fn = (
+        df.select(sub.f.add(sub.col("x"), 2))
+        .to_plan()
+        .relations[-1]
+        .root.input.project.expressions[0]
+        .scalar_function
+    )
+    assert len(fn.options) == 0
+
+
+def test_extension_single_passthrough_and_chaining():
+    from google.protobuf.any_pb2 import Any
+
+    df = sub.read_named_table("t", {"id": sub.i64, "v": sub.i64})
+    plan = (
+        df.extension(Any(type_url="example.com/R", value=b"x"))
+        .filter(sub.col("v") > 0)
+        .to_plan()
+    )
+    ext = plan.relations[-1].root.input.filter.input.extension_single
+    assert ext.detail.type_url == "example.com/R"
+    assert plan.relations[-1].root.input.HasField("filter")
+
+
 def test_default_registry_is_reused():
     assert sub.default_registry() is sub.default_registry()
 

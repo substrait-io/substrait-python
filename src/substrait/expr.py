@@ -41,6 +41,9 @@ from substrait.builders.extended_expression import (
     switch,
 )
 from substrait.builders.extended_expression import (
+    dynamic_parameter as _dynamic_parameter,
+)
+from substrait.builders.extended_expression import (
     execution_context_variable as _execution_context_variable,
 )
 from substrait.builders.extended_expression import (
@@ -793,6 +796,17 @@ def coalesce(*exprs: Any) -> Expr:
         raise ValueError("coalesce needs at least one expression")
     args = [Expr._coerce(e)._unbound for e in exprs]
     return Expr(scalar_function(FUNCTIONS_COMPARISON, "coalesce", expressions=args))
+
+
+def parameter(index: int, type: Any, alias: Union[str, None] = None) -> Expr:
+    """A dynamic (runtime-bound) parameter of the given ``type``.
+
+    ``index`` is the 0-based position bound via the plan's parameter bindings;
+    ``type`` may be a ``proto.Type`` or a bare type builder (e.g. ``sub.i64``).
+    """
+    if callable(type):
+        type = type()
+    return Expr(_dynamic_parameter(index, type, alias))
 
 
 def current_timestamp(precision: int = 6, alias: Union[str, None] = None) -> Expr:

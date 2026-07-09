@@ -36,6 +36,7 @@ from substrait.builders.type import (
     precision_timestamp,
     precision_timestamp_tz,
     struct,
+    user_defined,
 )
 from substrait.builders.type import list as list_  # `list`/`map` shadow builtins
 from substrait.builders.type import map as map_
@@ -70,6 +71,7 @@ from substrait.expr import (
     exists,
     infer_literal_type,
     lit,
+    parameter,
     scalar_subquery,
     unique,
     when,
@@ -152,6 +154,8 @@ __all__ = [
     "named_struct",
     "list_",
     "map_",
+    "user_defined",
     "DataType",
     "infer_literal_type",
+    "parameter",
 ]

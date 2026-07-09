@@ -428,6 +428,51 @@ class DataFrame:
             )
         )
 
+    def _equi_join(self, builder, rel_cls, other, left_on, right_on, how):
+        if how not in _JOIN_TYPES:
+            raise ValueError(
+                f"unknown join type {how!r}; expected one of {sorted(_JOIN_TYPES)}"
+            )
+        join_type = getattr(rel_cls, "JOIN_TYPE_" + how.upper())
+        left_keys = [left_on] if isinstance(left_on, (str, int)) else list(left_on)
+        if right_on is None:
+            right_keys = left_keys
+        else:
+            right_keys = (
+                [right_on] if isinstance(right_on, (str, int)) else list(right_on)
+            )
+        return self._next(
+            builder(self._plan, other._plan, left_keys, right_keys, join_type)
+        )
+
+    def hash_join(
+        self,
+        other: "DataFrame",
+        left_on: Union[str, int, Iterable[Union[str, int]]],
+        right_on: Union[str, int, Iterable[Union[str, int]], None] = None,
+        how: str = "inner",
+    ) -> "DataFrame":
+        """Physical hash equi-join on key columns.
+
+        ``left_on``/``right_on`` are column names/indices; ``right_on`` defaults
+        to ``left_on``. ``how`` accepts the same values as :meth:`join`.
+        """
+        return self._equi_join(
+            _plan.hash_join, stalg.HashJoinRel, other, left_on, right_on, how
+        )
+
+    def merge_join(
+        self,
+        other: "DataFrame",
+        left_on: Union[str, int, Iterable[Union[str, int]]],
+        right_on: Union[str, int, Iterable[Union[str, int]], None] = None,
+        how: str = "inner",
+    ) -> "DataFrame":
+        """Physical sort-merge equi-join on key columns (inputs assumed sorted)."""
+        return self._equi_join(
+            _plan.merge_join, stalg.MergeJoinRel, other, left_on, right_on, how
+        )
+
     def repartition(self, n: int = 0) -> "DataFrame":
         """Redistribute rows round-robin into ``n`` partitions (an ExchangeRel)."""
         return self._next(_plan.exchange(self._plan, partition_count=n))
@@ -435,6 +480,14 @@ class DataFrame:
     def broadcast(self) -> "DataFrame":
         """Broadcast every row to all partitions (an ExchangeRel)."""
         return self._next(_plan.exchange(self._plan, broadcast=True))
+
+    def extension(self, detail: Any) -> "DataFrame":
+        """Apply a custom single-input relation (ExtensionSingleRel).
+
+        ``detail`` is a ``google.protobuf.Any``. Schema is assumed unchanged
+        from the input (the detail is opaque to schema inference).
+        """
+        return self._next(_plan.extension_single(self._plan, detail))
 
     def hint(
         self,

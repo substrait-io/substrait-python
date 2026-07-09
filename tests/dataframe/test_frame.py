@@ -28,8 +28,8 @@ from substrait.builders.plan import sort as b_sort
 from substrait.builders.plan import virtual_table as b_virtual_table
 from substrait.builders.plan import write_named_table as b_write
 from substrait.builders.type import fp64, i64, named_struct, string, struct
-from substrait.extension_registry import ExtensionRegistry
 from substrait.dataframe.frame import _JOIN_TYPES
+from substrait.extension_registry import ExtensionRegistry
 
 registry = ExtensionRegistry(load_default_extensions=True)
 

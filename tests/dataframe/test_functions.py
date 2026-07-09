@@ -8,8 +8,8 @@ import substrait.dataframe as sub
 from substrait.builders.plan import consistent_partition_window
 from substrait.builders.plan import read_named_table as b_read
 from substrait.builders.type import fp64, i64, named_struct, string, struct
-from substrait.extension_registry import ExtensionRegistry
 from substrait.dataframe.functions import _safe_name
+from substrait.extension_registry import ExtensionRegistry
 
 registry = ExtensionRegistry(load_default_extensions=True)
 

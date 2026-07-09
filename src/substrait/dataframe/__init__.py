@@ -83,7 +83,6 @@ from substrait.dataframe.expr import (
     unique,
     when,
 )
-from substrait.extension_registry import ExtensionRegistry
 from substrait.dataframe.extension_relations import (
     ExtensionLeafDetail,
     ExtensionMultiDetail,
@@ -107,6 +106,7 @@ from substrait.dataframe.frame import (
     update_table,
 )
 from substrait.dataframe.functions import f, functions_for
+from substrait.extension_registry import ExtensionRegistry
 
 __all__ = [
     # entry points

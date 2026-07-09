@@ -98,7 +98,9 @@ def test_every_concrete_type_is_reachable_on_api():
         name = _KIND_TO_API.get(kind, kind)
         if name not in sub.__all__:
             missing.append(kind)
-    assert missing == [], f"Substrait types not exposed on substrait.dataframe: {missing}"
+    assert missing == [], (
+        f"Substrait types not exposed on substrait.dataframe: {missing}"
+    )
 
 
 def test_no_arg_types_are_datatypes_with_nullability():

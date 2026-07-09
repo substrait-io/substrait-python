@@ -35,6 +35,20 @@ def _alias_or_inferred(
         return [f"{op}({','.join(args)})"]
 
 
+def _function_options(options):
+    """Build FunctionOption messages from a ``{name: preference}`` mapping.
+
+    A preference may be a single string or an ordered list of acceptable values.
+    """
+    if not options:
+        return []
+    result = []
+    for name, preference in options.items():
+        prefs = [preference] if isinstance(preference, str) else list(preference)
+        result.append(stalg.FunctionOption(name=name, preference=prefs))
+    return result
+
+
 def resolve_expression(
     expression: ExtendedExpressionOrUnbound,
     base_schema: stp.NamedStruct,
@@ -348,8 +362,13 @@ def scalar_function(
     function: str,
     expressions: Iterable[ExtendedExpressionOrUnbound],
     alias: Union[Iterable[str], str, None] = None,
+    options: Union[dict, None] = None,
 ):
-    """Builds a resolver for ExtendedExpression containing a ScalarFunction expression"""
+    """Builds a resolver for ExtendedExpression containing a ScalarFunction expression.
+
+    ``options`` is an optional ``{name: preference}`` mapping of behavioral
+    function options (e.g. ``{"overflow": "ERROR"}``).
+    """
 
     def resolve(
         base_schema: stp.NamedStruct, registry: ExtensionRegistry
@@ -405,6 +424,7 @@ def scalar_function(
                                 )
                                 for e in bound_expressions
                             ],
+                            options=_function_options(options),
                             output_type=func[1],
                         )
                     ),
@@ -434,6 +454,7 @@ def aggregate_function(
     sorts: Iterable[
         tuple[ExtendedExpressionOrUnbound, "stalg.SortField.SortDirection.ValueType"]
     ] = (),
+    options: Union[dict, None] = None,
 ):
     """Builds a resolver for ExtendedExpression containing a AggregateFunction measure.
 
@@ -500,6 +521,7 @@ def aggregate_function(
                             stalg.FunctionArgument(value=e.referred_expr[0].expression)
                             for e in bound_expressions
                         ],
+                        options=_function_options(options),
                         output_type=func[1],
                         invocation=invocation
                         if invocation is not None
@@ -533,6 +555,7 @@ def window_function(
     expressions: Iterable[ExtendedExpressionOrUnbound],
     partitions: Iterable[ExtendedExpressionOrUnbound] = [],
     alias: Union[Iterable[str], str, None] = None,
+    options: Union[dict, None] = None,
 ):
     """Builds a resolver for ExtendedExpression containing a WindowFunction expression"""
 
@@ -598,6 +621,7 @@ def window_function(
                                 )
                                 for e in bound_expressions
                             ],
+                            options=_function_options(options),
                             output_type=func[1],
                             partitions=[
                                 e.referred_expr[0].expression for e in bound_partitions
@@ -997,6 +1021,33 @@ def execution_context_variable(variable: str, type_value, alias=None):
                 stee.ExpressionReference(
                     expression=stalg.Expression(execution_context_variable=ecv),
                     output_names=[alias or variable],
+                )
+            ],
+            base_schema=base_schema,
+        )
+
+    return resolve
+
+
+def dynamic_parameter(parameter_reference: int, type: stp.Type, alias=None):
+    """A DynamicParameter placeholder bound at runtime (prepared-statement style).
+
+    Carries its own ``type`` and a 0-based ``parameter_reference`` into the
+    plan's ``parameter_bindings``.
+    """
+
+    def resolve(
+        base_schema: stp.NamedStruct, registry: ExtensionRegistry
+    ) -> stee.ExtendedExpression:
+        expr = stalg.Expression(
+            dynamic_parameter=stalg.DynamicParameter(
+                parameter_reference=parameter_reference, type=type
+            )
+        )
+        return stee.ExtendedExpression(
+            referred_expr=[
+                stee.ExpressionReference(
+                    expression=expr, output_names=[alias or f"?{parameter_reference}"]
                 )
             ],
             base_schema=base_schema,

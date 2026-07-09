@@ -247,6 +247,8 @@ def infer_expression_type(
             )  # can this be a null?
         else:
             raise Exception(f"Unknown subquery_type {subquery_type}")
+    elif rex_type == "dynamic_parameter":
+        return expression.dynamic_parameter.type
     elif rex_type == "execution_context_variable":
         ecv = expression.execution_context_variable
         variable = ecv.WhichOneof("execution_context_variable_type")
@@ -438,12 +440,28 @@ def infer_rel_schema(rel: stalg.Rel) -> stt.Type.Struct:
             name, rel.nested_loop_join.left, rel.nested_loop_join.right
         )
         (common, struct) = (rel.nested_loop_join.common, raw_schema)
+    elif rel_type == "hash_join":
+        name = stalg.HashJoinRel.JoinType.Name(rel.hash_join.type)
+        raw_schema = _join_output_struct(name, rel.hash_join.left, rel.hash_join.right)
+        (common, struct) = (rel.hash_join.common, raw_schema)
+    elif rel_type == "merge_join":
+        name = stalg.MergeJoinRel.JoinType.Name(rel.merge_join.type)
+        raw_schema = _join_output_struct(
+            name, rel.merge_join.left, rel.merge_join.right
+        )
+        (common, struct) = (rel.merge_join.common, raw_schema)
     elif rel_type == "exchange":
         # Exchange redistributes rows without changing the schema.
         (common, struct) = (rel.exchange.common, infer_rel_schema(rel.exchange.input))
     elif rel_type == "top_n":
         # TopN is a fused sort+fetch; the schema is unchanged from the input.
         (common, struct) = (rel.top_n.common, infer_rel_schema(rel.top_n.input))
+    elif rel_type == "extension_single":
+        # The detail is opaque; assume the extension preserves the input schema.
+        (common, struct) = (
+            rel.extension_single.common,
+            infer_rel_schema(rel.extension_single.input),
+        )
     elif rel_type == "reference":
         subtrees = reference_subtrees.get()
         if subtrees is None:

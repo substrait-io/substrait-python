@@ -932,6 +932,109 @@ def nested_loop_join(
     return resolve
 
 
+def _comparison_join_keys(left_keys, right_keys, left_ns, right_ns, registry):
+    """Build EQ ComparisonJoinKeys from column names/indices on each side."""
+    keys = []
+    for left_key, right_key in zip(left_keys, right_keys):
+        from substrait.builders.extended_expression import column
+
+        left_ref = (
+            resolve_expression(column(left_key), left_ns, registry)
+            .referred_expr[0]
+            .expression.selection
+        )
+        right_ref = (
+            resolve_expression(column(right_key), right_ns, registry)
+            .referred_expr[0]
+            .expression.selection
+        )
+        keys.append(
+            stalg.ComparisonJoinKey(
+                left=left_ref,
+                right=right_ref,
+                comparison=stalg.ComparisonJoinKey.ComparisonType(
+                    simple=stalg.ComparisonJoinKey.SIMPLE_COMPARISON_TYPE_EQ
+                ),
+            )
+        )
+    return keys
+
+
+def _physical_equi_join(rel_name, rel_cls):
+    """Factory for the hash_join / merge_join builders (equi-join on key columns)."""
+
+    def builder(
+        left: PlanOrUnbound,
+        right: PlanOrUnbound,
+        left_keys: Iterable[Union[str, int]],
+        right_keys: Iterable[Union[str, int]],
+        type,
+        extension: Optional[AdvancedExtension] = None,
+    ) -> UnboundPlan:
+        def resolve(registry: ExtensionRegistry) -> stp.Plan:
+            bound_left = left if isinstance(left, stp.Plan) else left(registry)
+            bound_right = right if isinstance(right, stp.Plan) else right(registry)
+            left_ns = infer_plan_schema(bound_left)
+            right_ns = infer_plan_schema(bound_right)
+            keys = _comparison_join_keys(
+                list(left_keys), list(right_keys), left_ns, right_ns, registry
+            )
+            names = list(left_ns.names) + list(right_ns.names)
+            rel = stalg.Rel(
+                **{
+                    rel_name: rel_cls(
+                        left=bound_left.relations[-1].root.input,
+                        right=bound_right.relations[-1].root.input,
+                        keys=keys,
+                        type=type,
+                        advanced_extension=extension,
+                    )
+                }
+            )
+            return stp.Plan(
+                version=default_version,
+                relations=[stp.PlanRel(root=stalg.RelRoot(input=rel, names=names))],
+                **_merge_extensions(bound_left, bound_right),
+            )
+
+        return resolve
+
+    return builder
+
+
+hash_join = _physical_equi_join("hash_join", stalg.HashJoinRel)
+merge_join = _physical_equi_join("merge_join", stalg.MergeJoinRel)
+
+
+def extension_single(plan: PlanOrUnbound, detail) -> UnboundPlan:
+    """An ExtensionSingleRel wrapping ``input`` with a custom ``detail`` (Any).
+
+    The output schema is assumed to match the input (the detail is opaque to
+    schema inference).
+    """
+
+    def resolve(registry: ExtensionRegistry) -> stp.Plan:
+        bound_plan = plan if isinstance(plan, stp.Plan) else plan(registry)
+        rel = stalg.Rel(
+            extension_single=stalg.ExtensionSingleRel(
+                input=bound_plan.relations[-1].root.input, detail=detail
+            )
+        )
+        return stp.Plan(
+            version=default_version,
+            relations=[
+                stp.PlanRel(
+                    root=stalg.RelRoot(
+                        input=rel, names=bound_plan.relations[-1].root.names
+                    )
+                )
+            ],
+            **_merge_extensions(bound_plan),
+        )
+
+    return resolve
+
+
 def exchange(
     plan: PlanOrUnbound,
     partition_count: int = 0,

@@ -50,6 +50,9 @@ from substrait.builders.extended_expression import (
     in_predicate as _in_predicate,
 )
 from substrait.builders.extended_expression import (
+    outer_reference as _outer_reference,
+)
+from substrait.builders.extended_expression import (
     scalar_subquery as _scalar_subquery,
 )
 from substrait.builders.extended_expression import (
@@ -876,6 +879,19 @@ def all_(subquery: Any) -> _SubqueryReduction:
 def col(name: Union[str, int]) -> Expr:
     """Reference an input column by name or index."""
     return Expr(column(name))
+
+
+def outer(name: Union[str, int], steps_out: int = 0) -> Expr:
+    """Reference a column from an enclosing query (a correlated reference).
+
+    Only valid inside a subquery, e.g. a correlated ``exists``::
+
+        outer_df.filter(sub.exists(inner_df.filter(sub.col("k") == sub.outer("k"))))
+
+    ``steps_out`` counts query-nesting levels outward (0 = the immediately
+    enclosing query).
+    """
+    return Expr(_outer_reference(name, steps_out))
 
 
 def lit(value: Any, type: Union[stp.Type, None] = None) -> Expr:

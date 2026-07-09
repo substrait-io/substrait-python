@@ -1095,6 +1095,55 @@ def test_extension_single_passthrough_and_chaining():
     assert plan.relations[-1].root.input.HasField("filter")
 
 
+# -- Correlated subqueries (OuterReference) -------------------------------
+
+
+def test_correlated_exists():
+    outer = sub.read_named_table("o", {"k": sub.i64, "v": sub.i64})
+    inner = sub.read_named_table("i", {"k": sub.i64, "w": sub.i64})
+    corr = inner.filter(sub.col("k") == sub.outer("k"))  # inner.k == outer.k
+    plan = outer.filter(sub.exists(corr)).to_plan()
+
+    inner_cond = plan.relations[
+        -1
+    ].root.input.filter.condition.subquery.set_predicate.tuples.filter.condition
+    lhs, rhs = (a.value.selection for a in inner_cond.scalar_function.arguments)
+    assert lhs.WhichOneof("root_type") == "root_reference"  # inner.k
+    assert rhs.WhichOneof("root_type") == "outer_reference"  # outer.k
+    assert rhs.outer_reference.steps_out == 0
+    assert rhs.direct_reference.struct_field.field == 0  # "k" in the outer schema
+
+
+def test_correlated_scalar_subquery_chains():
+    outer = sub.read_named_table("o", {"k": sub.i64, "v": sub.i64})
+    inner = sub.read_named_table("i", {"k": sub.i64, "w": sub.i64})
+    sc = inner.filter(sub.col("k") == sub.outer("k")).select("w")
+    plan = outer.filter(sub.col("v") > sub.scalar_subquery(sc)).to_plan()
+    assert plan.relations[-1].root.input.HasField("filter")
+
+
+def test_nested_correlation_steps_out():
+    outer = sub.read_named_table("o", {"k": sub.i64})
+    mid = sub.read_named_table("m", {"k": sub.i64})
+    inner = sub.read_named_table("i", {"k": sub.i64})
+    # innermost references the outermost query -> steps_out=1
+    inner_corr = inner.filter(sub.col("k") == sub.outer("k", steps_out=1))
+    mid_corr = mid.filter(sub.exists(inner_corr))
+    plan = outer.filter(sub.exists(mid_corr)).to_plan()
+
+    inner_cond = plan.relations[
+        -1
+    ].root.input.filter.condition.subquery.set_predicate.tuples.filter.condition.subquery.set_predicate.tuples.filter.condition  # mid  # inner
+    rhs = inner_cond.scalar_function.arguments[1].value.selection
+    assert rhs.outer_reference.steps_out == 1  # two levels out -> the outermost
+
+
+def test_outer_outside_subquery_raises():
+    df = sub.read_named_table("t", {"x": sub.i64})
+    with pytest.raises(Exception, match="correlated subquery"):
+        df.filter(sub.col("x") == sub.outer("x")).to_plan()
+
+
 def test_default_registry_is_reused():
     assert sub.default_registry() is sub.default_registry()
 

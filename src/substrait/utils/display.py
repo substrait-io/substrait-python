@@ -477,8 +477,6 @@ class PlanPrinter:
             stream.write(f'{indent}literal: "{literal.string}"\n')
         elif literal.HasField("date"):
             stream.write(f"{indent}literal: date={literal.date}\n")
-        elif literal.HasField("timestamp"):
-            stream.write(f"{indent}literal: timestamp={literal.timestamp}\n")
         elif literal.HasField("map"):
             stream.write(f"{indent}literal: map\n")
             self._stream_map_literal(literal.map, stream, depth + 1)
@@ -626,8 +624,6 @@ class PlanPrinter:
                     return f'literal: "{arg.value.literal.string}"'
                 elif arg.value.literal.HasField("date"):
                     return f"literal: date={arg.value.literal.date}"
-                elif arg.value.literal.HasField("timestamp"):
-                    return f"literal: timestamp={arg.value.literal.timestamp}"
                 elif arg.value.literal.HasField("map"):
                     # For maps, we'll handle them specially in the main printing
                     return "<map_literal>"
@@ -679,10 +675,6 @@ class PlanPrinter:
                     stream.write(f'{indent}literal: "{arg.value.literal.string}"\n')
                 elif arg.value.literal.HasField("date"):
                     stream.write(f"{indent}literal: date={arg.value.literal.date}\n")
-                elif arg.value.literal.HasField("timestamp"):
-                    stream.write(
-                        f"{indent}literal: timestamp={arg.value.literal.timestamp}\n"
-                    )
                 elif arg.value.literal.HasField("map"):
                     # Handle map literals with proper indentation
                     stream.write(f"{indent}literal: map\n")
@@ -767,10 +759,6 @@ class PlanPrinter:
         elif literal.HasField("date"):
             stream.write(
                 f"{indent}{self._color('date', Colors.BLUE)}: {self._color(literal.date, Colors.GREEN)}\n"
-            )
-        elif literal.HasField("timestamp"):
-            stream.write(
-                f"{indent}{self._color('timestamp', Colors.BLUE)}: {self._color(literal.timestamp, Colors.GREEN)}\n"
             )
         elif literal.HasField("map"):
             # Recursively handle nested maps

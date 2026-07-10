@@ -2,7 +2,7 @@ import calendar
 import itertools
 import uuid as uuid_module
 from datetime import date, datetime, time, timedelta, timezone
-from decimal import ROUND_HALF_EVEN, Decimal
+from decimal import Decimal
 from typing import Any, Callable, Iterable, Union
 
 import substrait.algebra_pb2 as stalg
@@ -72,9 +72,32 @@ def _scale_subseconds(microseconds: int, precision: int) -> int:
 
 
 def _encode_decimal(value: Any, scale: int) -> bytes:
-    """Encode a decimal as the 16-byte little-endian two's-complement unscaled value."""
+    """Encode a decimal as the 16-byte little-endian two's-complement unscaled value.
+
+    Scaling uses pure-integer arithmetic on ``as_tuple()`` rather than ``Decimal``
+    multiplication, so it is exact regardless of the active ``decimal`` context
+    precision (which would otherwise silently round a value with more than
+    ``ctx.prec`` significant digits). A value carrying more fractional digits than
+    ``scale`` is rounded half-even.
+    """
     dec = value if isinstance(value, Decimal) else Decimal(str(value))
-    unscaled = int((dec * (Decimal(10) ** scale)).to_integral_value(ROUND_HALF_EVEN))
+    sign, digits, exponent = dec.as_tuple()
+    if not isinstance(exponent, int):  # NaN / Infinity have symbolic exponents
+        raise ValueError(f"cannot encode a non-finite decimal literal: {value!r}")
+    coeff = 0
+    for d in digits:
+        coeff = coeff * 10 + d
+    shift = exponent + scale
+    if shift >= 0:
+        unscaled = coeff * 10**shift
+    else:  # drop -shift low-order digits, rounding half-even
+        factor = 10 ** (-shift)
+        unscaled, remainder = divmod(coeff, factor)
+        twice = 2 * remainder
+        if twice > factor or (twice == factor and unscaled % 2):
+            unscaled += 1
+    if sign:
+        unscaled = -unscaled
     return unscaled.to_bytes(16, byteorder="little", signed=True)
 
 

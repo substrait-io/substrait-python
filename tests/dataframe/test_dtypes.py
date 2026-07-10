@@ -1,11 +1,15 @@
 """Tests for nullability control (substrait.dataframe.dtypes) and literal coercion."""
 
+from decimal import Decimal
+
 import pytest
 import substrait.type_pb2 as stt
 
 import substrait.dataframe as sub
+from substrait.builders.extended_expression import column, scalar_function
 from substrait.builders.plan import read_named_table as b_read
 from substrait.builders.plan import select
+from substrait.builders.type import decimal as b_decimal
 from substrait.builders.type import fp64, i32, i64, named_struct, string, struct
 from substrait.dataframe.dtypes import DataType
 from substrait.dataframe.expr import col
@@ -233,3 +237,150 @@ def test_two_column_mismatch_still_raises_without_cast():
     # Coercion only applies to literals, not between two columns.
     with pytest.raises(Exception):
         _project_expr(ns, col("a") + col("b"))
+
+
+# ---------------------------------------------------------------------------
+# #3 decimal operators + literal coercion
+# ---------------------------------------------------------------------------
+
+# builders.type.decimal is (scale, precision); DEC is a money-like decimal.
+DEC = b_decimal(2, 10, nullable=False)  # scale=2, precision=10
+DECIMAL_ARITHMETIC = "extension:io.substrait:functions_arithmetic_decimal"
+
+
+def _urns(plan):
+    return {u.urn.rsplit(":", 1)[-1] for u in plan.extension_urns}
+
+
+def _dec_ns(*types):
+    names = [chr(ord("a") + i) for i in range(len(types))]
+    return named_struct(names=names, struct=struct(types=list(types), nullable=False))
+
+
+def _scalar_fn(plan):
+    return plan.relations[-1].root.input.project.expressions[0].scalar_function
+
+
+@pytest.mark.parametrize(
+    "op_result, fn",
+    [
+        (col("a") + col("b"), "add"),
+        (col("a") - col("b"), "subtract"),
+        (col("a") * col("b"), "multiply"),
+        (col("a") / col("b"), "divide"),
+        (col("a") % col("b"), "modulus"),
+        (col("a") ** col("b"), "power"),
+    ],
+)
+def test_decimal_arithmetic_falls_through_to_decimal_extension(op_result, fn):
+    # The base functions_arithmetic has no decimal overload, so the operator must
+    # resolve against functions_arithmetic_decimal (like the f.* namespace).
+    plan = _project_expr(_dec_ns(DEC, DEC), op_result)
+    assert _urns(plan) == {"functions_arithmetic_decimal"}
+
+
+def test_decimal_arithmetic_different_precision_derives_result():
+    # decimal<P1,S1> + decimal<P2,S2> resolves and the result type is derived.
+    ns = _dec_ns(b_decimal(10, 38, nullable=False), b_decimal(4, 20, nullable=False))
+    plan = _project_expr(ns, col("a") + col("b"))
+    assert _urns(plan) == {"functions_arithmetic_decimal"}
+    assert _scalar_fn(plan).output_type.WhichOneof("kind") == "decimal"
+
+
+def test_decimal_add_matches_raw_builder():
+    ns = _dec_ns(DEC, DEC)
+    fluent = _project_expr(ns, col("a") + col("b"))
+    raw = select(
+        b_read("t", ns),
+        expressions=[
+            scalar_function(
+                DECIMAL_ARITHMETIC, "add", expressions=[column("a"), column("b")]
+            )
+        ],
+    )(registry)
+    assert fluent.SerializeToString() == raw.SerializeToString()
+
+
+def test_decimal_times_int_literal_keeps_natural_decimal():
+    # Arithmetic literal keeps its natural decimal type; derivation does the rest.
+    plan = _project_expr(_dec_ns(DEC), col("a") * 2)
+    assert _urns(plan) == {"functions_arithmetic_decimal"}
+    literal = _scalar_fn(plan).arguments[1].value.literal
+    assert literal.WhichOneof("literal_type") == "decimal"
+    assert (literal.decimal.scale, literal.decimal.precision) == (0, 1)
+
+
+def test_decimal_plus_decimal_literal_keeps_natural_decimal():
+    plan = _project_expr(_dec_ns(DEC), col("a") + Decimal("1.5"))
+    assert _urns(plan) == {"functions_arithmetic_decimal"}
+    literal = _scalar_fn(plan).arguments[1].value.literal
+    # natural type of Decimal("1.5") is scale=1, precision=2 (not the column's).
+    assert (literal.decimal.scale, literal.decimal.precision) == (1, 2)
+
+
+def test_decimal_compared_to_int_literal_coerces_to_column_type():
+    # Comparison uses any1,any1, so the literal is coerced to the column's exact type.
+    plan = _project_expr(_dec_ns(DEC), col("a") > 5)
+    assert _urns(plan) == {"functions_comparison"}
+    literal = _scalar_fn(plan).arguments[1].value.literal
+    assert literal.WhichOneof("literal_type") == "decimal"
+    assert (literal.decimal.scale, literal.decimal.precision) == (2, 10)
+
+
+def test_decimal_compared_to_decimal_literal_coerces_to_column_type():
+    plan = _project_expr(_dec_ns(DEC), col("a") == Decimal("5.00"))
+    assert _urns(plan) == {"functions_comparison"}
+    literal = _scalar_fn(plan).arguments[1].value.literal
+    # coerced to the column's (2, 10), not the literal's natural (2, 3).
+    assert (literal.decimal.scale, literal.decimal.precision) == (2, 10)
+
+
+def test_decimal_plus_float_literal_still_raises():
+    # A float against a decimal peer stays fp and does not resolve; pass a Decimal.
+    with pytest.raises(Exception):
+        _project_expr(_dec_ns(DEC), col("a") + 1.5)
+
+
+def test_int_arithmetic_unchanged_by_decimal_fallthrough():
+    # Regression: int columns still resolve against the base arithmetic extension.
+    ns = named_struct(
+        names=["a", "b"],
+        struct=struct(types=[i64(nullable=False), i64(nullable=False)], nullable=False),
+    )
+    plan = _project_expr(ns, col("a") + col("b"))
+    assert _urns(plan) == {"functions_arithmetic"}
+
+
+def test_decimal_comparison_literal_with_trailing_zeros_still_resolves():
+    # Trailing zeros do not count as a finer scale: 5.100 fits a scale-2 column.
+    plan = _project_expr(_dec_ns(DEC), col("a") == Decimal("5.100"))
+    assert _urns(plan) == {"functions_comparison"}
+    literal = _scalar_fn(plan).arguments[1].value.literal
+    assert (literal.decimal.scale, literal.decimal.precision) == (2, 10)
+
+
+def test_decimal_comparison_finer_scale_literal_raises():
+    # A literal needing a finer scale than the column would round the comparison;
+    # raise instead of silently changing which rows match.
+    with pytest.raises(ValueError, match="finer scale"):
+        _project_expr(_dec_ns(DEC), col("a") == Decimal("5.005"))
+
+
+def test_decimal_comparison_out_of_range_literal_raises():
+    # A literal too large for the column's precision cannot be represented exactly.
+    ns = _dec_ns(b_decimal(2, 4, nullable=False))  # scale=2, precision=4 -> max 99.99
+    with pytest.raises(ValueError, match="does not fit"):
+        _project_expr(ns, col("a") > 999999)
+
+
+def test_decimal_arithmetic_literal_exceeding_max_precision_raises():
+    # Natural-mode arithmetic literal with >38 significant digits is not a valid
+    # decimal; raise rather than emit a precision>38 (spec-invalid) plan.
+    with pytest.raises(ValueError, match="maximum decimal precision"):
+        _project_expr(_dec_ns(DEC), col("a") + (10**38))
+
+
+def test_lit_decimal_exceeding_max_precision_raises():
+    # The same guard applies to explicit decimal literals via lit(...).
+    with pytest.raises(ValueError, match="maximum decimal precision"):
+        sub.lit(Decimal(10**40))

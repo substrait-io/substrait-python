@@ -66,10 +66,20 @@ from substrait.type_inference import infer_extended_expression_schema
 # Standard Substrait function-extension URNs used by the operators below.
 FUNCTIONS_COMPARISON = "extension:io.substrait:functions_comparison"
 FUNCTIONS_ARITHMETIC = "extension:io.substrait:functions_arithmetic"
+FUNCTIONS_ARITHMETIC_DECIMAL = "extension:io.substrait:functions_arithmetic_decimal"
 FUNCTIONS_BOOLEAN = "extension:io.substrait:functions_boolean"
 FUNCTIONS_STRING = "extension:io.substrait:functions_string"
 FUNCTIONS_AGGREGATE_GENERIC = "extension:io.substrait:functions_aggregate_generic"
 FUNCTIONS_LIST = "extension:io.substrait:functions_list"
+
+# Arithmetic operators try the base extension first, then its decimal variant, so
+# decimal operands resolve against ``functions_arithmetic_decimal`` (there is no
+# such fallback for comparisons -- ``functions_comparison`` is generic ``any1``).
+_ARITHMETIC_URNS = [FUNCTIONS_ARITHMETIC, FUNCTIONS_ARITHMETIC_DECIMAL]
+
+
+# Substrait bounds a decimal's precision to 38 (a 128-bit unscaled value).
+_MAX_DECIMAL_PRECISION = 38
 
 
 def _decimal_type(value: _Decimal) -> stp.Type:
@@ -83,6 +93,12 @@ def _decimal_type(value: _Decimal) -> stp.Type:
     # too small for the encoded value.
     digits = len(value.as_tuple().digits) + max(exponent, 0)
     precision = max(digits, scale, 1)
+    if precision > _MAX_DECIMAL_PRECISION:
+        raise ValueError(
+            f"decimal literal {value!r} needs precision {precision}, exceeding "
+            f"Substrait's maximum decimal precision of {_MAX_DECIMAL_PRECISION}; "
+            f"the value has too many significant digits for a decimal"
+        )
     return _t.decimal(scale, precision)
 
 
@@ -135,23 +151,118 @@ _NUMERIC_BUILDERS = {
 }
 
 
-def _match_numeric_type(peer_type: stp.Type, value: Any) -> stp.Type:
+def _exact_unscaled(value: _Decimal, scale: int) -> Union[int, None]:
+    """The unscaled integer of ``value`` at ``scale``, or ``None`` if representing
+    it at ``scale`` would drop nonzero digits (i.e. the value needs a finer scale).
+
+    Pure-integer arithmetic on ``as_tuple()`` so it is exact regardless of the
+    ``decimal`` context precision.
+    """
+    sign, digits, exponent = value.as_tuple()
+    coeff = 0
+    for d in digits:
+        coeff = coeff * 10 + d
+    shift = exponent + scale
+    if shift < 0:  # value carries more fractional digits than `scale` allows
+        factor = 10 ** (-shift)
+        if coeff % factor:
+            return None
+        coeff //= factor
+    else:
+        coeff *= 10**shift
+    return -coeff if sign else coeff
+
+
+def _match_numeric_type(
+    peer_type: stp.Type, value: Any, *, decimal_literal: str = "natural"
+) -> stp.Type:
     """Pick a literal type for ``value`` that matches a numeric ``peer_type``.
 
     Substrait does not implicitly coerce mixed numeric operands, so
     ``col("price_fp64") * 2`` needs the ``2`` typed as ``fp64`` rather than the
     default ``i64`` for the ``multiply`` overload to resolve. A ``float`` value
     always stays floating point to avoid a lossy narrowing.
+
+    For a ``decimal`` peer the coercion depends on the operation, selected by
+    ``decimal_literal``:
+
+    - ``"peer"`` (comparisons) -- the ``functions_comparison`` overloads use
+      ``any1, any1`` and so require *identical* operand types, so the literal must
+      take the column's exact ``decimal(precision, scale)``. That is only sound
+      when the value is *exactly* representable there; if it would need a finer
+      scale or overflow the precision this raises rather than silently rounding or
+      truncating the comparison, so the user coerces explicitly with
+      ``lit(value, <decimal type>)`` or by casting the column.
+    - ``"natural"`` (arithmetic) -- ``functions_arithmetic_decimal`` accepts
+      ``decimal<P1,S1>, decimal<P2,S2>`` and derives the result type, so the
+      literal keeps its own natural decimal type (lossless).
+
+    A ``float`` against a decimal peer still stays floating point (so it raises
+    rather than being silently turned into a decimal); pass a ``Decimal``.
     """
     kind = peer_type.WhichOneof("kind")
     if isinstance(value, float):
         return _t.fp32() if kind == "fp32" else _t.fp64()
+    if kind == "decimal":
+        if decimal_literal == "peer":
+            scale = peer_type.decimal.scale
+            precision = peer_type.decimal.precision
+            dec = value if isinstance(value, _Decimal) else _Decimal(value)
+            if not dec.is_finite():
+                raise TypeError("cannot compare against a non-finite Decimal literal")
+            column = f"decimal(precision={precision}, scale={scale})"
+            unscaled = _exact_unscaled(dec, scale)
+            if unscaled is None:
+                raise ValueError(
+                    f"decimal literal {value!r} has a finer scale than the {column} "
+                    f"column it is compared to; comparing them would round it. Wrap "
+                    f"it with lit(value, <decimal type>) or cast the column."
+                )
+            if abs(unscaled) >= 10**precision:
+                raise ValueError(
+                    f"decimal literal {value!r} does not fit the {column} column it "
+                    f"is compared to. Wrap it with lit(value, <decimal type>) or cast "
+                    f"the column."
+                )
+            return _t.decimal(scale, precision)
+        return _decimal_type(value if isinstance(value, _Decimal) else _Decimal(value))
     builder = _NUMERIC_BUILDERS.get(kind)
     return builder() if builder else _t.i64()
 
 
+def _resolve_over_urns(
+    builder, urns, name, bound, base_schema, registry, *, alias=None, options=None
+):
+    """Resolve ``name`` over ``urns`` (in order) against the bound operands' types.
+
+    Builds with the first URN whose overload matches the operands' signature and
+    raises a uniform error if none do. Shared by the operator path
+    (:func:`_numeric_binary`) and the ``f.*`` namespace's multi-URN helper
+    (``substrait.dataframe.functions._multi_urn_helper``) so both resolve
+    identically and their error text cannot drift apart.
+    """
+    signature = [
+        typ for b in bound for typ in infer_extended_expression_schema(b).types
+    ]
+    for urn in urns:
+        if registry.lookup_function(urn, name, signature):
+            return builder(urn, name, expressions=bound, alias=alias, options=options)(
+                base_schema, registry
+            )
+    kinds = [t.WhichOneof("kind") for t in signature]
+    raise Exception(
+        f"No matching overload for '{name}' across {urns} with signature {kinds}"
+    )
+
+
 def _numeric_binary(
-    self_expr: "Expr", other: Any, urn: str, fn: str, *, swap: bool = False
+    self_expr: "Expr",
+    other: Any,
+    urns: Union[str, list],
+    fn: str,
+    *,
+    swap: bool = False,
+    decimal_literal: str = "natural",
 ) -> "Expr":
     """Build a binary comparison/arithmetic expression with literal coercion.
 
@@ -159,7 +270,15 @@ def _numeric_binary(
     resolve time, so mixed-width numeric comparisons and arithmetic resolve
     against the standard extension overloads. ``swap`` handles reflected
     operators (e.g. ``100 - col("a")``), keeping operand order intact.
+
+    ``urns`` may be a single URN or a list tried in order: arithmetic passes
+    ``[functions_arithmetic, functions_arithmetic_decimal]`` so decimal operands
+    fall through to the decimal extension when the base one has no overload,
+    mirroring the ``f.*`` namespace's multi-URN resolution. ``decimal_literal``
+    (``"natural"`` / ``"peer"``) is forwarded to :func:`_match_numeric_type` to
+    pick how a decimal literal is coerced against a decimal peer.
     """
+    urns = [urns] if isinstance(urns, str) else list(urns)
     left_operand = other if swap else self_expr
     right_operand = self_expr if swap else other
 
@@ -181,15 +300,23 @@ def _numeric_binary(
         def as_bound(value, is_expr):
             if is_expr:
                 return value
-            if not isinstance(value, bool) and isinstance(value, (int, float)) and peer:
-                lit_type = _match_numeric_type(peer, value)
-                return literal(value, lit_type)(base_schema, registry)
+            if peer is not None and not isinstance(value, bool):
+                # int/float coerce to match any numeric peer; a Decimal only when
+                # the peer is itself decimal (else keep its natural decimal type).
+                peer_is_decimal = peer.WhichOneof("kind") == "decimal"
+                if isinstance(value, (int, float)) or (
+                    isinstance(value, _Decimal) and peer_is_decimal
+                ):
+                    lit_type = _match_numeric_type(
+                        peer, value, decimal_literal=decimal_literal
+                    )
+                    return literal(value, lit_type)(base_schema, registry)
             return Expr._coerce(value)._unbound(base_schema, registry)
 
         left_bound = as_bound(left_val, left_is_expr)
         right_bound = as_bound(right_val, right_is_expr)
-        return scalar_function(urn, fn, expressions=[left_bound, right_bound])(
-            base_schema, registry
+        return _resolve_over_urns(
+            scalar_function, urns, fn, [left_bound, right_bound], base_schema, registry
         )
 
     return Expr(resolve)
@@ -296,7 +423,9 @@ class Expr:
                     self._unbound, other.plan, other.reduction_op, _COMPARISON_OPS[fn]
                 )
             )
-        return _numeric_binary(self, other, FUNCTIONS_COMPARISON, fn)
+        return _numeric_binary(
+            self, other, FUNCTIONS_COMPARISON, fn, decimal_literal="peer"
+        )
 
     def __lt__(self, other: Any) -> "Expr":
         return self._compare(other, "lt")
@@ -322,40 +451,40 @@ class Expr:
 
     # -- arithmetic -------------------------------------------------------
     def __add__(self, other: Any) -> "Expr":
-        return _numeric_binary(self, other, FUNCTIONS_ARITHMETIC, "add")
+        return _numeric_binary(self, other, _ARITHMETIC_URNS, "add")
 
     def __sub__(self, other: Any) -> "Expr":
-        return _numeric_binary(self, other, FUNCTIONS_ARITHMETIC, "subtract")
+        return _numeric_binary(self, other, _ARITHMETIC_URNS, "subtract")
 
     def __mul__(self, other: Any) -> "Expr":
-        return _numeric_binary(self, other, FUNCTIONS_ARITHMETIC, "multiply")
+        return _numeric_binary(self, other, _ARITHMETIC_URNS, "multiply")
 
     def __truediv__(self, other: Any) -> "Expr":
-        return _numeric_binary(self, other, FUNCTIONS_ARITHMETIC, "divide")
+        return _numeric_binary(self, other, _ARITHMETIC_URNS, "divide")
 
     def __radd__(self, other: Any) -> "Expr":
-        return _numeric_binary(self, other, FUNCTIONS_ARITHMETIC, "add", swap=True)
+        return _numeric_binary(self, other, _ARITHMETIC_URNS, "add", swap=True)
 
     def __rsub__(self, other: Any) -> "Expr":
-        return _numeric_binary(self, other, FUNCTIONS_ARITHMETIC, "subtract", swap=True)
+        return _numeric_binary(self, other, _ARITHMETIC_URNS, "subtract", swap=True)
 
     def __rmul__(self, other: Any) -> "Expr":
-        return _numeric_binary(self, other, FUNCTIONS_ARITHMETIC, "multiply", swap=True)
+        return _numeric_binary(self, other, _ARITHMETIC_URNS, "multiply", swap=True)
 
     def __rtruediv__(self, other: Any) -> "Expr":
-        return _numeric_binary(self, other, FUNCTIONS_ARITHMETIC, "divide", swap=True)
+        return _numeric_binary(self, other, _ARITHMETIC_URNS, "divide", swap=True)
 
     def __mod__(self, other: Any) -> "Expr":
-        return _numeric_binary(self, other, FUNCTIONS_ARITHMETIC, "modulus")
+        return _numeric_binary(self, other, _ARITHMETIC_URNS, "modulus")
 
     def __rmod__(self, other: Any) -> "Expr":
-        return _numeric_binary(self, other, FUNCTIONS_ARITHMETIC, "modulus", swap=True)
+        return _numeric_binary(self, other, _ARITHMETIC_URNS, "modulus", swap=True)
 
     def __pow__(self, other: Any) -> "Expr":
-        return _numeric_binary(self, other, FUNCTIONS_ARITHMETIC, "power")
+        return _numeric_binary(self, other, _ARITHMETIC_URNS, "power")
 
     def __rpow__(self, other: Any) -> "Expr":
-        return _numeric_binary(self, other, FUNCTIONS_ARITHMETIC, "power", swap=True)
+        return _numeric_binary(self, other, _ARITHMETIC_URNS, "power", swap=True)
 
     def __neg__(self) -> "Expr":
         return Expr(

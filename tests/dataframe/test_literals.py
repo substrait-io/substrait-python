@@ -106,6 +106,34 @@ def test_decimal_encoding_is_16_byte_little_endian_unscaled():
     assert lit.decimal.precision == 10
 
 
+def test_decimal_encoding_is_exact_beyond_context_precision():
+    # A value with more significant digits than the default decimal context (28)
+    # must still encode exactly -- scaling is pure-integer, not context-bound.
+    big = 10**38 - 1  # 38 nines, fits precision 38
+    lit = _built(Decimal(big), t.decimal(0, 38))
+    assert int.from_bytes(lit.decimal.value, "little", signed=True) == big
+
+
+def test_decimal_encoding_rounds_half_even_below_target_scale():
+    # A value finer than the target scale is rounded half-even during encoding.
+    assert (
+        int.from_bytes(
+            _built(Decimal("2.5"), t.decimal(0, 10)).decimal.value,
+            "little",
+            signed=True,
+        )
+        == 2
+    )
+    assert (
+        int.from_bytes(
+            _built(Decimal("3.5"), t.decimal(0, 10)).decimal.value,
+            "little",
+            signed=True,
+        )
+        == 4
+    )
+
+
 def test_uuid_encoding_16_bytes():
     u = uuid.uuid4()
     assert _built(u, t.uuid()).uuid == u.bytes

@@ -41,9 +41,8 @@ from substrait.builders.extended_expression import (
     scalar_function,
     window_function,
 )
-from substrait.dataframe.expr import Expr
+from substrait.dataframe.expr import Expr, _resolve_over_urns
 from substrait.extension_registry.function_entry import FunctionType
-from substrait.type_inference import infer_extended_expression_schema
 
 _BUILDERS = {
     FunctionType.SCALAR: scalar_function,
@@ -78,22 +77,15 @@ def _multi_urn_helper(builder, urns: list[str], name: str):
 
         def resolve(base_schema, registry):
             bound = [resolve_expression(e, base_schema, registry) for e in exprs]
-            signature = [
-                typ for b in bound for typ in infer_extended_expression_schema(b).types
-            ]
-            for urn in urns:
-                if registry.lookup_function(urn, name, signature):
-                    return builder(
-                        urn,
-                        name,
-                        expressions=bound,
-                        alias=alias,
-                        options=options or None,
-                    )(base_schema, registry)
-            kinds = [t.WhichOneof("kind") for t in signature]
-            raise Exception(
-                f"No matching overload for '{name}' across {urns} "
-                f"with signature {kinds}"
+            return _resolve_over_urns(
+                builder,
+                urns,
+                name,
+                bound,
+                base_schema,
+                registry,
+                alias=alias,
+                options=options or None,
             )
 
         return Expr(resolve)

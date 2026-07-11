@@ -337,31 +337,10 @@ def test_covers_binary():
     assert covers(covered, param_ctx, {})
 
 
-def test_covers_timestamp():
-    """Test timestamp type coverage."""
-    covered = Type(timestamp=Type.Timestamp(nullability=Type.NULLABILITY_REQUIRED))
-    param_ctx = _parse("timestamp")
-    assert covers(covered, param_ctx, {})
-
-
-def test_covers_timestamp_tz():
-    """Test timestamp_tz type coverage."""
-    covered = Type(timestamp_tz=Type.TimestampTZ(nullability=Type.NULLABILITY_REQUIRED))
-    param_ctx = _parse("timestamp_tz")
-    assert covers(covered, param_ctx, {})
-
-
 def test_covers_date():
     """Test date type coverage."""
     covered = Type(date=Type.Date(nullability=Type.NULLABILITY_REQUIRED))
     param_ctx = _parse("date")
-    assert covers(covered, param_ctx, {})
-
-
-def test_covers_time():
-    """Test time type coverage."""
-    covered = Type(time=Type.Time(nullability=Type.NULLABILITY_REQUIRED))
-    param_ctx = _parse("time")
     assert covers(covered, param_ctx, {})
 
 

@@ -1,3 +1,4 @@
+import os
 import sys
 import tempfile
 
@@ -7,6 +8,14 @@ import pytest
 
 from substrait.extension_registry import ExtensionRegistry
 from substrait.sql.sql_to_substrait import convert
+
+# External consumers may crash the interpreter when reading newer spec plans.
+# Keep round-trip coverage opt-in until their bundled Substrait versions catch up.
+pytestmark = pytest.mark.skipif(
+    not os.environ.get("SUBSTRAIT_ENGINE_TESTS"),
+    reason="engine Substrait consumers lag the pinned spec; "
+    "set SUBSTRAIT_ENGINE_TESTS=1 to run",
+)
 
 data: pyarrow.Table = pyarrow.Table.from_batches(
     [

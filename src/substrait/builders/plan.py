@@ -435,10 +435,6 @@ def aggregate(
                 groupings=[
                     stalg.AggregateRel.Grouping(
                         expression_references=range(len(bound_grouping_expressions)),
-                        grouping_expressions=[
-                            e.referred_expr[0].expression
-                            for e in bound_grouping_expressions
-                        ],
                     )
                 ],
                 measures=[

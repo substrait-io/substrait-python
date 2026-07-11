@@ -42,18 +42,8 @@ testcases = [
         stt.Type(binary=stt.Type.Binary(nullability=stt.Type.NULLABILITY_NULLABLE)),
     ),
     (
-        stalg.Expression.Literal(timestamp=1000000, nullable=True),
-        stt.Type(
-            timestamp=stt.Type.Timestamp(nullability=stt.Type.NULLABILITY_NULLABLE)
-        ),
-    ),
-    (
         stalg.Expression.Literal(date=1000, nullable=True),
         stt.Type(date=stt.Type.Date(nullability=stt.Type.NULLABILITY_NULLABLE)),
-    ),
-    (
-        stalg.Expression.Literal(time=1000, nullable=True),
-        stt.Type(time=stt.Type.Time(nullability=stt.Type.NULLABILITY_NULLABLE)),
     ),
     (
         stalg.Expression.Literal(

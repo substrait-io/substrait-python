@@ -15,6 +15,17 @@ def test_simple_arithmetic_parenthesis():
     assert evaluate("(1 + var) * 3", {"var": 2}) == 9
 
 
+def test_operator_contexts():
+    assert evaluate("9 / 2") == 4
+    assert evaluate("1 + 1 = 2 and 3 != 4") is True
+    assert evaluate("!(1 > 2) or 3 < 2") is True
+
+
+def test_if_expression():
+    assert evaluate("if var > 3 then 1 else 0", {"var": 5}) == 1
+    assert evaluate("if var > 3 then 1 else 0", {"var": 2}) == 0
+
+
 def test_min_max():
     assert evaluate("min(var, 7) + max(var, 7)", {"var": 5}) == 12
 

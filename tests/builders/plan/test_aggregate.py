@@ -79,11 +79,6 @@ def test_aggregate():
                             ],
                             groupings=[
                                 stalg.AggregateRel.Grouping(
-                                    grouping_expressions=[
-                                        group_expr(ns, registry)
-                                        .referred_expr[0]
-                                        .expression
-                                    ],
                                     expression_references=[0],
                                 )
                             ],

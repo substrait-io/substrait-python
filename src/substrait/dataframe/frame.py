@@ -139,6 +139,16 @@ class _CteContext:
 
 
 # Active while a DataFrame is being materialized; None otherwise.
+#
+# ``cache()`` needs one accumulator shared by every nested ``resolve()`` in a
+# single ``to_plan()`` -- to dedupe repeated uses of a cached frame by identity
+# and hand out ``subtree_ordinal``s. The builder contract is
+# ``UnboundPlan = Callable[[ExtensionRegistry], Plan]``, which has no slot to
+# thread that accumulator, and schema inference (which resolves ReferenceRels
+# against the subtree list) runs *inside* the builder layer. Rather than widen
+# that contract across every builder, ``cache()`` publishes the accumulator here
+# and ``type_inference.reference_subtrees`` exposes its ``.subtrees`` list to
+# inference; ``_materialize`` sets both for the duration of the build.
 _cte_context: contextvars.ContextVar = contextvars.ContextVar(
     "cte_context", default=None
 )
@@ -678,16 +688,10 @@ class DataFrame:
                 ctx.subtrees.append(subplan.relations[-1].root.input)
                 ctx.names.append(list(subplan.relations[-1].root.names))
                 ctx.plans.append(subplan)
-            ref = stalg.Rel(reference=stalg.ReferenceRel(subtree_ordinal=ordinal))
-            return stpl.Plan(
-                version=_plan.default_version,
-                relations=[
-                    stpl.PlanRel(
-                        root=stalg.RelRoot(input=ref, names=ctx.names[ordinal])
-                    )
-                ],
-                # Propagate the subtree's extensions so builder merges carry them up.
-                **_plan._merge_extensions(ctx.plans[ordinal]),
+            # Emit a ReferenceRel to the shared subtree, propagating the
+            # subtree's extensions so builder merges carry them up.
+            return _plan.reference(ordinal, ctx.names[ordinal], ctx.plans[ordinal])(
+                registry
             )
 
         return self._next(resolve)

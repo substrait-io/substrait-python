@@ -1,3 +1,4 @@
+import pytest
 import substrait.algebra_pb2 as stalg
 import substrait.plan_pb2 as stp
 import substrait.type_pb2 as stt
@@ -21,6 +22,21 @@ named_struct_2 = stt.NamedStruct(
         types=[i64(nullable=False), string()], nullability=stt.Type.NULLABILITY_REQUIRED
     ),
 )
+
+
+def test_join_optional_args_are_keyword_only():
+    # post_join_filter / extension are keyword-only so inserting new params
+    # cannot silently rebind an extension passed positionally.
+    table = read_named_table("table", named_struct)
+    table2 = read_named_table("table2", named_struct_2)
+    with pytest.raises(TypeError):
+        join(
+            table,
+            table2,
+            literal(True, boolean()),
+            stalg.JoinRel.JOIN_TYPE_INNER,
+            None,  # would have bound to post_join_filter positionally
+        )
 
 
 def test_join():

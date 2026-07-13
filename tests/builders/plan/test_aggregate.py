@@ -78,14 +78,7 @@ def test_aggregate():
                                 group_expr(ns, registry).referred_expr[0].expression
                             ],
                             groupings=[
-                                stalg.AggregateRel.Grouping(
-                                    grouping_expressions=[
-                                        group_expr(ns, registry)
-                                        .referred_expr[0]
-                                        .expression
-                                    ],
-                                    expression_references=[0],
-                                )
+                                stalg.AggregateRel.Grouping(expression_references=[0])
                             ],
                             measures=[
                                 stalg.AggregateRel.Measure(

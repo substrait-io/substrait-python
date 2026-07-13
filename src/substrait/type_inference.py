@@ -1,7 +1,43 @@
+import contextvars
+
 import substrait.algebra_pb2 as stalg
 import substrait.extended_expression_pb2 as stee
 import substrait.plan_pb2 as stp
 import substrait.type_pb2 as stt
+
+# Stack of enclosing-query schemas (NamedStruct) for correlated subqueries, so a
+# field reference with an OuterReference root resolves against the right level.
+# Pushed by the subquery builders while resolving their inner plan.
+outer_schemas: contextvars.ContextVar = contextvars.ContextVar(
+    "outer_schemas", default=()
+)
+
+
+# Registered extension-relation detail classes ({type_url: class}) so an
+# extension relation's schema can be derived by reconstructing the user's detail
+# object from the plan's opaque Any. Populated via register_extension_relation
+# (also reachable as ExtensionRegistry.register_extension_relation).
+_extension_relation_derivers: dict = {}
+
+
+def register_extension_relation(detail_cls) -> None:
+    """Register an extension-relation detail class by its ``type_url``."""
+    _extension_relation_derivers[detail_cls.type_url] = detail_cls
+
+
+def _derive_extension_schema(detail, inputs):
+    """Derive a registered extension relation's output NamedStruct, or None.
+
+    ``inputs`` is ``None`` (leaf), a single ``Type.Struct`` (single), or a list
+    of ``Type.Struct`` (multi).
+    """
+    detail_cls = _extension_relation_derivers.get(detail.type_url)
+    if detail_cls is None:
+        return None
+    reconstructed = detail_cls.from_any(detail)
+    if inputs is None:
+        return reconstructed.derive_schema()
+    return reconstructed.derive_schema(inputs)
 
 
 def infer_literal_type(literal: stalg.Expression.Literal) -> stt.Type:
@@ -31,12 +67,8 @@ def infer_literal_type(literal: stalg.Expression.Literal) -> stt.Type:
         return stt.Type(string=stt.Type.String(nullability=nullability))
     elif literal_type == "binary":
         return stt.Type(binary=stt.Type.Binary(nullability=nullability))
-    elif literal_type == "timestamp":
-        return stt.Type(timestamp=stt.Type.Timestamp(nullability=nullability))
     elif literal_type == "date":
         return stt.Type(date=stt.Type.Date(nullability=nullability))
-    elif literal_type == "time":
-        return stt.Type(time=stt.Type.Time(nullability=nullability))
     elif literal_type == "interval_year_to_month":
         return stt.Type(interval_year=stt.Type.IntervalYear(nullability=nullability))
     elif literal_type == "interval_day_to_second":
@@ -79,6 +111,12 @@ def infer_literal_type(literal: stalg.Expression.Literal) -> stt.Type:
                 nullability=nullability,
             )
         )
+    elif literal_type == "precision_time":
+        return stt.Type(
+            precision_time=stt.Type.PrecisionTime(
+                precision=literal.precision_time.precision, nullability=nullability
+            )
+        )
     elif literal_type == "precision_timestamp":
         return stt.Type(
             precision_timestamp=stt.Type.PrecisionTimestamp(
@@ -107,8 +145,6 @@ def infer_literal_type(literal: stalg.Expression.Literal) -> stt.Type:
                 nullability=nullability,
             )
         )
-    elif literal_type == "timestamp_tz":
-        return stt.Type(timestamp_tz=stt.Type.TimestampTZ(nullability=nullability))
     elif literal_type == "uuid":
         return stt.Type(uuid=stt.Type.UUID(nullability=nullability))
     elif literal_type == "null":
@@ -173,7 +209,20 @@ def infer_expression_type(
     rex_type = expression.WhichOneof("rex_type")
     if rex_type == "selection":
         root_type = expression.selection.WhichOneof("root_type")
-        assert root_type == "root_reference"
+        # An OuterReference resolves against an enclosing query's schema (from
+        # the correlated-subquery stack); a lambda parameter reference against
+        # the lambda's parameter struct; otherwise against the input row.
+        if root_type == "outer_reference":
+            stack = outer_schemas.get()
+            steps = expression.selection.outer_reference.steps_out
+            if steps >= len(stack):
+                raise Exception(
+                    "outer reference outside an enclosing (correlated) query"
+                )
+            schema = stack[len(stack) - 1 - steps].struct
+        else:
+            assert root_type in ("root_reference", "lambda_parameter_reference")
+            schema = parent_schema
 
         reference_type = expression.selection.WhichOneof("reference_type")
 
@@ -183,7 +232,7 @@ def infer_expression_type(
             segment_reference_type = segment.WhichOneof("reference_type")
 
             if segment_reference_type == "struct_field":
-                return parent_schema.types[segment.struct_field.field]
+                return schema.types[segment.struct_field.field]
             else:
                 raise Exception(f"Unknown reference_type {reference_type}")
         else:
@@ -209,22 +258,61 @@ def infer_expression_type(
         )
     elif rex_type == "nested":
         return infer_nested_type(expression.nested, parent_schema)
+    elif rex_type == "lambda":
+        # A lambda's type is func<param_types -> body_type>; the body's parameter
+        # references resolve against the lambda's own parameter struct.
+        lam = getattr(expression, "lambda")
+        body_type = infer_expression_type(lam.body, lam.parameters)
+        return stt.Type(
+            func=stt.Type.Func(
+                parameter_types=list(lam.parameters.types),
+                return_type=body_type,
+                nullability=stt.Type.NULLABILITY_REQUIRED,
+            )
+        )
     elif rex_type == "subquery":
         subquery_type = expression.subquery.WhichOneof("subquery_type")
 
-        if subquery_type == "scalar":
-            scalar_rel = infer_rel_schema(expression.subquery.scalar.input)
-            return scalar_rel.types[0]
-        elif (
-            subquery_type == "in_predicate"
-            or subquery_type == "set_comparison"
-            or subquery_type == "set_predicate"
-        ):
-            stt.Type.Boolean(
-                nullability=stt.Type.Nullability.NULLABILITY_NULLABLE
-            )  # can this be a null?
+        # The subquery's inner plan may contain OuterReferences (correlated
+        # columns) that resolve against this enclosing query's schema. Push it so
+        # inferring the inner rel resolves them -- this makes inference
+        # self-contained rather than relying on the build-time push in
+        # extended_expression._inner_rel (which is gone by the time a downstream
+        # verb re-infers the enclosing plan's schema).
+        stack = outer_schemas.get()
+        token = outer_schemas.set((*stack, stt.NamedStruct(struct=parent_schema)))
+        try:
+            if subquery_type == "scalar":
+                scalar_rel = infer_rel_schema(expression.subquery.scalar.input)
+                return scalar_rel.types[0]
+            elif (
+                subquery_type == "in_predicate"
+                or subquery_type == "set_comparison"
+                or subquery_type == "set_predicate"
+            ):
+                return stt.Type(
+                    bool=stt.Type.Boolean(
+                        nullability=stt.Type.Nullability.NULLABILITY_NULLABLE
+                    )
+                )
+            else:
+                raise Exception(f"Unknown subquery_type {subquery_type}")
+        finally:
+            outer_schemas.reset(token)
+    elif rex_type == "dynamic_parameter":
+        return expression.dynamic_parameter.type
+    elif rex_type == "execution_context_variable":
+        ecv = expression.execution_context_variable
+        variable = ecv.WhichOneof("execution_context_variable_type")
+        # Each variant carries the variable's own type.
+        if variable == "current_timestamp":
+            return stt.Type(precision_timestamp_tz=ecv.current_timestamp)
+        elif variable == "current_date":
+            return stt.Type(date=ecv.current_date)
+        elif variable == "current_timezone":
+            return stt.Type(string=ecv.current_timezone)
         else:
-            raise Exception(f"Unknown subquery_type {subquery_type}")
+            raise Exception(f"Unknown execution context variable {variable}")
     else:
         raise Exception(f"Unknown rex_type {rex_type}")
 
@@ -238,6 +326,64 @@ def infer_extended_expression_schema(ee: stee.ExtendedExpression) -> stt.Type.St
         types=types,
         nullability=stt.Type.NULLABILITY_REQUIRED,
     )
+
+
+# Name of the extra boolean column a mark join appends to its output.
+JOIN_MARK_COLUMN_NAME = "mark"
+
+
+def _join_column_shape(type_name: str) -> str:
+    """Which columns a join emits, by join-type NAME (shared across all join
+    relations, whose enum integer values differ): ``left`` / ``right`` only for
+    semi/anti, ``both+mark`` for mark joins, ``both`` otherwise. Single source of
+    truth for both the inferred type list and the RelRoot names."""
+    if type_name in ("JOIN_TYPE_LEFT_SEMI", "JOIN_TYPE_LEFT_ANTI"):
+        return "left"
+    if type_name in ("JOIN_TYPE_RIGHT_SEMI", "JOIN_TYPE_RIGHT_ANTI"):
+        return "right"
+    if type_name in ("JOIN_TYPE_LEFT_MARK", "JOIN_TYPE_RIGHT_MARK"):
+        return "both+mark"
+    return "both"  # inner / outer / left / right / single
+
+
+def join_output_names(type_name: str, left_names, right_names) -> list:
+    """RelRoot output names for a join, matching the columns
+    :func:`_join_output_struct` emits so names and inferred types never disagree
+    in count."""
+    shape = _join_column_shape(type_name)
+    if shape == "left":
+        return list(left_names)
+    if shape == "right":
+        return list(right_names)
+    if shape == "both+mark":
+        return list(left_names) + list(right_names) + [JOIN_MARK_COLUMN_NAME]
+    return list(left_names) + list(right_names)
+
+
+def _join_output_struct(type_name: str, left_rel, right_rel) -> stt.Type.Struct:
+    """Join output column types by join-type NAME (shared across all join
+    relations, whose enum integer values differ)."""
+    left = infer_rel_schema(left_rel)
+    right = infer_rel_schema(right_rel)
+    required = stt.Type.Nullability.NULLABILITY_REQUIRED
+    shape = _join_column_shape(type_name)
+    if shape == "left":
+        types = list(left.types)
+    elif shape == "right":
+        types = list(right.types)
+    elif shape == "both+mark":
+        types = (
+            list(left.types)
+            + list(right.types)
+            + [
+                stt.Type(
+                    bool=stt.Type.Boolean(nullability=stt.Type.NULLABILITY_NULLABLE)
+                )
+            ]
+        )
+    else:
+        types = list(left.types) + list(right.types)
+    return stt.Type.Struct(types=types, nullability=required)
 
 
 def infer_rel_schema(rel: stalg.Rel) -> stt.Type.Struct:
@@ -295,52 +441,11 @@ def infer_rel_schema(rel: stalg.Rel) -> stt.Type.Struct:
 
         (common, struct) = (rel.cross.common, raw_schema)
     elif rel_type == "join":
-        if rel.join.type in [
-            stalg.JoinRel.JOIN_TYPE_INNER,
-            stalg.JoinRel.JOIN_TYPE_OUTER,
-            stalg.JoinRel.JOIN_TYPE_LEFT,
-            stalg.JoinRel.JOIN_TYPE_RIGHT,
-            stalg.JoinRel.JOIN_TYPE_LEFT_SINGLE,
-            stalg.JoinRel.JOIN_TYPE_RIGHT_SINGLE,
-        ]:
-            raw_schema = stt.Type.Struct(
-                types=list(infer_rel_schema(rel.join.left).types)
-                + list(infer_rel_schema(rel.join.right).types),
-                nullability=stt.Type.Nullability.NULLABILITY_REQUIRED,
-            )
-        elif rel.join.type in [
-            stalg.JoinRel.JOIN_TYPE_LEFT_ANTI,
-            stalg.JoinRel.JOIN_TYPE_LEFT_SEMI,
-        ]:
-            raw_schema = stt.Type.Struct(
-                types=infer_rel_schema(rel.join.left).types,
-                nullability=stt.Type.Nullability.NULLABILITY_REQUIRED,
-            )
-        elif rel.join.type in [
-            stalg.JoinRel.JOIN_TYPE_RIGHT_ANTI,
-            stalg.JoinRel.JOIN_TYPE_RIGHT_SEMI,
-        ]:
-            raw_schema = stt.Type.Struct(
-                types=infer_rel_schema(rel.join.right).types,
-                nullability=stt.Type.Nullability.NULLABILITY_REQUIRED,
-            )
-        elif rel.join.type in [
-            stalg.JoinRel.JOIN_TYPE_LEFT_MARK,
-            stalg.JoinRel.JOIN_TYPE_RIGHT_MARK,
-        ]:
-            raw_schema = stt.Type.Struct(
-                types=list(infer_rel_schema(rel.join.left).types)
-                + list(infer_rel_schema(rel.join.right).types)
-                + [
-                    stt.Type(
-                        bool=stt.Type.Boolean(nullability=stt.Type.NULLABILITY_NULLABLE)
-                    )
-                ],
-                nullability=stt.Type.Nullability.NULLABILITY_REQUIRED,
-            )
-        else:
-            raise Exception(f"Unhandled join_type {rel.join.type}")
-
+        raw_schema = _join_output_struct(
+            stalg.JoinRel.JoinType.Name(rel.join.type),
+            rel.join.left,
+            rel.join.right,
+        )
         (common, struct) = (rel.join.common, raw_schema)
     elif rel_type == "window":
         parent_schema = infer_rel_schema(rel.window.input)
@@ -350,6 +455,80 @@ def infer_rel_schema(rel: stalg.Rel) -> stt.Type.Struct:
             nullability=parent_schema.nullability,
         )
         (common, struct) = (rel.window.common, raw_schema)
+    elif rel_type == "expand":
+        parent_schema = infer_rel_schema(rel.expand.input)
+        field_types = []
+        for field in rel.expand.fields:
+            if field.HasField("consistent_field"):
+                field_types.append(
+                    infer_expression_type(field.consistent_field, parent_schema)
+                )
+            else:
+                duplicates = field.switching_field.duplicates
+                if not duplicates:
+                    raise ValueError(
+                        "expand switching field has no duplicate expressions; its "
+                        "output type cannot be inferred"
+                    )
+                # All duplicates of a switching field share one type; the first
+                # determines the output column type.
+                field_types.append(infer_expression_type(duplicates[0], parent_schema))
+        # Expand appends an i32 column with the index of the duplicate the row
+        # is derived from.
+        field_types.append(
+            stt.Type(i32=stt.Type.I32(nullability=stt.Type.NULLABILITY_REQUIRED))
+        )
+        raw_schema = stt.Type.Struct(
+            types=field_types, nullability=parent_schema.nullability
+        )
+        (common, struct) = (rel.expand.common, raw_schema)
+    elif rel_type == "nested_loop_join":
+        name = stalg.NestedLoopJoinRel.JoinType.Name(rel.nested_loop_join.type)
+        raw_schema = _join_output_struct(
+            name, rel.nested_loop_join.left, rel.nested_loop_join.right
+        )
+        (common, struct) = (rel.nested_loop_join.common, raw_schema)
+    elif rel_type == "hash_join":
+        name = stalg.HashJoinRel.JoinType.Name(rel.hash_join.type)
+        raw_schema = _join_output_struct(name, rel.hash_join.left, rel.hash_join.right)
+        (common, struct) = (rel.hash_join.common, raw_schema)
+    elif rel_type == "merge_join":
+        name = stalg.MergeJoinRel.JoinType.Name(rel.merge_join.type)
+        raw_schema = _join_output_struct(
+            name, rel.merge_join.left, rel.merge_join.right
+        )
+        (common, struct) = (rel.merge_join.common, raw_schema)
+    elif rel_type == "exchange":
+        # Exchange redistributes rows without changing the schema.
+        (common, struct) = (rel.exchange.common, infer_rel_schema(rel.exchange.input))
+    elif rel_type == "top_n":
+        # TopN is a fused sort+fetch; the schema is unchanged from the input.
+        (common, struct) = (rel.top_n.common, infer_rel_schema(rel.top_n.input))
+    elif rel_type == "extension_leaf":
+        derived = _derive_extension_schema(rel.extension_leaf.detail, None)
+        if derived is None:
+            raise Exception(
+                "no schema deriver registered for extension leaf relation "
+                f"{rel.extension_leaf.detail.type_url!r}"
+            )
+        (common, struct) = (rel.extension_leaf.common, derived.struct)
+    elif rel_type == "extension_single":
+        input_struct = infer_rel_schema(rel.extension_single.input)
+        derived = _derive_extension_schema(rel.extension_single.detail, input_struct)
+        # Fall back to a pass-through schema when no deriver is registered.
+        (common, struct) = (
+            rel.extension_single.common,
+            derived.struct if derived is not None else input_struct,
+        )
+    elif rel_type == "extension_multi":
+        input_structs = [infer_rel_schema(i) for i in rel.extension_multi.inputs]
+        derived = _derive_extension_schema(rel.extension_multi.detail, input_structs)
+        if derived is None:
+            raise Exception(
+                "no schema deriver registered for extension multi relation "
+                f"{rel.extension_multi.detail.type_url!r}"
+            )
+        (common, struct) = (rel.extension_multi.common, derived.struct)
     else:
         raise Exception(f"Unhandled rel_type {rel_type}")
 

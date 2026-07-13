@@ -264,3 +264,22 @@ def named_struct(names: Iterable[str], struct: stt.Type) -> stt.NamedStruct:
         struct.struct.nullability = stt.Type.NULLABILITY_REQUIRED
 
     return stt.NamedStruct(names=names, struct=struct.struct)
+
+
+def user_defined(
+    type_reference: int,
+    nullable: bool = True,
+    type_variation_reference: int = 0,
+    type_parameters: Iterable[stt.Type.Parameter] = (),
+) -> stt.Type:
+    """A user-defined (extension) type referenced by its declaration anchor."""
+    return stt.Type(
+        user_defined=stt.Type.UserDefined(
+            type_reference=type_reference,
+            type_variation_reference=type_variation_reference,
+            nullability=stt.Type.NULLABILITY_NULLABLE
+            if nullable
+            else stt.Type.NULLABILITY_REQUIRED,
+            type_parameters=[*type_parameters],  # `list` is shadowed in this module
+        )
+    )

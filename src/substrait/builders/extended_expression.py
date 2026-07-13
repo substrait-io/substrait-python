@@ -1,5 +1,8 @@
+import calendar
 import itertools
-from datetime import date
+import uuid as uuid_module
+from datetime import date, datetime, time, timedelta, timezone
+from decimal import Decimal
 from typing import Any, Callable, Iterable, Union
 
 import substrait.algebra_pb2 as stalg
@@ -8,7 +11,7 @@ import substrait.extensions.extensions_pb2 as ste
 import substrait.type_pb2 as stp
 
 from substrait.extension_registry import ExtensionRegistry
-from substrait.type_inference import infer_extended_expression_schema
+from substrait.type_inference import infer_extended_expression_schema, outer_schemas
 from substrait.utils import (
     merge_extension_declarations,
     merge_extension_urns,
@@ -32,6 +35,20 @@ def _alias_or_inferred(
         return [f"{op}({','.join(args)})"]
 
 
+def _function_options(options):
+    """Build FunctionOption messages from a ``{name: preference}`` mapping.
+
+    A preference may be a single string or an ordered list of acceptable values.
+    """
+    if not options:
+        return []
+    result = []
+    for name, preference in options.items():
+        prefs = [preference] if isinstance(preference, str) else list(preference)
+        result.append(stalg.FunctionOption(name=name, preference=prefs))
+    return result
+
+
 def resolve_expression(
     expression: ExtendedExpressionOrUnbound,
     base_schema: stp.NamedStruct,
@@ -44,109 +61,313 @@ def resolve_expression(
     )
 
 
+_EPOCH_DATE = date(1970, 1, 1)
+
+
+def _scale_subseconds(microseconds: int, precision: int) -> int:
+    """Convert a microsecond count to ``precision`` sub-second units."""
+    if precision >= 6:
+        return microseconds * 10 ** (precision - 6)
+    return microseconds // 10 ** (6 - precision)
+
+
+def _encode_decimal(value: Any, scale: int) -> bytes:
+    """Encode a decimal as the 16-byte little-endian two's-complement unscaled value.
+
+    Scaling uses pure-integer arithmetic on ``as_tuple()`` rather than ``Decimal``
+    multiplication, so it is exact regardless of the active ``decimal`` context
+    precision (which would otherwise silently round a value with more than
+    ``ctx.prec`` significant digits). A value carrying more fractional digits than
+    ``scale`` is rounded half-even.
+    """
+    dec = value if isinstance(value, Decimal) else Decimal(str(value))
+    sign, digits, exponent = dec.as_tuple()
+    if not isinstance(exponent, int):  # NaN / Infinity have symbolic exponents
+        raise ValueError(f"cannot encode a non-finite decimal literal: {value!r}")
+    coeff = 0
+    for d in digits:
+        coeff = coeff * 10 + d
+    shift = exponent + scale
+    if shift >= 0:
+        unscaled = coeff * 10**shift
+    else:  # drop -shift low-order digits, rounding half-even
+        factor = 10 ** (-shift)
+        unscaled, remainder = divmod(coeff, factor)
+        twice = 2 * remainder
+        if twice > factor or (twice == factor and unscaled % 2):
+            unscaled += 1
+    if sign:
+        unscaled = -unscaled
+    return unscaled.to_bytes(16, byteorder="little", signed=True)
+
+
+def _encode_uuid(value: Any) -> bytes:
+    if isinstance(value, uuid_module.UUID):
+        return value.bytes
+    if isinstance(value, str):
+        return uuid_module.UUID(value).bytes
+    if isinstance(value, (bytes, bytearray)):
+        if len(value) != 16:
+            raise ValueError("uuid literal must be exactly 16 bytes")
+        return bytes(value)
+    raise TypeError(f"cannot build a uuid literal from {type(value).__name__}")
+
+
+def _timestamp_units(value: Any, precision: int) -> int:
+    """Sub-second units since the Unix epoch for an int or datetime value."""
+    if isinstance(value, datetime):
+        if value.tzinfo is not None:
+            value = value.astimezone(timezone.utc)
+        micros = calendar.timegm(value.timetuple()) * 1_000_000 + value.microsecond
+        return _scale_subseconds(micros, precision)
+    return value
+
+
+def _time_units(value: Any, precision: int) -> int:
+    """Sub-second units since midnight for an int or datetime.time value."""
+    if isinstance(value, time):
+        micros = (
+            value.hour * 3600 + value.minute * 60 + value.second
+        ) * 1_000_000 + value.microsecond
+        return _scale_subseconds(micros, precision)
+    return value
+
+
+def _interval_day_to_second(value: Any, precision: int):
+    """Build an IntervalDayToSecond from a timedelta or a (days, seconds[, subseconds]) tuple."""
+    if isinstance(value, timedelta):
+        days, seconds, subseconds = (
+            value.days,
+            value.seconds,
+            _scale_subseconds(value.microseconds, precision),
+        )
+    else:
+        days, seconds, *rest = value
+        subseconds = rest[0] if rest else 0
+    return stalg.Expression.Literal.IntervalDayToSecond(
+        days=days, seconds=seconds, subseconds=subseconds, precision=precision
+    )
+
+
+def _interval_year_to_month(value: Any):
+    """Build an IntervalYearToMonth from an int (years) or a (years, months) tuple."""
+    if isinstance(value, (tuple, list)):
+        years, months = value
+    else:
+        years, months = value, 0
+    return stalg.Expression.Literal.IntervalYearToMonth(years=years, months=months)
+
+
+def _make_literal(value: Any, type: stp.Type) -> stalg.Expression.Literal:
+    """Recursively build an ``Expression.Literal`` for ``value`` of ``type``.
+
+    A ``value`` of ``None`` produces a typed null literal of ``type``. Nested
+    types (struct/list/map) recurse into their element types. Supported value
+    representations for the less-obvious kinds:
+
+    - decimal: ``decimal.Decimal`` / ``int`` / ``float`` / ``str``
+    - uuid: ``uuid.UUID`` / 16 ``bytes`` / hex ``str``
+    - precision_timestamp[_tz]: ``int`` sub-second units, or ``datetime``
+    - precision_time: ``int`` sub-second units, or ``datetime.time``
+    - interval_year: ``int`` years or ``(years, months)``
+    - interval_day: ``datetime.timedelta`` or ``(days, seconds[, subseconds])``
+    - interval_compound: ``((years, months), (days, seconds[, subseconds]))``
+    - struct: sequence of field values; list: sequence; map: ``dict`` or pairs
+    """
+    Literal = stalg.Expression.Literal
+
+    if value is None:
+        return Literal(null=type, nullable=True)
+
+    kind = type.WhichOneof("kind")
+    nullable = getattr(type, kind).nullability == stp.Type.NULLABILITY_NULLABLE
+
+    if kind == "bool":
+        return Literal(boolean=value, nullable=nullable)
+    elif kind == "i8":
+        return Literal(i8=value, nullable=nullable)
+    elif kind == "i16":
+        return Literal(i16=value, nullable=nullable)
+    elif kind == "i32":
+        return Literal(i32=value, nullable=nullable)
+    elif kind == "i64":
+        return Literal(i64=value, nullable=nullable)
+    elif kind == "fp32":
+        return Literal(fp32=value, nullable=nullable)
+    elif kind == "fp64":
+        return Literal(fp64=value, nullable=nullable)
+    elif kind == "string":
+        return Literal(string=value, nullable=nullable)
+    elif kind == "binary":
+        return Literal(binary=value, nullable=nullable)
+    elif kind == "date":
+        date_value = (value - _EPOCH_DATE).days if isinstance(value, date) else value
+        return Literal(date=date_value, nullable=nullable)
+    elif kind == "interval_year":
+        return Literal(
+            interval_year_to_month=_interval_year_to_month(value), nullable=nullable
+        )
+    elif kind == "interval_day":
+        return Literal(
+            interval_day_to_second=_interval_day_to_second(
+                value, type.interval_day.precision
+            ),
+            nullable=nullable,
+        )
+    elif kind == "interval_compound":
+        precision = type.interval_compound.precision
+        ym, ds = value
+        return Literal(
+            interval_compound=stalg.Expression.Literal.IntervalCompound(
+                interval_year_to_month=_interval_year_to_month(ym),
+                interval_day_to_second=_interval_day_to_second(ds, precision),
+            ),
+            nullable=nullable,
+        )
+    elif kind == "fixed_char":
+        return Literal(fixed_char=value, nullable=nullable)
+    elif kind == "varchar":
+        return Literal(
+            var_char=Literal.VarChar(value=value, length=type.varchar.length),
+            nullable=nullable,
+        )
+    elif kind == "fixed_binary":
+        return Literal(fixed_binary=value, nullable=nullable)
+    elif kind == "decimal":
+        return Literal(
+            decimal=Literal.Decimal(
+                value=_encode_decimal(value, type.decimal.scale),
+                precision=type.decimal.precision,
+                scale=type.decimal.scale,
+            ),
+            nullable=nullable,
+        )
+    elif kind == "precision_time":
+        precision = type.precision_time.precision
+        return Literal(
+            precision_time=Literal.PrecisionTime(
+                precision=precision, value=_time_units(value, precision)
+            ),
+            nullable=nullable,
+        )
+    elif kind == "precision_timestamp":
+        precision = type.precision_timestamp.precision
+        return Literal(
+            precision_timestamp=Literal.PrecisionTimestamp(
+                precision=precision, value=_timestamp_units(value, precision)
+            ),
+            nullable=nullable,
+        )
+    elif kind == "precision_timestamp_tz":
+        precision = type.precision_timestamp_tz.precision
+        return Literal(
+            precision_timestamp_tz=Literal.PrecisionTimestamp(
+                precision=precision, value=_timestamp_units(value, precision)
+            ),
+            nullable=nullable,
+        )
+    elif kind == "uuid":
+        return Literal(uuid=_encode_uuid(value), nullable=nullable)
+    elif kind == "struct":
+        values = list(value)
+        field_types = list(type.struct.types)
+        if len(values) != len(field_types):
+            raise ValueError(
+                f"struct literal has {len(values)} value(s) but its type declares "
+                f"{len(field_types)} field(s)"
+            )
+        return Literal(
+            struct=Literal.Struct(
+                fields=[_make_literal(v, t) for v, t in zip(values, field_types)]
+            ),
+            nullable=nullable,
+        )
+    elif kind == "list":
+        values = list(value)
+        if not values:
+            return Literal(empty_list=type.list, nullable=nullable)
+        return Literal(
+            list=Literal.List(
+                values=[_make_literal(v, type.list.type) for v in values]
+            ),
+            nullable=nullable,
+        )
+    elif kind == "map":
+        items = list(value.items() if isinstance(value, dict) else value)
+        if not items:
+            return Literal(empty_map=type.map, nullable=nullable)
+        return Literal(
+            map=Literal.Map(
+                key_values=[
+                    Literal.Map.KeyValue(
+                        key=_make_literal(k, type.map.key),
+                        value=_make_literal(v, type.map.value),
+                    )
+                    for k, v in items
+                ]
+            ),
+            nullable=nullable,
+        )
+    else:
+        raise Exception(f"Unknown literal type - {type}")
+
+
 def literal(
     value: Any, type: stp.Type, alias: Union[Iterable[str], str, None] = None
 ) -> UnboundExtendedExpression:
-    """Builds a resolver for ExtendedExpression containing a literal expression"""
+    """Builds a resolver for ExtendedExpression containing a literal expression.
+
+    ``value`` of ``None`` yields a typed null literal. See :func:`_make_literal`
+    for the accepted value representations of each type kind.
+    """
 
     def resolve(
         base_schema: stp.NamedStruct, registry: ExtensionRegistry
     ) -> stee.ExtendedExpression:
-        kind = type.WhichOneof("kind")
-
-        if kind == "bool":
-            literal = stalg.Expression.Literal(
-                boolean=value,
-                nullable=type.bool.nullability == stp.Type.NULLABILITY_NULLABLE,
-            )
-        elif kind == "i8":
-            literal = stalg.Expression.Literal(
-                i8=value, nullable=type.i8.nullability == stp.Type.NULLABILITY_NULLABLE
-            )
-        elif kind == "i16":
-            literal = stalg.Expression.Literal(
-                i16=value,
-                nullable=type.i16.nullability == stp.Type.NULLABILITY_NULLABLE,
-            )
-        elif kind == "i32":
-            literal = stalg.Expression.Literal(
-                i32=value,
-                nullable=type.i32.nullability == stp.Type.NULLABILITY_NULLABLE,
-            )
-        elif kind == "i64":
-            literal = stalg.Expression.Literal(
-                i64=value,
-                nullable=type.i64.nullability == stp.Type.NULLABILITY_NULLABLE,
-            )
-        elif kind == "fp32":
-            literal = stalg.Expression.Literal(
-                fp32=value,
-                nullable=type.fp32.nullability == stp.Type.NULLABILITY_NULLABLE,
-            )
-        elif kind == "fp64":
-            literal = stalg.Expression.Literal(
-                fp64=value,
-                nullable=type.fp64.nullability == stp.Type.NULLABILITY_NULLABLE,
-            )
-        elif kind == "string":
-            literal = stalg.Expression.Literal(
-                string=value,
-                nullable=type.string.nullability == stp.Type.NULLABILITY_NULLABLE,
-            )
-        elif kind == "binary":
-            literal = stalg.Expression.Literal(
-                binary=value,
-                nullable=type.binary.nullability == stp.Type.NULLABILITY_NULLABLE,
-            )
-        elif kind == "date":
-            date_value = (
-                (value - date(1970, 1, 1)).days if isinstance(value, date) else value
-            )
-            literal = stalg.Expression.Literal(
-                date=date_value,
-                nullable=type.date.nullability == stp.Type.NULLABILITY_NULLABLE,
-            )
-        # TODO
-        # IntervalYearToMonth interval_year_to_month = 19;
-        # IntervalDayToSecond interval_day_to_second = 20;
-        # IntervalCompound interval_compound = 36;
-        elif kind == "fixed_char":
-            literal = stalg.Expression.Literal(
-                fixed_char=value,
-                nullable=type.fixed_char.nullability == stp.Type.NULLABILITY_NULLABLE,
-            )
-        elif kind == "varchar":
-            literal = stalg.Expression.Literal(
-                var_char=stalg.Expression.Literal.VarChar(
-                    value=value, length=type.varchar.length
-                ),
-                nullable=type.varchar.nullability == stp.Type.NULLABILITY_NULLABLE,
-            )
-        elif kind == "fixed_binary":
-            literal = stalg.Expression.Literal(
-                fixed_binary=value,
-                nullable=type.fixed_binary.nullability == stp.Type.NULLABILITY_NULLABLE,
-            )
-        # TODO
-        # Decimal decimal = 24;
-        # PrecisionTime precision_time = 37; // Time in precision units past midnight.
-        # PrecisionTimestamp precision_timestamp = 34;
-        # PrecisionTimestamp precision_timestamp_tz = 35;
-        # Struct struct = 25;
-        # Map map = 26;
-        # bytes uuid = 28;
-        # Type null = 29; // a typed null literal
-        # List list = 30;
-        # Type.List empty_list = 31;
-        # Type.Map empty_map = 32;
-        else:
-            raise Exception(f"Unknown literal type - {type}")
-
         return stee.ExtendedExpression(
             referred_expr=[
                 stee.ExpressionReference(
-                    expression=stalg.Expression(literal=literal),
+                    expression=stalg.Expression(literal=_make_literal(value, type)),
                     output_names=_alias_or_inferred(alias, "Literal", [str(value)]),
+                )
+            ],
+            base_schema=base_schema,
+        )
+
+    return resolve
+
+
+def outer_reference(field: Union[str, int], steps_out: int = 0):
+    """A field reference to an enclosing query's column (a correlated reference).
+
+    Only valid inside a subquery; ``steps_out`` counts query-nesting levels
+    outward (0 = the immediately enclosing query). ``field`` is resolved against
+    that enclosing query's schema.
+    """
+
+    def resolve(
+        base_schema: stp.NamedStruct, registry: ExtensionRegistry
+    ) -> stee.ExtendedExpression:
+        stack = outer_schemas.get()
+        if steps_out >= len(stack):
+            raise Exception("outer() is only valid inside a correlated subquery")
+        outer_ns = stack[len(stack) - 1 - steps_out]
+        # Resolve the column against the enclosing schema, then re-root it as an
+        # outer reference (keeping the resolved struct-field segment).
+        resolved = column(field)(outer_ns, registry).referred_expr[0]
+        segment = resolved.expression.selection.direct_reference
+        expr = stalg.Expression(
+            selection=stalg.Expression.FieldReference(
+                outer_reference=stalg.Expression.FieldReference.OuterReference(
+                    steps_out=steps_out
+                ),
+                direct_reference=segment,
+            )
+        )
+        return stee.ExtendedExpression(
+            referred_expr=[
+                stee.ExpressionReference(
+                    expression=expr, output_names=resolved.output_names
                 )
             ],
             base_schema=base_schema,
@@ -210,8 +431,13 @@ def scalar_function(
     function: str,
     expressions: Iterable[ExtendedExpressionOrUnbound],
     alias: Union[Iterable[str], str, None] = None,
+    options: Union[dict, None] = None,
 ):
-    """Builds a resolver for ExtendedExpression containing a ScalarFunction expression"""
+    """Builds a resolver for ExtendedExpression containing a ScalarFunction expression.
+
+    ``options`` is an optional ``{name: preference}`` mapping of behavioral
+    function options (e.g. ``{"overflow": "ERROR"}``).
+    """
 
     def resolve(
         base_schema: stp.NamedStruct, registry: ExtensionRegistry
@@ -267,6 +493,7 @@ def scalar_function(
                                 )
                                 for e in bound_expressions
                             ],
+                            options=_function_options(options),
                             output_type=func[1],
                         )
                     ),
@@ -290,14 +517,29 @@ def aggregate_function(
     function: str,
     expressions: Iterable[ExtendedExpressionOrUnbound],
     alias: Union[Iterable[str], str, None] = None,
+    invocation: Union[
+        "stalg.AggregateFunction.AggregationInvocation.ValueType", None
+    ] = None,
+    sorts: Iterable[
+        tuple[ExtendedExpressionOrUnbound, "stalg.SortField.SortDirection.ValueType"]
+    ] = (),
+    options: Union[dict, None] = None,
 ):
-    """Builds a resolver for ExtendedExpression containing a AggregateFunction measure"""
+    """Builds a resolver for ExtendedExpression containing a AggregateFunction measure.
+
+    ``invocation`` selects ALL vs DISTINCT (``COUNT(DISTINCT ...)``); ``sorts`` is
+    a list of ``(expression, SortDirection)`` pairs for order-sensitive aggregates.
+    """
 
     def resolve(
         base_schema: stp.NamedStruct, registry: ExtensionRegistry
     ) -> stee.ExtendedExpression:
         bound_expressions: Iterable[stee.ExtendedExpression] = [
             resolve_expression(e, base_schema, registry) for e in expressions
+        ]
+        bound_sorts = [
+            (resolve_expression(e, base_schema, registry), direction)
+            for e, direction in sorts
         ]
 
         expression_schemas = [
@@ -328,11 +570,15 @@ def aggregate_function(
         ]
 
         extension_urns = merge_extension_urns(
-            func_extension_urns, *[b.extension_urns for b in bound_expressions]
+            func_extension_urns,
+            *[b.extension_urns for b in bound_expressions],
+            *[s.extension_urns for s, _ in bound_sorts],
         )
 
         extensions = merge_extension_declarations(
-            func_extensions, *[b.extensions for b in bound_expressions]
+            func_extensions,
+            *[b.extensions for b in bound_expressions],
+            *[s.extensions for s, _ in bound_sorts],
         )
 
         return stee.ExtendedExpression(
@@ -344,7 +590,17 @@ def aggregate_function(
                             stalg.FunctionArgument(value=e.referred_expr[0].expression)
                             for e in bound_expressions
                         ],
+                        options=_function_options(options),
                         output_type=func[1],
+                        invocation=invocation
+                        if invocation is not None
+                        else stalg.AggregateFunction.AGGREGATION_INVOCATION_UNSPECIFIED,
+                        sorts=[
+                            stalg.SortField(
+                                expr=s.referred_expr[0].expression, direction=direction
+                            )
+                            for s, direction in bound_sorts
+                        ],
                     ),
                     output_names=_alias_or_inferred(
                         alias,
@@ -368,6 +624,7 @@ def window_function(
     expressions: Iterable[ExtendedExpressionOrUnbound],
     partitions: Iterable[ExtendedExpressionOrUnbound] = [],
     alias: Union[Iterable[str], str, None] = None,
+    options: Union[dict, None] = None,
 ):
     """Builds a resolver for ExtendedExpression containing a WindowFunction expression"""
 
@@ -433,6 +690,7 @@ def window_function(
                                 )
                                 for e in bound_expressions
                             ],
+                            options=_function_options(options),
                             output_type=func[1],
                             partitions=[
                                 e.referred_expr[0].expression for e in bound_partitions
@@ -717,6 +975,158 @@ def cast(
             base_schema=base_schema,
             extension_urns=bound_input.extension_urns,
             extensions=bound_input.extensions,
+        )
+
+    return resolve
+
+
+# -- subqueries -----------------------------------------------------------
+# These embed an inner query's Rel. ``query`` is a Plan or an UnboundPlan
+# (a ``registry -> Plan`` callable) -- e.g. a DataFrame's underlying plan.
+
+
+def _subquery(subquery, base_schema, output_name, *extension_sources):
+    return stee.ExtendedExpression(
+        referred_expr=[
+            stee.ExpressionReference(
+                expression=stalg.Expression(subquery=subquery),
+                output_names=[output_name],
+            )
+        ],
+        base_schema=base_schema,
+        extension_urns=merge_extension_urns(
+            *[s.extension_urns for s in extension_sources]
+        ),
+        extensions=merge_extension_declarations(
+            *[s.extensions for s in extension_sources]
+        ),
+    )
+
+
+def _inner_rel(query, registry: ExtensionRegistry, base_schema):
+    # Push the enclosing schema so field references inside the subquery that use
+    # an OuterReference (i.e. correlated columns) resolve against it.
+    stack = outer_schemas.get()
+    token = outer_schemas.set((*stack, base_schema))
+    try:
+        plan = query(registry) if callable(query) else query
+    finally:
+        outer_schemas.reset(token)
+    return plan, plan.relations[-1].root.input
+
+
+def scalar_subquery(query, alias: Union[str, None] = None):
+    """A scalar (one-row, one-column) subquery expression."""
+
+    def resolve(base_schema, registry):
+        plan, rel = _inner_rel(query, registry, base_schema)
+        subquery = stalg.Expression.Subquery(
+            scalar=stalg.Expression.Subquery.Scalar(input=rel)
+        )
+        return _subquery(subquery, base_schema, alias or "subquery", plan)
+
+    return resolve
+
+
+def set_predicate(query, op, alias: Union[str, None] = None):
+    """An EXISTS / UNIQUE subquery predicate."""
+
+    def resolve(base_schema, registry):
+        plan, rel = _inner_rel(query, registry, base_schema)
+        subquery = stalg.Expression.Subquery(
+            set_predicate=stalg.Expression.Subquery.SetPredicate(
+                predicate_op=op, tuples=rel
+            )
+        )
+        return _subquery(subquery, base_schema, alias or "exists", plan)
+
+    return resolve
+
+
+def in_predicate(needles, query, alias: Union[str, None] = None):
+    """A ``needles IN (subquery)`` predicate."""
+
+    def resolve(base_schema, registry):
+        plan, rel = _inner_rel(query, registry, base_schema)
+        bound = [resolve_expression(n, base_schema, registry) for n in needles]
+        subquery = stalg.Expression.Subquery(
+            in_predicate=stalg.Expression.Subquery.InPredicate(
+                needles=[b.referred_expr[0].expression for b in bound], haystack=rel
+            )
+        )
+        return _subquery(subquery, base_schema, alias or "in_subquery", plan, *bound)
+
+    return resolve
+
+
+def set_comparison(left, query, reduction_op, comparison_op, alias=None):
+    """A ``left <op> ANY/ALL (subquery)`` predicate."""
+
+    def resolve(base_schema, registry):
+        plan, rel = _inner_rel(query, registry, base_schema)
+        bound_left = resolve_expression(left, base_schema, registry)
+        subquery = stalg.Expression.Subquery(
+            set_comparison=stalg.Expression.Subquery.SetComparison(
+                reduction_op=reduction_op,
+                comparison_op=comparison_op,
+                left=bound_left.referred_expr[0].expression,
+                right=rel,
+            )
+        )
+        return _subquery(
+            subquery, base_schema, alias or "set_comparison", plan, bound_left
+        )
+
+    return resolve
+
+
+def execution_context_variable(variable: str, type_value, alias=None):
+    """A leaf expression for a runtime context value.
+
+    ``variable`` is one of ``current_timestamp`` / ``current_timezone`` /
+    ``current_date``; ``type_value`` is the matching ``Type.*`` message the
+    oneof carries (it also declares the variable's type).
+    """
+
+    def resolve(
+        base_schema: stp.NamedStruct, registry: ExtensionRegistry
+    ) -> stee.ExtendedExpression:
+        ecv = stalg.Expression.ExecutionContextVariable(**{variable: type_value})
+        return stee.ExtendedExpression(
+            referred_expr=[
+                stee.ExpressionReference(
+                    expression=stalg.Expression(execution_context_variable=ecv),
+                    output_names=[alias or variable],
+                )
+            ],
+            base_schema=base_schema,
+        )
+
+    return resolve
+
+
+def dynamic_parameter(parameter_reference: int, type: stp.Type, alias=None):
+    """A DynamicParameter placeholder bound at runtime (prepared-statement style).
+
+    Carries its own ``type`` and a 0-based ``parameter_reference`` into the
+    plan's ``parameter_bindings``.
+    """
+
+    def resolve(
+        base_schema: stp.NamedStruct, registry: ExtensionRegistry
+    ) -> stee.ExtendedExpression:
+        expr = stalg.Expression(
+            dynamic_parameter=stalg.DynamicParameter(
+                parameter_reference=parameter_reference, type=type
+            )
+        )
+        return stee.ExtendedExpression(
+            referred_expr=[
+                stee.ExpressionReference(
+                    expression=expr, output_names=[alias or f"?{parameter_reference}"]
+                )
+            ],
+            base_schema=base_schema,
         )
 
     return resolve

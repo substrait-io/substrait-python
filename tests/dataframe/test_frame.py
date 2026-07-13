@@ -1,0 +1,1347 @@
+"""Tests for the fluent DataFrame facade (substrait.dataframe.frame / substrait.dataframe).
+
+Each fluent chain is checked against the equivalent raw builder pipeline for
+byte-identical protobuf output.
+"""
+
+import pytest
+import substrait.algebra_pb2 as stalg
+
+import substrait.dataframe as sub
+from substrait.builders.extended_expression import (
+    aggregate_function,
+    column,
+    literal,
+    scalar_function,
+)
+from substrait.builders.plan import aggregate as b_aggregate
+from substrait.builders.plan import cross as b_cross
+from substrait.builders.plan import extension_table as b_extension_table
+from substrait.builders.plan import fetch as b_fetch
+from substrait.builders.plan import filter as b_filter
+from substrait.builders.plan import join as b_join
+from substrait.builders.plan import local_files as b_local_files
+from substrait.builders.plan import read_named_table as b_read
+from substrait.builders.plan import select as b_select
+from substrait.builders.plan import set as b_set
+from substrait.builders.plan import sort as b_sort
+from substrait.builders.plan import virtual_table as b_virtual_table
+from substrait.builders.plan import write_named_table as b_write
+from substrait.builders.type import fp64, i64, named_struct, string, struct
+from substrait.dataframe.frame import _JOIN_TYPES
+from substrait.extension_registry import ExtensionRegistry
+
+registry = ExtensionRegistry(load_default_extensions=True)
+
+COMPARISON = "extension:io.substrait:functions_comparison"
+ARITHMETIC = "extension:io.substrait:functions_arithmetic"
+
+
+def people_ns():
+    # Matches the {name: sub.<type>} dict form, whose columns default to nullable.
+    return named_struct(
+        names=["id", "age", "name"],
+        struct=struct(types=[i64(), i64(), string()], nullable=False),
+    )
+
+
+def people_df():
+    return sub.read_named_table(
+        "people", {"id": sub.i64, "age": sub.i64, "name": sub.string}
+    )
+
+
+def test_schema_dict_matches_named_struct():
+    # A {name: type} dict must build the same NamedStruct as the explicit form.
+    from_dict = sub.read_named_table(
+        "people", {"id": sub.i64, "age": sub.i64, "name": sub.string}
+    ).to_plan()
+    explicit = b_read("people", people_ns())(registry)
+    assert from_dict.SerializeToString() == explicit.SerializeToString()
+
+
+def test_filter_select_matches_builder():
+    fluent = people_df().filter(sub.col("age") > 25).select("id").to_plan()
+
+    raw = b_select(
+        b_filter(
+            b_read("people", people_ns()),
+            expression=scalar_function(
+                COMPARISON, "gt", expressions=[column("age"), literal(25, i64())]
+            ),
+        ),
+        expressions=[column("id")],
+    )(registry)
+
+    assert fluent.SerializeToString() == raw.SerializeToString()
+
+
+def test_with_columns_named_appends_projection():
+    fluent = people_df().with_columns(bonus=sub.col("age") + 1).to_plan()
+    # ProjectRel appends: output has original columns + the new one.
+    root = fluent.relations[-1].root.input
+    assert root.HasField("project")
+    assert len(root.project.expressions) == 1  # the appended bonus expression
+
+
+def test_sort_descending_matches_builder():
+    fluent = people_df().sort("age", descending=True).to_plan()
+    raw = b_sort(
+        b_read("people", people_ns()),
+        expressions=[(column("age"), stalg.SortField.SORT_DIRECTION_DESC_NULLS_LAST)],
+    )(registry)
+    assert fluent.SerializeToString() == raw.SerializeToString()
+
+
+@pytest.mark.parametrize(
+    "descending, nulls_last, direction",
+    [
+        (False, False, stalg.SortField.SORT_DIRECTION_ASC_NULLS_FIRST),
+        (False, True, stalg.SortField.SORT_DIRECTION_ASC_NULLS_LAST),
+        (True, False, stalg.SortField.SORT_DIRECTION_DESC_NULLS_FIRST),
+        (True, True, stalg.SortField.SORT_DIRECTION_DESC_NULLS_LAST),
+    ],
+)
+def test_sort_direction_combinations_match_builder(descending, nulls_last, direction):
+    fluent = (
+        people_df().sort("age", descending=descending, nulls_last=nulls_last).to_plan()
+    )
+    raw = b_sort(
+        b_read("people", people_ns()),
+        expressions=[(column("age"), direction)],
+    )(registry)
+    assert fluent.SerializeToString() == raw.SerializeToString()
+
+
+def test_sort_per_column_directions_match_builder():
+    fluent = (
+        people_df()
+        .sort("age", "id", descending=[True, False], nulls_last=[True, False])
+        .to_plan()
+    )
+    raw = b_sort(
+        b_read("people", people_ns()),
+        expressions=[
+            (column("age"), stalg.SortField.SORT_DIRECTION_DESC_NULLS_LAST),
+            (column("id"), stalg.SortField.SORT_DIRECTION_ASC_NULLS_FIRST),
+        ],
+    )(registry)
+    assert fluent.SerializeToString() == raw.SerializeToString()
+
+
+def test_sort_per_column_length_mismatch_raises():
+    with pytest.raises(ValueError, match="but 2 sort columns"):
+        people_df().sort("age", "id", descending=[True])
+
+
+def test_limit_matches_builder_fetch():
+    fluent = people_df().limit(5).to_plan()
+    raw = b_fetch(
+        b_read("people", people_ns()),
+        offset=literal(0, i64()),
+        count=literal(5, i64()),
+    )(registry)
+    assert fluent.SerializeToString() == raw.SerializeToString()
+
+
+def test_join_matches_builder():
+    left_ns = named_struct(
+        names=["cust_id", "name"],
+        struct=struct(types=[i64(), string()], nullable=False),
+    )
+    right_ns = named_struct(
+        names=["order_id", "cust_ref", "amount"],
+        struct=struct(types=[i64(), i64(), fp64()], nullable=False),
+    )
+
+    left = sub.read_named_table("customers", {"cust_id": sub.i64, "name": sub.string})
+    right = sub.read_named_table(
+        "orders", {"order_id": sub.i64, "cust_ref": sub.i64, "amount": sub.fp64}
+    )
+    fluent = left.join(
+        right, on=sub.col("cust_id") == sub.col("cust_ref"), how="inner"
+    ).to_plan()
+
+    raw = b_join(
+        b_read("customers", left_ns),
+        b_read("orders", right_ns),
+        expression=scalar_function(
+            COMPARISON, "equal", expressions=[column("cust_id"), column("cust_ref")]
+        ),
+        type=stalg.JoinRel.JOIN_TYPE_INNER,
+    )(registry)
+
+    assert fluent.SerializeToString() == raw.SerializeToString()
+
+
+def test_join_unknown_type_raises():
+    left = sub.read_named_table("a", {"x": sub.i64})
+    right = sub.read_named_table("b", {"x": sub.i64})
+    with pytest.raises(ValueError, match="unknown join type"):
+        left.join(right, on=sub.col("x") == sub.col("x"), how="banana")
+
+
+@pytest.mark.parametrize("how, join_type", sorted(_JOIN_TYPES.items()))
+def test_join_all_types_match_builder(how, join_type):
+    left_ns = named_struct(
+        names=["cust_id", "name"],
+        struct=struct(types=[i64(), string()], nullable=False),
+    )
+    right_ns = named_struct(
+        names=["order_id", "cust_ref", "amount"],
+        struct=struct(types=[i64(), i64(), fp64()], nullable=False),
+    )
+    left = sub.read_named_table("customers", {"cust_id": sub.i64, "name": sub.string})
+    right = sub.read_named_table(
+        "orders", {"order_id": sub.i64, "cust_ref": sub.i64, "amount": sub.fp64}
+    )
+    fluent = left.join(
+        right, on=sub.col("cust_id") == sub.col("cust_ref"), how=how
+    ).to_plan()
+    raw = b_join(
+        b_read("customers", left_ns),
+        b_read("orders", right_ns),
+        expression=scalar_function(
+            COMPARISON, "equal", expressions=[column("cust_id"), column("cust_ref")]
+        ),
+        type=join_type,
+    )(registry)
+    assert fluent.SerializeToString() == raw.SerializeToString()
+
+
+def test_group_by_agg_matches_builder():
+    ns = named_struct(
+        names=["region", "amount"],
+        struct=struct(types=[string(), fp64()], nullable=False),
+    )
+    fluent = (
+        sub.read_named_table("sales", {"region": sub.string, "amount": sub.fp64})
+        .group_by("region")
+        .agg(sub.f.sum(sub.col("amount")).alias("total"))
+        .to_plan()
+    )
+    raw = b_aggregate(
+        b_read("sales", ns),
+        grouping_expressions=[column("region")],
+        measures=[
+            aggregate_function(
+                ARITHMETIC, "sum", expressions=[column("amount")], alias="total"
+            )
+        ],
+    )(registry)
+    assert fluent.SerializeToString() == raw.SerializeToString()
+
+
+def test_group_by_agg_equals_aggregate_oneshot():
+    df = sub.read_named_table("sales", {"region": sub.string, "amount": sub.fp64})
+    via_groupby = (
+        df.group_by("region").agg(sub.f.sum(sub.col("amount")).alias("t")).to_plan()
+    )
+    via_aggregate = df.aggregate(
+        "region", sub.f.sum(sub.col("amount")).alias("t")
+    ).to_plan()
+    assert via_groupby.SerializeToString() == via_aggregate.SerializeToString()
+
+
+# -- Phase 4: grouping sets / rollup / cube, FILTER, DISTINCT, ordered -----
+
+
+def _sales_ns():
+    return named_struct(
+        names=["region", "dept", "amount", "status"],
+        struct=struct(types=[string(), string(), fp64(), string()], nullable=False),
+    )
+
+
+def _sales_df():
+    return sub.read_named_table(
+        "sales",
+        {
+            "region": sub.string,
+            "dept": sub.string,
+            "amount": sub.fp64,
+            "status": sub.string,
+        },
+    )
+
+
+@pytest.mark.parametrize(
+    "group, sets",
+    [
+        (lambda df: df.rollup("region", "dept"), [[0, 1], [0], []]),
+        (lambda df: df.cube("region", "dept"), [[0, 1], [0], [1], []]),
+        (
+            lambda df: df.group_by(
+                "region", "dept", grouping_sets=[["region", "dept"], ["region"], []]
+            ),
+            [[0, 1], [0], []],
+        ),
+    ],
+)
+def test_grouping_sets_match_builder(group, sets):
+    fluent = group(_sales_df()).agg(sub.f.sum(sub.col("amount")).alias("t")).to_plan()
+    raw = b_aggregate(
+        b_read("sales", _sales_ns()),
+        grouping_expressions=[column("region"), column("dept")],
+        measures=[
+            aggregate_function(
+                ARITHMETIC, "sum", expressions=[column("amount")], alias="t"
+            )
+        ],
+        grouping_sets=sets,
+    )(registry)
+    assert fluent.SerializeToString() == raw.SerializeToString()
+
+
+def test_agg_filter_matches_builder():
+    fluent = (
+        _sales_df()
+        .group_by("region")
+        .agg(
+            sub.f.sum(sub.col("amount"))
+            .filter(sub.col("status") == "paid")
+            .alias("paid")
+        )
+        .to_plan()
+    )
+    raw = b_aggregate(
+        b_read("sales", _sales_ns()),
+        grouping_expressions=[column("region")],
+        measures=[
+            aggregate_function(
+                ARITHMETIC, "sum", expressions=[column("amount")], alias="paid"
+            )
+        ],
+        filters=[
+            scalar_function(
+                COMPARISON,
+                "equal",
+                expressions=[column("status"), literal("paid", string())],
+            )
+        ],
+    )(registry)
+    assert fluent.SerializeToString() == raw.SerializeToString()
+
+
+def test_agg_distinct_matches_builder():
+    fluent = (
+        _sales_df()
+        .group_by("region")
+        .agg(sub.f.sum(sub.col("amount")).distinct().alias("s"))
+        .to_plan()
+    )
+    raw = b_aggregate(
+        b_read("sales", _sales_ns()),
+        grouping_expressions=[column("region")],
+        measures=[
+            aggregate_function(
+                ARITHMETIC,
+                "sum",
+                expressions=[column("amount")],
+                alias="s",
+                invocation=stalg.AggregateFunction.AGGREGATION_INVOCATION_DISTINCT,
+            )
+        ],
+    )(registry)
+    assert fluent.SerializeToString() == raw.SerializeToString()
+
+
+def test_agg_order_by_matches_builder():
+    fluent = (
+        _sales_df()
+        .group_by("region")
+        .agg(sub.f.sum(sub.col("amount")).order_by("dept", descending=True).alias("s"))
+        .to_plan()
+    )
+    raw = b_aggregate(
+        b_read("sales", _sales_ns()),
+        grouping_expressions=[column("region")],
+        measures=[
+            aggregate_function(
+                ARITHMETIC,
+                "sum",
+                expressions=[column("amount")],
+                alias="s",
+                sorts=[
+                    (column("dept"), stalg.SortField.SORT_DIRECTION_DESC_NULLS_LAST)
+                ],
+            )
+        ],
+    )(registry)
+    assert fluent.SerializeToString() == raw.SerializeToString()
+
+
+def test_grouping_sets_unknown_key_raises():
+    with pytest.raises(ValueError, match="not a group_by key"):
+        _sales_df().group_by("region", grouping_sets=[["nope"]])
+
+
+def test_distinct_on_non_measure_raises():
+    with pytest.raises(TypeError, match="aggregate measures"):
+        _sales_df().select(sub.col("region").distinct()).to_plan()
+
+
+# -- Phase 5: read sources (virtual table, local files, extension table) --
+
+
+def test_from_records_matches_builder():
+    ns = named_struct(
+        names=["id", "name"], struct=struct(types=[i64(), string()], nullable=False)
+    )
+    fluent = sub.from_records(
+        [{"id": 1, "name": "a"}, {"id": 2, "name": "b"}],
+        {"id": sub.i64, "name": sub.string},
+    ).to_plan()
+    raw = b_virtual_table(
+        [
+            [literal(1, i64()), literal("a", string())],
+            [literal(2, i64()), literal("b", string())],
+        ],
+        ns,
+    )(registry)
+    assert fluent.SerializeToString() == raw.SerializeToString()
+
+
+def test_from_records_positional_matches_dict():
+    schema = {"id": sub.i64, "name": sub.string}
+    by_dict = sub.from_records([{"id": 1, "name": "a"}], schema).to_plan()
+    by_tuple = sub.from_records([(1, "a")], schema).to_plan()
+    assert by_dict.SerializeToString() == by_tuple.SerializeToString()
+
+
+def test_from_records_null_is_typed_null():
+    plan = sub.from_records([{"id": None}], {"id": sub.i64}).to_plan()
+    lit0 = plan.relations[-1].root.input.read.virtual_table.expressions[0].fields[0]
+    assert lit0.literal.WhichOneof("literal_type") == "null"
+
+
+def test_from_records_row_length_mismatch_raises():
+    with pytest.raises(ValueError, match="but schema has"):
+        sub.from_records([(1, 2)], {"id": sub.i64})
+
+
+def test_read_parquet_matches_builder():
+    ns = named_struct(names=["id"], struct=struct(types=[i64()], nullable=False))
+    fof = stalg.ReadRel.LocalFiles.FileOrFiles
+    fluent = sub.read_parquet("f.parquet", {"id": sub.i64}).to_plan()
+    raw = b_local_files(
+        ns, [fof(uri_file="f.parquet", parquet=fof.ParquetReadOptions())]
+    )(registry)
+    assert fluent.SerializeToString() == raw.SerializeToString()
+
+
+def test_read_csv_matches_builder():
+    ns = named_struct(names=["id"], struct=struct(types=[i64()], nullable=False))
+    fof = stalg.ReadRel.LocalFiles.FileOrFiles
+    fluent = sub.read_csv(
+        ["a.csv", "b.csv"], {"id": sub.i64}, delimiter=";", header_lines_to_skip=2
+    ).to_plan()
+    text = fof.DelimiterSeparatedTextReadOptions(
+        field_delimiter=";", header_lines_to_skip=2
+    )
+    raw = b_local_files(
+        ns,
+        [fof(uri_file="a.csv", text=text), fof(uri_file="b.csv", text=text)],
+    )(registry)
+    assert fluent.SerializeToString() == raw.SerializeToString()
+
+
+def test_read_extension_table_matches_builder():
+    from google.protobuf.any_pb2 import Any
+
+    ns = named_struct(names=["id"], struct=struct(types=[i64()], nullable=False))
+    detail = Any(type_url="example.com/Foo", value=b"payload")
+    fluent = sub.read_extension_table({"id": sub.i64}, detail).to_plan()
+    raw = b_extension_table(ns, detail)(registry)
+    assert fluent.SerializeToString() == raw.SerializeToString()
+
+
+# -- Phase 6: subqueries --------------------------------------------------
+
+
+def _outer():
+    return sub.read_named_table("o", {"x": sub.i64, "y": sub.i64})
+
+
+def _inner():
+    return sub.read_named_table("i", {"v": sub.i64})
+
+
+def _rel(df):
+    return df.to_plan().relations[-1].root.input
+
+
+def _filter_condition(df):
+    return _rel(df).filter.condition
+
+
+def test_scalar_subquery_embeds_inner_rel():
+    inner = _inner()
+    cond = _filter_condition(_outer().filter(sub.col("x") > sub.scalar_subquery(inner)))
+    sq = cond.scalar_function.arguments[1].value.subquery
+    assert sq.WhichOneof("subquery_type") == "scalar"
+    assert sq.scalar.input == _rel(inner)
+
+
+@pytest.mark.parametrize(
+    "make, op",
+    [
+        (sub.exists, stalg.Expression.Subquery.SetPredicate.PREDICATE_OP_EXISTS),
+        (sub.unique, stalg.Expression.Subquery.SetPredicate.PREDICATE_OP_UNIQUE),
+    ],
+)
+def test_set_predicate_subquery(make, op):
+    inner = _inner()
+    cond = _filter_condition(_outer().filter(make(inner)))
+    assert cond.subquery.WhichOneof("subquery_type") == "set_predicate"
+    assert cond.subquery.set_predicate.predicate_op == op
+    assert cond.subquery.set_predicate.tuples == _rel(inner)
+
+
+def test_in_subquery():
+    inner = _inner()
+    cond = _filter_condition(_outer().filter(sub.col("x").in_subquery(inner)))
+    in_pred = cond.subquery.in_predicate
+    assert cond.subquery.WhichOneof("subquery_type") == "in_predicate"
+    assert len(in_pred.needles) == 1
+    assert in_pred.needles[0].selection.direct_reference.struct_field.field == 0
+    assert in_pred.haystack == _rel(inner)
+
+
+@pytest.mark.parametrize(
+    "make, reduction, comparison",
+    [
+        (
+            lambda c, q: c > sub.any_(q),
+            stalg.Expression.Subquery.SetComparison.REDUCTION_OP_ANY,
+            stalg.Expression.Subquery.SetComparison.COMPARISON_OP_GT,
+        ),
+        (
+            lambda c, q: c <= sub.all_(q),
+            stalg.Expression.Subquery.SetComparison.REDUCTION_OP_ALL,
+            stalg.Expression.Subquery.SetComparison.COMPARISON_OP_LE,
+        ),
+        (
+            lambda c, q: c == sub.any_(q),
+            stalg.Expression.Subquery.SetComparison.REDUCTION_OP_ANY,
+            stalg.Expression.Subquery.SetComparison.COMPARISON_OP_EQ,
+        ),
+    ],
+)
+def test_set_comparison_subquery(make, reduction, comparison):
+    inner = _inner()
+    cond = _filter_condition(_outer().filter(make(sub.col("x"), inner)))
+    sc = cond.subquery.set_comparison
+    assert cond.subquery.WhichOneof("subquery_type") == "set_comparison"
+    assert sc.reduction_op == reduction
+    assert sc.comparison_op == comparison
+    assert sc.right == _rel(inner)
+
+
+def test_subquery_merges_inner_extensions():
+    # A function used inside the subquery must be declared in the outer plan.
+    inner = _inner().filter(sub.col("v") > 5)
+    plan = _outer().filter(sub.exists(inner)).to_plan()
+    urns = {u.urn for u in plan.extension_urns}
+    assert "extension:io.substrait:functions_comparison" in urns
+
+
+def test_subquery_requires_dataframe():
+    with pytest.raises(TypeError, match="expects a DataFrame"):
+        sub.scalar_subquery(sub.col("x"))
+
+
+# -- Phase 7: write op, DDL, update ---------------------------------------
+
+
+def test_write_insert_matches_builder():
+    fluent = people_df().write_named_table("t", op="insert", mode="append").to_plan()
+    raw = b_write(
+        "t",
+        b_read("people", people_ns()),
+        create_mode=stalg.WriteRel.CREATE_MODE_APPEND_IF_EXISTS,
+        op=stalg.WriteRel.WRITE_OP_INSERT,
+    )(registry)
+    assert fluent.SerializeToString() == raw.SerializeToString()
+
+
+def test_write_unknown_op_raises():
+    with pytest.raises(ValueError, match="unknown write op"):
+        people_df().write_named_table("t", op="banana")
+
+
+def test_create_table_ddl():
+    ddl = (
+        sub.create_table(["db", "t"], {"id": sub.i64, "v": sub.string}, replace=True)
+        .to_plan()
+        .relations[-1]
+        .root.input.ddl
+    )
+    assert ddl.object == stalg.DdlRel.DDL_OBJECT_TABLE
+    assert ddl.op == stalg.DdlRel.DDL_OP_CREATE_OR_REPLACE
+    assert list(ddl.named_object.names) == ["db", "t"]
+    assert list(ddl.table_schema.names) == ["id", "v"]
+
+
+def test_create_view_infers_schema_and_embeds_query():
+    query = people_df().select("id")
+    ddl = sub.create_view("v", query).to_plan().relations[-1].root.input.ddl
+    assert ddl.object == stalg.DdlRel.DDL_OBJECT_VIEW
+    assert ddl.HasField("view_definition")
+    assert ddl.view_definition == query.to_plan().relations[-1].root.input
+    assert list(ddl.table_schema.names) == ["id"]
+
+
+@pytest.mark.parametrize(
+    "make, op, obj",
+    [
+        (
+            lambda: sub.drop_table("t"),
+            stalg.DdlRel.DDL_OP_DROP,
+            stalg.DdlRel.DDL_OBJECT_TABLE,
+        ),
+        (
+            lambda: sub.drop_table("t", if_exists=True),
+            stalg.DdlRel.DDL_OP_DROP_IF_EXIST,
+            stalg.DdlRel.DDL_OBJECT_TABLE,
+        ),
+        (
+            lambda: sub.drop_view("v"),
+            stalg.DdlRel.DDL_OP_DROP,
+            stalg.DdlRel.DDL_OBJECT_VIEW,
+        ),
+    ],
+)
+def test_drop_ddl(make, op, obj):
+    ddl = make().to_plan().relations[-1].root.input.ddl
+    assert ddl.op == op
+    assert ddl.object == obj
+
+
+def test_update_table():
+    up = (
+        sub.update_table(
+            "accounts",
+            {"id": sub.i64, "balance": sub.fp64},
+            {"balance": sub.col("balance") + 100.0},
+            where=sub.col("id") == 1,
+        )
+        .to_plan()
+        .relations[-1]
+        .root.input.update
+    )
+    assert list(up.named_table.names) == ["accounts"]
+    assert len(up.transformations) == 1
+    assert up.transformations[0].column_target == 1  # "balance"
+    assert up.HasField("condition")
+
+
+def test_update_table_by_index_no_condition():
+    up = (
+        sub.update_table("t", {"a": sub.i64, "b": sub.i64}, {0: sub.lit(5)})
+        .to_plan()
+        .relations[-1]
+        .root.input.update
+    )
+    assert up.transformations[0].column_target == 0
+    assert not up.HasField("condition")
+
+
+def test_update_merges_transformation_extensions():
+    plan = sub.update_table(
+        "accounts",
+        {"id": sub.i64, "balance": sub.fp64},
+        {"balance": sub.col("balance") + 100.0},
+    ).to_plan()
+    urns = {u.urn for u in plan.extension_urns}
+    assert "extension:io.substrait:functions_arithmetic" in urns
+
+
+# -- Phase (no-bump): window functions ------------------------------------
+
+
+def _win_df():
+    return sub.read_named_table(
+        "sales", {"region": sub.string, "day": sub.i64, "amount": sub.fp64}
+    )
+
+
+def _win_expr(expr):
+    return (
+        _win_df().select(expr).to_plan().relations[-1].root.input.project.expressions[0]
+    )
+
+
+def test_window_partition_and_order():
+    e = _win_expr(sub.f.row_number().over(partition_by="region", order_by="day"))
+    assert e.WhichOneof("rex_type") == "window_function"
+    assert len(e.window_function.partitions) == 1
+    assert len(e.window_function.sorts) == 1
+    assert (
+        e.window_function.sorts[0].direction
+        == stalg.SortField.SORT_DIRECTION_ASC_NULLS_LAST
+    )
+
+
+def test_window_multiple_partitions_and_desc_order():
+    e = _win_expr(
+        sub.f.rank().over(
+            partition_by=["region", "day"], order_by="amount", descending=True
+        )
+    )
+    assert len(e.window_function.partitions) == 2
+    assert (
+        e.window_function.sorts[0].direction
+        == stalg.SortField.SORT_DIRECTION_DESC_NULLS_LAST
+    )
+
+
+@pytest.mark.parametrize(
+    "frame_kwargs, bounds_type, lower, upper",
+    [
+        (
+            {"rows": (None, 0)},
+            stalg.Expression.WindowFunction.BOUNDS_TYPE_ROWS,
+            "unbounded",
+            "current_row",
+        ),
+        (
+            {"rows": (-1, 1)},
+            stalg.Expression.WindowFunction.BOUNDS_TYPE_ROWS,
+            "preceding",
+            "following",
+        ),
+        (
+            {"range": (None, None)},
+            stalg.Expression.WindowFunction.BOUNDS_TYPE_RANGE,
+            "unbounded",
+            "unbounded",
+        ),
+    ],
+)
+def test_window_frame(frame_kwargs, bounds_type, lower, upper):
+    w = _win_expr(sub.f.rank().over(order_by="day", **frame_kwargs)).window_function
+    assert w.bounds_type == bounds_type
+    assert w.lower_bound.WhichOneof("kind") == lower
+    assert w.upper_bound.WhichOneof("kind") == upper
+
+
+def test_window_frame_offsets():
+    w = _win_expr(sub.f.rank().over(order_by="day", rows=(-2, 3))).window_function
+    assert w.lower_bound.preceding.offset == 2
+    assert w.upper_bound.following.offset == 3
+
+
+def test_window_rows_and_range_conflict_raises():
+    with pytest.raises(ValueError, match="at most one"):
+        sub.f.rank().over(rows=(None, 0), range=(None, 0))
+
+
+def test_over_on_non_window_raises():
+    with pytest.raises(TypeError, match="window functions"):
+        _win_df().select(sub.col("region").over(partition_by="day")).to_plan()
+
+
+# -- Phase (core-ext): Expand / unpivot -----------------------------------
+
+
+def _wide_df():
+    return sub.read_named_table(
+        "sales",
+        {"region": sub.string, "q1": sub.fp64, "q2": sub.fp64, "q3": sub.fp64},
+    )
+
+
+def test_unpivot_structure():
+    plan = (
+        _wide_df()
+        .unpivot(
+            ["q1", "q2", "q3"],
+            index="region",
+            variable_name="quarter",
+            value_name="amount",
+        )
+        .to_plan()
+    )
+    root = plan.relations[-1].root
+    assert list(root.names) == ["region", "quarter", "amount"]  # index col dropped
+    expand = root.input.project.input.expand
+    assert [f.WhichOneof("field_type") for f in expand.fields] == [
+        "consistent_field",
+        "switching_field",
+        "switching_field",
+    ]
+    assert [d.literal.string for d in expand.fields[1].switching_field.duplicates] == [
+        "q1",
+        "q2",
+        "q3",
+    ]
+
+
+def test_unpivot_schema_inference_allows_chaining():
+    # Filtering after unpivot exercises infer_rel_schema for the expand relation.
+    plan = (
+        _wide_df()
+        .unpivot(["q1", "q2", "q3"], index="region", value_name="amount")
+        .filter(sub.col("amount") > 0.0)
+        .to_plan()
+    )
+    assert plan.relations[-1].root.input.HasField("filter")
+
+
+def test_unpivot_requires_on():
+    with pytest.raises(ValueError, match="at least one column"):
+        _wide_df().unpivot([], index="region")
+
+
+# -- Phase (core-ext): physical joins + exchange --------------------------
+
+
+def _ab():
+    left = sub.read_named_table("a", {"x": sub.i64, "y": sub.string})
+    right = sub.read_named_table("b", {"w": sub.i64, "z": sub.fp64})
+    return left, right
+
+
+def test_nested_loop_join_and_chaining():
+    left, right = _ab()
+    plan = (
+        left.nested_loop_join(right, on=sub.col("x") == sub.col("w"), how="inner")
+        .select("x", "z")
+        .to_plan()
+    )
+    root = plan.relations[-1].root
+    assert root.input.project.input.HasField("nested_loop_join")
+    assert list(root.names) == ["x", "z"]
+
+
+def test_nested_loop_semi_join_left_only_schema():
+    left, right = _ab()
+    # left_semi keeps only left columns; filtering on x proves the inferred schema.
+    plan = (
+        left.nested_loop_join(right, on=sub.col("x") == sub.col("w"), how="left_semi")
+        .filter(sub.col("x") > 0)
+        .to_plan()
+    )
+    assert plan.relations[-1].root.input.HasField("filter")
+
+
+def test_nested_loop_join_unknown_type_raises():
+    left, right = _ab()
+    with pytest.raises(ValueError, match="unknown join type"):
+        left.nested_loop_join(right, on=sub.col("x") == sub.col("w"), how="banana")
+
+
+@pytest.mark.parametrize(
+    "make, kind, count",
+    [
+        (lambda df: df.repartition(4), "round_robin", 4),
+        (lambda df: df.broadcast(), "broadcast", 0),
+    ],
+)
+def test_exchange(make, kind, count):
+    df = sub.read_named_table("a", {"x": sub.i64})
+    ex = make(df).to_plan().relations[-1].root.input.exchange
+    assert ex.WhichOneof("exchange_kind") == kind
+    assert ex.partition_count == count
+
+
+def test_exchange_preserves_schema_for_chaining():
+    df = sub.read_named_table("a", {"x": sub.i64, "y": sub.i64})
+    plan = df.repartition(2).filter(sub.col("y") > 0).to_plan()
+    assert plan.relations[-1].root.input.HasField("filter")
+
+
+# -- Phase (0.96-unblocked): TopN + execution-context variables -----------
+
+
+def test_top_n_structure_and_chaining():
+    df = sub.read_named_table("t", {"id": sub.i64, "score": sub.fp64})
+    plan = df.top_n(5, "score", descending=True, with_ties=True).select("id").to_plan()
+    tn = plan.relations[-1].root.input.project.input.top_n
+    assert len(tn.sorts) == 1
+    assert tn.sorts[0].direction == stalg.SortField.SORT_DIRECTION_DESC_NULLS_LAST
+    assert tn.count.literal.i64 == 5
+    assert tn.mode == stalg.FetchMode.FETCH_MODE_WITH_TIES
+    assert not tn.HasField("offset")
+    assert list(plan.relations[-1].root.names) == ["id"]
+
+
+def test_top_n_offset_and_multikey():
+    df = sub.read_named_table("t", {"id": sub.i64, "score": sub.fp64})
+    tn = df.top_n(3, ["score", "id"], offset=2).to_plan().relations[-1].root.input.top_n
+    assert len(tn.sorts) == 2
+    assert tn.offset.literal.i64 == 2
+    assert tn.mode == stalg.FetchMode.FETCH_MODE_ROWS_ONLY
+
+
+@pytest.mark.parametrize(
+    "make, variable, kind",
+    [
+        (sub.current_timestamp, "current_timestamp", "precision_timestamp_tz"),
+        (sub.current_date, "current_date", "date"),
+        (sub.current_timezone, "current_timezone", "string"),
+    ],
+)
+def test_execution_context_variable(make, variable, kind):
+    from substrait.type_inference import infer_plan_schema
+
+    df = sub.read_named_table("t", {"id": sub.i64})
+    plan = df.with_columns(v=make()).to_plan()
+    e = plan.relations[-1].root.input.project.expressions[0]
+    assert e.WhichOneof("rex_type") == "execution_context_variable"
+    assert (
+        e.execution_context_variable.WhichOneof("execution_context_variable_type")
+        == variable
+    )
+    # infer_expression_type derives the variable's type
+    assert infer_plan_schema(plan).struct.types[-1].WhichOneof("kind") == kind
+
+
+# -- Phase 9: hints -------------------------------------------------------
+
+
+def test_hint_annotates_common_and_is_advisory():
+    df = sub.read_named_table("t", {"id": sub.i64, "v": sub.i64})
+    plan = (
+        df.filter(sub.col("v") > 0)
+        .hint(row_count=1000, alias="big", output_names=["a", "b"])
+        .select("id")
+        .to_plan()
+    )
+    filt = plan.relations[-1].root.input.project.input.filter
+    hint = filt.common.hint
+    assert hint.stats.row_count == 1000
+    assert hint.alias == "big"
+    assert list(hint.output_names) == ["a", "b"]
+    # advisory only: the filter condition and the plan's output are unchanged
+    assert filt.HasField("condition")
+    assert list(plan.relations[-1].root.names) == ["id"]
+
+
+# -- Lambda / higher-order list functions ---------------------------------
+
+
+def _list_df():
+    return sub.read_named_table("t", {"arr": sub.list_(sub.i64.non_null)})
+
+
+@pytest.mark.parametrize(
+    "make",
+    [
+        lambda: sub.col("arr").list_transform(lambda x: x + 1),
+        lambda: sub.col("arr").list_filter(lambda x: x > 0),
+    ],
+)
+def test_higher_order_builds_lambda_arg(make):
+    proj = _list_df().select(make()).to_plan().relations[-1].root.input.project
+    fn = proj.expressions[0].scalar_function
+    assert fn.output_type.WhichOneof("kind") == "list"  # both return a list
+    lambda_arg = fn.arguments[1].value
+    assert lambda_arg.WhichOneof("rex_type") == "lambda"
+    # the lambda body references the element via a lambda-parameter reference
+    body = getattr(lambda_arg, "lambda").body
+    element = body.scalar_function.arguments[0].value
+    assert element.selection.HasField("lambda_parameter_reference")
+
+
+def test_list_transform_schema_inference():
+    from substrait.type_inference import infer_plan_schema
+
+    plan = (
+        _list_df()
+        .select(sub.col("arr").list_transform(lambda x: x + 1).alias("inc"))
+        .to_plan()
+    )
+    t = infer_plan_schema(plan).struct.types[0]
+    assert t.WhichOneof("kind") == "list"
+    assert t.list.type.WhichOneof("kind") == "i64"
+
+
+# -- Niche close-out: equi-joins, params, UDT, options, extension ---------
+
+
+def test_hash_join_and_chaining():
+    left = sub.read_named_table("l", {"id": sub.i64, "name": sub.string})
+    right = sub.read_named_table("r", {"rid": sub.i64, "amt": sub.fp64})
+    plan = (
+        left.hash_join(right, "id", "rid", how="left").select("name", "amt").to_plan()
+    )
+    hj = plan.relations[-1].root.input.project.input.hash_join
+    assert hj.type == stalg.HashJoinRel.JOIN_TYPE_LEFT
+    assert len(hj.keys) == 1
+    assert (
+        hj.keys[0].comparison.simple
+        == stalg.ComparisonJoinKey.SIMPLE_COMPARISON_TYPE_EQ
+    )
+    assert list(plan.relations[-1].root.names) == ["name", "amt"]
+
+
+def test_merge_join_default_right_on():
+    left = sub.read_named_table("l", {"id": sub.i64})
+    right = sub.read_named_table("r", {"id": sub.i64})
+    mj = left.merge_join(right, "id").to_plan().relations[-1].root.input.merge_join
+    assert mj.type == stalg.MergeJoinRel.JOIN_TYPE_INNER
+    assert len(mj.keys) == 1
+
+
+def test_dynamic_parameter():
+    from substrait.type_inference import infer_plan_schema
+
+    df = sub.read_named_table("t", {"id": sub.i64})
+    plan = df.with_columns(p=sub.parameter(1, sub.string)).to_plan()
+    dp = plan.relations[-1].root.input.project.expressions[0].dynamic_parameter
+    assert dp.parameter_reference == 1
+    assert dp.type.WhichOneof("kind") == "string"
+    assert infer_plan_schema(plan).struct.types[-1].WhichOneof("kind") == "string"
+
+
+def test_user_defined_type_in_schema():
+    plan = sub.read_named_table(
+        "u", {"x": sub.user_defined(7, nullable=False)}
+    ).to_plan()
+    col_t = plan.relations[-1].root.input.read.base_schema.struct.types[0]
+    assert col_t.WhichOneof("kind") == "user_defined"
+    assert col_t.user_defined.type_reference == 7
+
+
+def test_function_options():
+    df = sub.read_named_table("t", {"x": sub.i64})
+    fn = (
+        df.select(sub.f.add(sub.col("x"), 2, overflow="ERROR").alias("s"))
+        .to_plan()
+        .relations[-1]
+        .root.input.project.expressions[0]
+        .scalar_function
+    )
+    assert [o.name for o in fn.options] == ["overflow"]
+    assert list(fn.options[0].preference) == ["ERROR"]
+
+
+def test_function_without_options_has_none():
+    df = sub.read_named_table("t", {"x": sub.i64})
+    fn = (
+        df.select(sub.f.add(sub.col("x"), 2))
+        .to_plan()
+        .relations[-1]
+        .root.input.project.expressions[0]
+        .scalar_function
+    )
+    assert len(fn.options) == 0
+
+
+def test_extension_single_passthrough_and_chaining():
+    from google.protobuf.any_pb2 import Any
+
+    df = sub.read_named_table("t", {"id": sub.i64, "v": sub.i64})
+    plan = (
+        df.extension(Any(type_url="example.com/R", value=b"x"))
+        .filter(sub.col("v") > 0)
+        .to_plan()
+    )
+    ext = plan.relations[-1].root.input.filter.input.extension_single
+    assert ext.detail.type_url == "example.com/R"
+    assert plan.relations[-1].root.input.HasField("filter")
+
+
+# -- Correlated subqueries (OuterReference) -------------------------------
+
+
+def test_correlated_exists():
+    outer = sub.read_named_table("o", {"k": sub.i64, "v": sub.i64})
+    inner = sub.read_named_table("i", {"k": sub.i64, "w": sub.i64})
+    corr = inner.filter(sub.col("k") == sub.outer("k"))  # inner.k == outer.k
+    plan = outer.filter(sub.exists(corr)).to_plan()
+
+    inner_cond = plan.relations[
+        -1
+    ].root.input.filter.condition.subquery.set_predicate.tuples.filter.condition
+    lhs, rhs = (a.value.selection for a in inner_cond.scalar_function.arguments)
+    assert lhs.WhichOneof("root_type") == "root_reference"  # inner.k
+    assert rhs.WhichOneof("root_type") == "outer_reference"  # outer.k
+    assert rhs.outer_reference.steps_out == 0
+    assert rhs.direct_reference.struct_field.field == 0  # "k" in the outer schema
+
+
+def test_correlated_scalar_subquery_chains():
+    outer = sub.read_named_table("o", {"k": sub.i64, "v": sub.i64})
+    inner = sub.read_named_table("i", {"k": sub.i64, "w": sub.i64})
+    sc = inner.filter(sub.col("k") == sub.outer("k")).select("w")
+    plan = outer.filter(sub.col("v") > sub.scalar_subquery(sc)).to_plan()
+    assert plan.relations[-1].root.input.HasField("filter")
+
+
+def test_nested_correlation_steps_out():
+    outer = sub.read_named_table("o", {"k": sub.i64})
+    mid = sub.read_named_table("m", {"k": sub.i64})
+    inner = sub.read_named_table("i", {"k": sub.i64})
+    # innermost references the outermost query -> steps_out=1
+    inner_corr = inner.filter(sub.col("k") == sub.outer("k", steps_out=1))
+    mid_corr = mid.filter(sub.exists(inner_corr))
+    plan = outer.filter(sub.exists(mid_corr)).to_plan()
+
+    inner_cond = plan.relations[
+        -1
+    ].root.input.filter.condition.subquery.set_predicate.tuples.filter.condition.subquery.set_predicate.tuples.filter.condition  # mid  # inner
+    rhs = inner_cond.scalar_function.arguments[1].value.selection
+    assert rhs.outer_reference.steps_out == 1  # two levels out -> the outermost
+
+
+def test_outer_outside_subquery_raises():
+    df = sub.read_named_table("t", {"x": sub.i64})
+    with pytest.raises(Exception, match="correlated subquery"):
+        df.filter(sub.col("x") == sub.outer("x")).to_plan()
+
+
+def test_correlated_subquery_projecting_outer_column_then_chaining():
+    # Regression: a correlated subquery whose *output* is the outer column forces
+    # the enclosing plan's schema inference to resolve the OuterReference. This
+    # must not depend on the build-time outer-schema stack (which is gone by the
+    # time a downstream verb re-infers the enclosing schema).
+    from substrait.type_inference import infer_plan_schema
+
+    outer = sub.read_named_table("o", {"k": sub.i64, "v": sub.i64})
+    inner = sub.read_named_table("i", {"k": sub.i64, "w": sub.i64})
+    correlated = inner.select(sub.outer("k").alias("ok"))
+    plan = (
+        outer.with_columns(x=sub.scalar_subquery(correlated))
+        .filter(sub.col("v") > 0)
+        .to_plan()
+    )
+    # Schema inference over the whole plan must succeed.
+    infer_plan_schema(plan)
+
+
+@pytest.mark.parametrize(
+    "make",
+    [
+        lambda inner: sub.exists(inner),
+        lambda inner: sub.unique(inner),
+        lambda inner: sub.col("x").in_subquery(inner),
+        lambda inner: sub.col("x") > sub.any_(inner),
+        lambda inner: sub.col("x") <= sub.all_(inner),
+    ],
+)
+def test_set_predicate_subquery_projected_infers_bool(make):
+    # Regression: projecting a set-predicate subquery (EXISTS / IN / ANY / ALL)
+    # must infer a boolean output type -- previously the branch built a Boolean
+    # but did not return it, yielding None and a TypeError in the Struct build.
+    from substrait.type_inference import infer_plan_schema
+
+    outer = _outer()
+    plan = outer.with_columns(flag=make(_inner())).to_plan()
+    last = infer_plan_schema(plan).struct.types[-1]
+    assert last.WhichOneof("kind") == "bool"
+
+
+def test_semi_join_output_names_match_types():
+    # Regression: a semi join emits only the left side, so RelRoot names must not
+    # carry the right side's names (which would leave more names than types).
+    from substrait.type_inference import infer_plan_schema
+
+    left, right = _ab()
+    plan = left.hash_join(right, "x", "w", how="left_semi").to_plan()
+    ns = infer_plan_schema(plan)
+    assert list(ns.names) == ["x", "y"]
+    assert len(ns.names) == len(ns.struct.types)
+
+
+def test_mark_join_output_names_match_types():
+    from substrait.type_inference import infer_plan_schema
+
+    left, right = _ab()
+    plan = left.hash_join(right, "x", "w", how="left_mark").to_plan()
+    ns = infer_plan_schema(plan)
+    # left + right + a trailing boolean mark column.
+    assert list(ns.names) == ["x", "y", "w", "z", "mark"]
+    assert len(ns.names) == len(ns.struct.types)
+    assert ns.struct.types[-1].WhichOneof("kind") == "bool"
+
+
+def test_default_registry_is_reused():
+    assert sub.default_registry() is sub.default_registry()
+
+
+def test_to_substrait_registry_override():
+    df = people_df()
+    custom = ExtensionRegistry(load_default_extensions=True)
+    # Should not raise and should honor the explicit registry.
+    plan = df.filter(sub.col("age") > 25).to_substrait(registry=custom)
+    assert plan.relations
+
+
+# -- Phase 1: set ops, cross join, write sink -----------------------------
+
+
+@pytest.mark.parametrize(
+    "call, op",
+    [
+        (lambda a, b: a.union(b), stalg.SetRel.SET_OP_UNION_ALL),
+        (lambda a, b: a.union(b, distinct=True), stalg.SetRel.SET_OP_UNION_DISTINCT),
+        (
+            lambda a, b: a.intersect(b),
+            stalg.SetRel.SET_OP_INTERSECTION_MULTISET,
+        ),
+        (
+            lambda a, b: a.intersect(b, distinct=False),
+            stalg.SetRel.SET_OP_INTERSECTION_MULTISET_ALL,
+        ),
+        (lambda a, b: a.except_(b), stalg.SetRel.SET_OP_MINUS_PRIMARY),
+        (
+            lambda a, b: a.except_(b, distinct=False),
+            stalg.SetRel.SET_OP_MINUS_PRIMARY_ALL,
+        ),
+    ],
+)
+def test_set_ops_match_builder(call, op):
+    cols = {"id": sub.i64, "age": sub.i64, "name": sub.string}
+    fluent = call(
+        sub.read_named_table("a", cols), sub.read_named_table("b", cols)
+    ).to_plan()
+    raw = b_set([b_read("a", people_ns()), b_read("b", people_ns())], op)(registry)
+    assert fluent.SerializeToString() == raw.SerializeToString()
+
+
+def test_union_nary_matches_builder():
+    cols = {"id": sub.i64, "age": sub.i64, "name": sub.string}
+    fluent = (
+        sub.read_named_table("a", cols)
+        .union(sub.read_named_table("b", cols), sub.read_named_table("c", cols))
+        .to_plan()
+    )
+    raw = b_set(
+        [b_read("a", people_ns()), b_read("b", people_ns()), b_read("c", people_ns())],
+        stalg.SetRel.SET_OP_UNION_ALL,
+    )(registry)
+    assert fluent.SerializeToString() == raw.SerializeToString()
+
+
+def test_union_without_others_raises():
+    with pytest.raises(ValueError, match="at least one other"):
+        people_df().union()
+
+
+def test_cross_join_matches_builder():
+    left_ns = named_struct(
+        names=["cust_id", "name"],
+        struct=struct(types=[i64(), string()], nullable=False),
+    )
+    right_ns = named_struct(
+        names=["order_id", "amount"],
+        struct=struct(types=[i64(), fp64()], nullable=False),
+    )
+    left = sub.read_named_table("customers", {"cust_id": sub.i64, "name": sub.string})
+    right = sub.read_named_table("orders", {"order_id": sub.i64, "amount": sub.fp64})
+    fluent = left.cross_join(right).to_plan()
+    raw = b_cross(b_read("customers", left_ns), b_read("orders", right_ns))(registry)
+    assert fluent.SerializeToString() == raw.SerializeToString()
+
+
+def test_write_named_table_matches_builder():
+    fluent = people_df().write_named_table("people_copy").to_plan()
+    raw = b_write("people_copy", b_read("people", people_ns()))(registry)
+    assert fluent.SerializeToString() == raw.SerializeToString()
+
+
+def test_write_replace_mode_matches_builder():
+    fluent = people_df().write_named_table("people_copy", mode="replace").to_plan()
+    raw = b_write(
+        "people_copy",
+        b_read("people", people_ns()),
+        create_mode=stalg.WriteRel.CREATE_MODE_REPLACE_IF_EXISTS,
+    )(registry)
+    assert fluent.SerializeToString() == raw.SerializeToString()
+
+
+def test_write_unknown_mode_raises():
+    with pytest.raises(ValueError, match="unknown write mode"):
+        people_df().write_named_table("t", mode="banana")
+
+
+# -- Phase 3 (finish): post_filter, head/offset, rename/drop --------------
+
+
+def test_join_post_filter_matches_builder():
+    left_ns = named_struct(
+        names=["cust_id", "name"],
+        struct=struct(types=[i64(), string()], nullable=False),
+    )
+    right_ns = named_struct(
+        names=["order_id", "cust_ref", "amount"],
+        struct=struct(types=[i64(), i64(), fp64()], nullable=False),
+    )
+    left = sub.read_named_table("customers", {"cust_id": sub.i64, "name": sub.string})
+    right = sub.read_named_table(
+        "orders", {"order_id": sub.i64, "cust_ref": sub.i64, "amount": sub.fp64}
+    )
+    fluent = left.join(
+        right,
+        on=sub.col("cust_id") == sub.col("cust_ref"),
+        post_filter=sub.col("amount") > 100.0,
+    ).to_plan()
+    raw = b_join(
+        b_read("customers", left_ns),
+        b_read("orders", right_ns),
+        expression=scalar_function(
+            COMPARISON, "equal", expressions=[column("cust_id"), column("cust_ref")]
+        ),
+        type=stalg.JoinRel.JOIN_TYPE_INNER,
+        post_join_filter=scalar_function(
+            COMPARISON, "gt", expressions=[column("amount"), literal(100.0, fp64())]
+        ),
+    )(registry)
+    assert fluent.SerializeToString() == raw.SerializeToString()
+
+
+def test_head_matches_limit():
+    assert (
+        people_df().head(3).to_plan().SerializeToString()
+        == people_df().limit(3).to_plan().SerializeToString()
+    )
+
+
+def test_offset_matches_builder():
+    fluent = people_df().offset(2).to_plan()
+    raw = b_fetch(b_read("people", people_ns()), offset=literal(2, i64()), count=None)(
+        registry
+    )
+    assert fluent.SerializeToString() == raw.SerializeToString()
+    # count_expr is left unset -> "all remaining rows".
+    assert not fluent.relations[-1].root.input.fetch.HasField("count_expr")
+
+
+def test_rename_matches_builder():
+    fluent = people_df().rename({"age": "years"}).to_plan()
+    raw = b_select(
+        b_read("people", people_ns()),
+        expressions=[
+            column("id"),
+            column("age", alias="years"),
+            column("name"),
+        ],
+    )(registry)
+    assert fluent.SerializeToString() == raw.SerializeToString()
+
+
+def test_drop_matches_builder():
+    fluent = people_df().drop("age").to_plan()
+    raw = b_select(
+        b_read("people", people_ns()),
+        expressions=[column("id"), column("name")],
+    )(registry)
+    assert fluent.SerializeToString() == raw.SerializeToString()
+
+
+def test_rename_unknown_column_raises():
+    with pytest.raises(ValueError, match="unknown columns"):
+        people_df().rename({"nope": "x"}).to_plan()
+
+
+def test_drop_unknown_column_raises():
+    with pytest.raises(ValueError, match="unknown columns"):
+        people_df().drop("nope").to_plan()
+
+
+def test_drop_all_columns_raises():
+    with pytest.raises(ValueError, match="every column"):
+        people_df().drop("id", "age", "name").to_plan()

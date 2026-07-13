@@ -5,12 +5,6 @@ import substrait.extended_expression_pb2 as stee
 import substrait.plan_pb2 as stp
 import substrait.type_pb2 as stt
 
-# The shared subtrees (Rels) a ReferenceRel's subtree_ordinal indexes into, set
-# for the duration of a plan build so a `reference` relation's schema resolves.
-reference_subtrees: contextvars.ContextVar = contextvars.ContextVar(
-    "reference_subtrees", default=None
-)
-
 # Stack of enclosing-query schemas (NamedStruct) for correlated subqueries, so a
 # field reference with an OuterReference root resolves against the right level.
 # Pushed by the subquery builders while resolving their inner plan.
@@ -535,12 +529,6 @@ def infer_rel_schema(rel: stalg.Rel) -> stt.Type.Struct:
                 f"{rel.extension_multi.detail.type_url!r}"
             )
         (common, struct) = (rel.extension_multi.common, derived.struct)
-    elif rel_type == "reference":
-        subtrees = reference_subtrees.get()
-        if subtrees is None:
-            raise Exception("cannot infer a ReferenceRel's schema outside a plan build")
-        # ReferenceRel has no common/emit; its schema is the subtree's schema.
-        return infer_rel_schema(subtrees[rel.reference.subtree_ordinal])
     else:
         raise Exception(f"Unhandled rel_type {rel_type}")
 

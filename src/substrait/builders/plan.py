@@ -389,36 +389,6 @@ def set(inputs: Iterable[PlanOrUnbound], op: stalg.SetRel.SetOp) -> UnboundPlan:
     return resolve
 
 
-def reference(
-    subtree_ordinal: int,
-    names: Iterable[str],
-    *extension_sources: PlanOrUnbound,
-) -> UnboundPlan:
-    """A plan whose root references a shared subtree by ordinal (a ReferenceRel).
-
-    ``subtree_ordinal`` indexes into the plan's leading shared relations (the
-    common subplans a ``ReferenceRel`` points at); ``names`` labels the output.
-    ``extension_sources`` are the already-resolved subtree plans whose extension
-    declarations are propagated, so a builder merging this plan upward keeps the
-    subtree's extensions.
-
-    Inferring the resulting ``ReferenceRel``'s schema needs the subtree list to
-    be in scope via :data:`substrait.type_inference.reference_subtrees`; this
-    builder is meant for shared-subplan / CTE construction (see
-    ``substrait.dataframe.DataFrame.cache``), which sets that up.
-    """
-
-    def resolve(registry: ExtensionRegistry) -> stp.Plan:
-        rel = stalg.Rel(reference=stalg.ReferenceRel(subtree_ordinal=subtree_ordinal))
-        return stp.Plan(
-            version=default_version,
-            relations=[stp.PlanRel(root=stalg.RelRoot(input=rel, names=list(names)))],
-            **_merge_extensions(*extension_sources),
-        )
-
-    return resolve
-
-
 def fetch(
     plan: PlanOrUnbound,
     offset: ExtendedExpressionOrUnbound,

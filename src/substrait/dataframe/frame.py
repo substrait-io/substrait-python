@@ -28,19 +28,17 @@ native frame; the two layers compose rather than compete.
 
 from __future__ import annotations
 
-import contextvars
 from itertools import combinations
 from typing import Any, Iterable, Optional, Union
 
 import substrait.algebra_pb2 as stalg
-import substrait.plan_pb2 as stpl
 import substrait.type_pb2 as stp
 
 from substrait.builders import plan as _plan
 from substrait.builders import type as _type
 from substrait.dataframe.expr import Expr, Measure, col, lit
 from substrait.extension_registry import ExtensionRegistry
-from substrait.type_inference import infer_plan_schema, reference_subtrees
+from substrait.type_inference import infer_plan_schema
 
 # All 13 JoinRel.JoinType variants (SET_OP_UNSPECIFIED excluded). "single"
 # returns at most one right match per left row (runtime error on multiple);
@@ -124,34 +122,6 @@ def _split_measure(m: Union[Expr, Measure]):
     if isinstance(m, Measure):
         return _unbound(m.expr), _unbound(m.predicate)
     return _unbound(m), None
-
-
-class _CteContext:
-    """Collects shared subtrees while a plan with ``cache()`` is being built."""
-
-    __slots__ = ("subtrees", "names", "plans", "ordinal_by_token")
-
-    def __init__(self):
-        self.subtrees: "list[stalg.Rel]" = []  # indexed by subtree_ordinal
-        self.names: "list[list[str]]" = []
-        self.plans: "list[stpl.Plan]" = []  # the resolved subtree plans (extensions)
-        self.ordinal_by_token: dict = {}
-
-
-# Active while a DataFrame is being materialized; None otherwise.
-#
-# ``cache()`` needs one accumulator shared by every nested ``resolve()`` in a
-# single ``to_plan()`` -- to dedupe repeated uses of a cached frame by identity
-# and hand out ``subtree_ordinal``s. The builder contract is
-# ``UnboundPlan = Callable[[ExtensionRegistry], Plan]``, which has no slot to
-# thread that accumulator, and schema inference (which resolves ReferenceRels
-# against the subtree list) runs *inside* the builder layer. Rather than widen
-# that contract across every builder, ``cache()`` publishes the accumulator here
-# and ``type_inference.reference_subtrees`` exposes its ``.subtrees`` list to
-# inference; ``_materialize`` sets both for the duration of the build.
-_cte_context: contextvars.ContextVar = contextvars.ContextVar(
-    "cte_context", default=None
-)
 
 
 _default_registry: Optional[ExtensionRegistry] = None
@@ -532,15 +502,6 @@ class DataFrame:
             bound = inner(registry)
             rel = bound.relations[-1].root.input
             rel_inner = getattr(rel, rel.WhichOneof("rel_type"))
-            # A few relations (ReferenceRel from .cache(), UpdateRel) carry no
-            # RelCommon and so cannot hold a hint -- fail with a clear message
-            # rather than an opaque AttributeError on `.common`.
-            if "common" not in rel_inner.DESCRIPTOR.fields_by_name:
-                raise TypeError(
-                    f"cannot attach a hint to a {rel_inner.DESCRIPTOR.name} "
-                    "(e.g. a cached/reference relation); apply .hint(...) before "
-                    ".cache()"
-                )
             common = rel_inner.common
             if row_count is not None:
                 common.hint.stats.row_count = row_count
@@ -666,62 +627,13 @@ class DataFrame:
             )
         )
 
-    def cache(self) -> "DataFrame":
-        """Mark this DataFrame as a reusable common subplan (a CTE).
-
-        Every use of the returned frame in the same ``to_plan()`` emits the
-        subplan once as a shared subtree and references it (``ReferenceRel``),
-        instead of inlining a fresh copy each time.
-        """
-        inner = self._plan
-        token = object()  # identity for this cached node
-
-        def resolve(registry: ExtensionRegistry) -> stpl.Plan:
-            ctx = _cte_context.get(None)
-            if ctx is None:  # built without a context -> just inline
-                return inner(registry)
-            ordinal = ctx.ordinal_by_token.get(token)
-            if ordinal is None:
-                subplan = inner(registry)
-                ordinal = len(ctx.subtrees)
-                ctx.ordinal_by_token[token] = ordinal
-                ctx.subtrees.append(subplan.relations[-1].root.input)
-                ctx.names.append(list(subplan.relations[-1].root.names))
-                ctx.plans.append(subplan)
-            # Emit a ReferenceRel to the shared subtree, propagating the
-            # subtree's extensions so builder merges carry them up.
-            return _plan.reference(ordinal, ctx.names[ordinal], ctx.plans[ordinal])(
-                registry
-            )
-
-        return self._next(resolve)
-
-    def _materialize(self, registry: ExtensionRegistry) -> stpl.Plan:
-        ctx = _CteContext()
-        cte_token = _cte_context.set(ctx)
-        ref_token = reference_subtrees.set(ctx.subtrees)
-        try:
-            plan = self._plan(registry)
-        finally:
-            _cte_context.reset(cte_token)
-            reference_subtrees.reset(ref_token)
-        if not ctx.subtrees:
-            return plan
-        # Prepend the shared subtrees; ReferenceRel ordinals index into them.
-        subtree_rels = [stpl.PlanRel(rel=s) for s in ctx.subtrees]
-        return stpl.Plan(
-            version=_plan.default_version,
-            relations=[*subtree_rels, plan.relations[-1]],
-            **_plan._merge_extensions(plan, *ctx.plans),
-        )
-
     def to_plan(self):
         """Materialize to a ``substrait.proto.Plan``."""
-        return self._materialize(self._registry)
+        return self._plan(self._registry)
 
     # Kept for parity with the substrait.narwhals (Narwhals) wrapper's API.
     def to_substrait(self, registry: Optional[ExtensionRegistry] = None):
-        return self._materialize(registry or self._registry)
+        return self._plan(registry or self._registry)
 
 
 class GroupBy:

@@ -794,57 +794,6 @@ def test_unpivot_requires_on():
         _wide_df().unpivot([], index="region")
 
 
-# -- Phase (core-ext): References / CTEs -----------------------------------
-
-
-def _find_reference(rel):
-    kind = rel.WhichOneof("rel_type")
-    if kind == "reference":
-        return rel.reference.subtree_ordinal
-    for field in ("filter", "project", "fetch", "sort"):
-        if kind == field:
-            return _find_reference(getattr(rel, field).input)
-    return None
-
-
-def test_cache_emits_shared_subtree_referenced_twice():
-    base = sub.read_named_table("t", {"id": sub.i64, "v": sub.i64}).cache()
-    plan = (
-        base.filter(sub.col("id") < 10)
-        .union(base.filter(sub.col("id") >= 10))
-        .to_plan()
-    )
-    assert [r.WhichOneof("rel_type") for r in plan.relations] == ["rel", "root"]
-    assert plan.relations[0].rel.HasField("read")
-    set_inputs = plan.relations[-1].root.input.set.inputs
-    assert [_find_reference(i) for i in set_inputs] == [0, 0]
-
-
-def test_no_cache_inlines_single_relation():
-    a = sub.read_named_table("t", {"id": sub.i64})
-    plan = a.filter(sub.col("id") > 0).union(a.filter(sub.col("id") < 0)).to_plan()
-    # Without cache the source is inlined into each union input.
-    assert len(plan.relations) == 1
-    for i in plan.relations[-1].root.input.set.inputs:
-        assert _find_reference(i) is None
-
-
-def test_cache_schema_inference_through_reference():
-    # Filtering/selecting the cached frame requires inferring its schema
-    # through the ReferenceRel.
-    base = sub.read_named_table("t", {"id": sub.i64, "v": sub.i64}).cache()
-    plan = base.filter(sub.col("v") > 0).select("id").to_plan()
-    assert plan.relations[-1].root.input.project.HasField("common")
-    assert list(plan.relations[-1].root.names) == ["id"]
-
-
-def test_cache_merges_subtree_extensions():
-    base = sub.read_named_table("t", {"id": sub.i64}).filter(sub.col("id") > 5).cache()
-    plan = base.union(base).to_plan()
-    urns = {u.urn for u in plan.extension_urns}
-    assert "extension:io.substrait:functions_comparison" in urns
-
-
 # -- Phase (core-ext): physical joins + exchange --------------------------
 
 
@@ -1207,14 +1156,6 @@ def test_mark_join_output_names_match_types():
     assert list(ns.names) == ["x", "y", "w", "z", "mark"]
     assert len(ns.names) == len(ns.struct.types)
     assert ns.struct.types[-1].WhichOneof("kind") == "bool"
-
-
-def test_hint_after_cache_raises_clear_error():
-    # Regression: a ReferenceRel (from .cache()) has no RelCommon, so hint() must
-    # fail with a clear message rather than an opaque AttributeError.
-    df = sub.read_named_table("t", {"a": sub.i64})
-    with pytest.raises(TypeError, match="cannot attach a hint"):
-        df.cache().hint(row_count=100).to_plan()
 
 
 def test_default_registry_is_reused():

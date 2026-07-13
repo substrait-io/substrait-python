@@ -17,6 +17,13 @@
 
 set -euo pipefail
 
+# semantic-release uses env-ci to detect the branch/PR context. Under GitHub
+# Actions that resolves GITHUB_REF=refs/pull/N/merge to a PR build, so it decides
+# the branch isn't "main" and computes no release -- leaving the notes empty and
+# this check falsely failing. Clear the Actions markers so env-ci falls back to
+# the throwaway repo's own git branch (main) below, matching a local run.
+unset GITHUB_ACTIONS GITHUB_EVENT_NAME GITHUB_REF GITHUB_HEAD_REF GITHUB_BASE_REF GITHUB_SHA
+
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
 workdir="$(mktemp -d)"

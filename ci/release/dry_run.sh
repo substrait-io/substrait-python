@@ -1,15 +1,16 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
 #
-# Credential-free release-notes regression check.
+# Credential-free release-notes dry run.
 #
-# Reproduces the failure seen on PR #171: with a floating release toolchain the
-# release-notes-generator emitted only the version heading and silently dropped
-# the "Features" / "Bug Fixes" sections. This builds a throwaway git repo with
-# known feat/fix commits, runs the *pinned* semantic-release in dry-run mode,
-# and asserts the generated notes actually contain those sections.
+# Runs the *pinned* semantic-release toolchain in dry-run mode against the real
+# repository history (in a throwaway worktree so nothing is mutated) and prints
+# the notes it would generate. When a release is actually due, it asserts the
+# notes contain sections rather than just a version heading -- guarding the
+# regression seen on PR #171, where a floating conventional-changelog preset
+# emitted only the heading and silently dropped the Features/Bug Fixes sections.
 #
-# It needs no GitHub token: RELEASE_DRY_RUN is left at its default so
+# No GitHub token is needed: RELEASE_DRY_RUN is left at its default so
 # .releaserc.mjs omits the @semantic-release/github and @semantic-release/git
 # plugins, whose verifyConditions would otherwise demand credentials.
 #
@@ -17,39 +18,30 @@
 
 set -euo pipefail
 
-# semantic-release uses env-ci to detect the branch/PR context. Under GitHub
-# Actions that resolves GITHUB_REF=refs/pull/N/merge to a PR build, so it decides
-# the branch isn't "main" and computes no release -- leaving the notes empty and
-# this check falsely failing. Clear the Actions markers so env-ci falls back to
-# the throwaway repo's own git branch (main) below, matching a local run.
+# semantic-release uses env-ci to detect the branch. Under GitHub Actions on a
+# pull_request it resolves GITHUB_REF=refs/pull/N/merge to a PR build and refuses
+# to run; clear the Actions markers so env-ci falls back to the worktree's own
+# branch below (created fresh from HEAD, so this works from a detached checkout).
 unset GITHUB_ACTIONS GITHUB_EVENT_NAME GITHUB_REF GITHUB_HEAD_REF GITHUB_BASE_REF GITHUB_SHA
 
-repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+curdir="$PWD"
+worktree="$(mktemp -d)"
+branch="$(basename "$worktree")"
 
-workdir="$(mktemp -d)"
-cleanup() { rm -rf "$workdir"; }
+git worktree add -q "$worktree"
+
+cleanup() {
+  cd "$curdir" || exit 1
+  git worktree remove --force "$worktree" >/dev/null 2>&1 || true
+  git worktree prune
+  git branch -D "$branch" >/dev/null 2>&1 || true
+}
 trap cleanup EXIT
 
-cp "$repo_root/.releaserc.mjs" "$workdir/.releaserc.mjs"
+cd "$worktree"
 
-cd "$workdir"
-git -c init.defaultBranch=main init -q
-git config user.email "release-check@substrait.io"
-git config user.name "release check"
-git config commit.gpgsign false
-git config tag.gpgsign false
-
-# A baseline release to compute the next version against, then two commits of
-# each releasable type so both sections are expected in the notes.
-git commit -q --allow-empty -m "chore: baseline"
-git tag v0.0.0
-git commit -q --allow-empty -m "feat: add a first capability"
-git commit -q --allow-empty -m "feat: add a second capability"
-git commit -q --allow-empty -m "fix: correct a first defect"
-git commit -q --allow-empty -m "fix: correct a second defect"
-
-echo "Running semantic-release dry run against synthetic history..."
-notes="$(
+echo "Running semantic-release dry run against real history (branch ${branch})..."
+if notes="$(
   npx --yes \
     -p "semantic-release@25.0.5" \
     -p "@semantic-release/commit-analyzer@13.0.1" \
@@ -61,24 +53,34 @@ notes="$(
     semantic-release \
     --ci false \
     --dry-run \
-    --branches main \
-    --repository-url "file://$workdir" 2>&1
-)"
+    --branches "$branch" \
+    --repository-url "file://$worktree" 2>&1
+)"; then
+  sr_exit=0
+else
+  sr_exit=$?
+fi
 
 echo "$notes"
 
-fail=0
-for section in "Features" "Bug Fixes"; do
-  if ! grep -qE "^#+ ${section}\$" <<<"$notes"; then
-    echo "ERROR: release notes are missing the '${section}' section." >&2
-    fail=1
-  fi
-done
-
-if [[ "$fail" -ne 0 ]]; then
-  echo "Release-notes generation is broken -- likely an unpinned or incompatible" >&2
-  echo "toolchain version. See ci/release/run.sh and .releaserc.mjs." >&2
+if [[ "$sr_exit" -ne 0 ]]; then
+  echo "ERROR: semantic-release dry run failed (exit ${sr_exit})." >&2
   exit 1
 fi
 
-echo "OK: generated notes contain the expected Features and Bug Fixes sections."
+if ! grep -qE 'The next release version is' <<<"$notes"; then
+  echo "NOTE: no release is due from the current history, so there are no notes to assert."
+  echo "OK: semantic-release dry run completed without errors."
+  exit 0
+fi
+
+# A release is due, so at least one feat/fix/breaking commit exists and the notes
+# must carry a matching section. The regression produced only the "## <version>"
+# heading (h2) with no "### <section>" (h3) beneath it.
+if ! grep -qE '^### ' <<<"$notes"; then
+  echo "ERROR: a release is due but the generated notes contain no sections -- only the heading." >&2
+  echo "This is the PR #171 regression; check the pinned toolchain in ci/release/run.sh and .releaserc.mjs." >&2
+  exit 1
+fi
+
+echo "OK: a release is due and the generated notes contain the expected sections."

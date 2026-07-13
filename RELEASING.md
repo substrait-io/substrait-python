@@ -57,4 +57,5 @@ The semantic-release toolchain versions are pinned in
 `Bug Fixes` sections from the generated notes. When bumping any of these
 versions, the [Release Notes Check](.github/workflows/release-notes-check.yml)
 workflow runs [`ci/release/dry_run.sh`](ci/release/dry_run.sh) — a credential-free
-dry run against synthetic history that fails if those sections go missing.
+dry run against the real history (in a throwaway worktree) that fails if a release
+is due but its notes come out with no sections.

@@ -2,8 +2,9 @@ name: Release Notes Check
 
 # Guards the release toolchain: a floating dependency once dropped the
 # Features/Bug Fixes sections from the generated notes. This runs the pinned
-# semantic-release against synthetic history and fails if those sections go
-# missing. Scoped to the release config/scripts so ordinary PRs are unaffected.
+# semantic-release in dry-run mode against the real history and, when a release
+# is due, fails if the notes carry no sections. Scoped to the release
+# config/scripts so ordinary PRs are unaffected.
 on:
   pull_request:
     paths:

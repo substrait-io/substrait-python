@@ -1,0 +1,36 @@
+name: Release Notes Check
+
+# Guards the release toolchain: a floating dependency once dropped the
+# Features/Bug Fixes sections from the generated notes. This runs the pinned
+# semantic-release against synthetic history and fails if those sections go
+# missing. Scoped to the release config/scripts so ordinary PRs are unaffected.
+on:
+  pull_request:
+    paths:
+      - .releaserc.mjs
+      - ci/release/**
+      - .github/workflows/release-notes-check.yml
+  push:
+    branches: [ main ]
+    paths:
+      - .releaserc.mjs
+      - ci/release/**
+      - .github/workflows/release-notes-check.yml
+
+permissions:
+  contents: read
+
+jobs:
+  release-notes-check:
+    name: Release Notes Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+      - name: Assert generated release notes contain the expected sections
+        run: ./ci/release/dry_run.sh

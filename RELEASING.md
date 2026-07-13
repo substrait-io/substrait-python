@@ -47,3 +47,14 @@ substrait-python follows semantic versioning as described for the Substrait
 specification here: https://substrait.io/spec/versioning/. Because the project is
 pre-1.0, breaking changes produce a **minor** bump rather than a major one (matching
 substrait-java).
+
+## Release toolchain
+
+The semantic-release toolchain versions are pinned in
+[`ci/release/run.sh`](ci/release/run.sh) and the release plugin set lives in
+[`.releaserc.mjs`](.releaserc.mjs). Pinning is deliberate: a floating
+`conventional-changelog-conventionalcommits` once dropped the `Features` /
+`Bug Fixes` sections from the generated notes. When bumping any of these
+versions, the [Release Notes Check](.github/workflows/release-notes-check.yml)
+workflow runs [`ci/release/dry_run.sh`](ci/release/dry_run.sh) — a credential-free
+dry run against synthetic history that fails if those sections go missing.

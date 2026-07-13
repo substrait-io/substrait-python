@@ -17,11 +17,6 @@ from substrait.builders import type as t
 from substrait.builders.extended_expression import _make_literal
 from substrait.type_inference import infer_literal_type
 
-
-def _built(value, typ):
-    return _make_literal(value, typ)
-
-
 # ---------------------------------------------------------------------------
 # Round-trip: built literal -> inferred type kind matches the requested kind
 # ---------------------------------------------------------------------------
@@ -55,7 +50,7 @@ def _built(value, typ):
     ],
 )
 def test_literal_kind_round_trips(value, typ):
-    lit = _built(value, typ)
+    lit = _make_literal(value, typ)
     assert infer_literal_type(lit).WhichOneof("kind") == typ.WhichOneof("kind")
 
 
@@ -89,7 +84,7 @@ def test_every_concrete_type_kind_can_build_a_literal():
     }
     for kind, (value, typ) in samples.items():
         assert typ.WhichOneof("kind") == kind
-        lit = _built(value, typ)
+        lit = _make_literal(value, typ)
         assert lit.WhichOneof("literal_type") is not None
 
 
@@ -99,7 +94,7 @@ def test_every_concrete_type_kind_can_build_a_literal():
 
 
 def test_decimal_encoding_is_16_byte_little_endian_unscaled():
-    lit = _built(Decimal("-12.34"), t.decimal(2, 10))
+    lit = _make_literal(Decimal("-12.34"), t.decimal(2, 10))
     assert len(lit.decimal.value) == 16
     assert int.from_bytes(lit.decimal.value, "little", signed=True) == -1234
     assert lit.decimal.scale == 2
@@ -110,7 +105,7 @@ def test_decimal_encoding_is_exact_beyond_context_precision():
     # A value with more significant digits than the default decimal context (28)
     # must still encode exactly -- scaling is pure-integer, not context-bound.
     big = 10**38 - 1  # 38 nines, fits precision 38
-    lit = _built(Decimal(big), t.decimal(0, 38))
+    lit = _make_literal(Decimal(big), t.decimal(0, 38))
     assert int.from_bytes(lit.decimal.value, "little", signed=True) == big
 
 
@@ -118,7 +113,7 @@ def test_decimal_encoding_rounds_half_even_below_target_scale():
     # A value finer than the target scale is rounded half-even during encoding.
     assert (
         int.from_bytes(
-            _built(Decimal("2.5"), t.decimal(0, 10)).decimal.value,
+            _make_literal(Decimal("2.5"), t.decimal(0, 10)).decimal.value,
             "little",
             signed=True,
         )
@@ -126,7 +121,7 @@ def test_decimal_encoding_rounds_half_even_below_target_scale():
     )
     assert (
         int.from_bytes(
-            _built(Decimal("3.5"), t.decimal(0, 10)).decimal.value,
+            _make_literal(Decimal("3.5"), t.decimal(0, 10)).decimal.value,
             "little",
             signed=True,
         )
@@ -136,21 +131,23 @@ def test_decimal_encoding_rounds_half_even_below_target_scale():
 
 def test_uuid_encoding_16_bytes():
     u = uuid.uuid4()
-    assert _built(u, t.uuid()).uuid == u.bytes
+    assert _make_literal(u, t.uuid()).uuid == u.bytes
     # hex string and raw bytes accepted too
-    assert _built(str(u), t.uuid()).uuid == u.bytes
-    assert _built(u.bytes, t.uuid()).uuid == u.bytes
+    assert _make_literal(str(u), t.uuid()).uuid == u.bytes
+    assert _make_literal(u.bytes, t.uuid()).uuid == u.bytes
 
 
 def test_precision_timestamp_from_datetime_microseconds():
-    lit = _built(dt.datetime(1970, 1, 1, 0, 0, 1), t.precision_timestamp(6))
+    lit = _make_literal(dt.datetime(1970, 1, 1, 0, 0, 1), t.precision_timestamp(6))
     assert lit.precision_timestamp.value == 1_000_000  # 1s in microseconds
     assert lit.precision_timestamp.precision == 6
 
 
 def test_precision_timestamp_tz_normalizes_to_utc():
-    naive_utc = _built(dt.datetime(2021, 6, 1, 12, 0), t.precision_timestamp_tz(6))
-    aware = _built(
+    naive_utc = _make_literal(
+        dt.datetime(2021, 6, 1, 12, 0), t.precision_timestamp_tz(6)
+    )
+    aware = _make_literal(
         dt.datetime(2021, 6, 1, 12, 0, tzinfo=dt.timezone.utc),
         t.precision_timestamp_tz(6),
     )
@@ -158,19 +155,20 @@ def test_precision_timestamp_tz_normalizes_to_utc():
 
 
 def test_interval_year_tuple_and_int():
-    assert _built((2, 6), t.interval_year()).interval_year_to_month.months == 6
-    assert _built(3, t.interval_year()).interval_year_to_month.years == 3
+    assert _make_literal((2, 6), t.interval_year()).interval_year_to_month.months == 6
+    assert _make_literal(3, t.interval_year()).interval_year_to_month.years == 3
 
 
 def test_empty_list_and_map_use_empty_variants():
-    assert _built([], t.list(t.i64())).WhichOneof("literal_type") == "empty_list"
+    assert _make_literal([], t.list(t.i64())).WhichOneof("literal_type") == "empty_list"
     assert (
-        _built({}, t.map(t.string(), t.i64())).WhichOneof("literal_type") == "empty_map"
+        _make_literal({}, t.map(t.string(), t.i64())).WhichOneof("literal_type")
+        == "empty_map"
     )
 
 
 def test_nested_struct_recurses():
-    lit = _built(
+    lit = _make_literal(
         [1, [2, 3]],
         t.struct(
             [t.i64(nullable=False), t.list(t.i64(nullable=False))],
@@ -181,7 +179,7 @@ def test_nested_struct_recurses():
 
 
 def test_typed_null():
-    lit = _built(None, t.i64())
+    lit = _make_literal(None, t.i64())
     assert lit.WhichOneof("literal_type") == "null"
     assert lit.null.WhichOneof("kind") == "i64"
     assert lit.nullable is True
@@ -248,9 +246,9 @@ def test_lit_decimal_precision_covers_unscaled_value(value, scale, precision):
 def test_lit_struct_requires_matching_arity():
     struct_t = t.struct([t.i64(nullable=False), t.i64(nullable=False)])
     # Right arity is fine.
-    _built((1, 2), struct_t)
+    _make_literal((1, 2), struct_t)
     # Too few / too many values must raise rather than silently truncate.
     with pytest.raises(ValueError, match="declares 2 field"):
-        _built((1,), struct_t)
+        _make_literal((1,), struct_t)
     with pytest.raises(ValueError, match="declares 2 field"):
-        _built((1, 2, 3), struct_t)
+        _make_literal((1, 2, 3), struct_t)

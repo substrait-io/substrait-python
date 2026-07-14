@@ -26,3 +26,19 @@ Run tests in the project's root dir.
 ```
 uv run pytest
 ```
+
+# Documentation
+The user guide lives in `docs/` and is built with [Zensical](https://zensical.org);
+the API reference under `docs/reference/` is generated from the package
+docstrings via mkdocstrings. Configuration is in `zensical.toml`.
+
+Preview it locally with live reload, or build the static site into `./site`:
+```
+pixi run docs-serve   # or: uv run --group docs zensical serve
+pixi run docs-build   # or: uv run --group docs zensical build
+```
+
+When editing docstrings that appear in the reference, prefer Markdown (fenced
+code blocks and backticked names) over reStructuredText so they render cleanly.
+Every pull request runs a docs build-check; versioned docs are published to
+GitHub Pages on release (see `.github/workflows/docs-deploy.yml`).

@@ -1,16 +1,10 @@
 name: Deploy documentation
 
 # Publishes versioned docs to the `gh-pages` branch using the Zensical-compatible
-# fork of `mike` (https://github.com/squidfunk/mike). Each version is committed
-# as a subdirectory of `site_url` (see zensical.toml), and a `latest` alias +
-# root redirect always point at the newest release.
-#
-# One-time setup:
-#   1. Run this workflow manually (Actions -> Deploy documentation -> Run
-#      workflow) to create the `gh-pages` branch. It must exist on the default
-#      branch first for the "Run workflow" button to appear.
-#   2. Settings -> Pages -> Source: "Deploy from a branch" -> gh-pages / (root).
-#   3. Thereafter, pushing a release tag (v*.*.*) publishes that version.
+# fork of `mike` (https://github.com/squidfunk/mike): each version is committed
+# as a subdirectory of `site_url` (see zensical.toml), with a `latest` alias and
+# root redirect pointing at the newest release. Runs on release tags (v*.*.*),
+# and can be triggered manually.
 
 on:
   push:

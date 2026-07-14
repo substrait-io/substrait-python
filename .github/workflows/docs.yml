@@ -10,31 +10,8 @@ permissions:
 
 # Build-check only: this verifies the docs compile on every PR so broken pages
 # or a broken mkdocstrings reference are caught early. It does NOT publish.
-#
-# To publish to GitHub Pages, enable Pages for the repository (Settings ->
-# Pages -> "GitHub Actions") and add a deploy job, e.g.:
-#
-#   permissions:
-#     pages: write
-#     id-token: write
-#   deploy:
-#     needs: build
-#     environment:
-#       name: github-pages
-#       url: ${{ steps.deployment.outputs.page_url }}
-#     runs-on: ubuntu-latest
-#     steps:
-#       - uses: actions/configure-pages@v6
-#       - uses: actions/checkout@v6
-#       - uses: astral-sh/setup-uv@v7
-#         with:
-#           python-version: "3.12"
-#       - run: uv run --frozen --group docs zensical build
-#       - uses: actions/upload-pages-artifact@v5
-#         with:
-#           path: site
-#       - uses: actions/deploy-pages@v5
-#         id: deployment
+# Versioned publishing to GitHub Pages is handled separately by
+# .github/workflows/docs-deploy.yml (mike -> gh-pages branch).
 
 jobs:
   build:

@@ -8,8 +8,10 @@
 site_name = "substrait-python"
 site_description = "Python bindings for Substrait, with an ergonomic DataFrame API for authoring plans."
 site_author = "Substrait contributors"
-# Set this when the docs get a canonical hosting URL:
-#site_url = "https://substrait-io.github.io/substrait-python/"
+# Canonical hosting URL. Required for multi-version docs: each version is
+# published as a subdirectory of this URL. Adjust if the site is served
+# elsewhere (custom domain, or a fork's *.github.io while testing).
+site_url = "https://substrait-io.github.io/substrait-python/"
 repo_url = "https://github.com/substrait-io/substrait-python"
 repo_name = "substrait-io/substrait-python"
 copyright = "Copyright &copy; 2026 Substrait contributors"
@@ -35,6 +37,17 @@ nav = [
   ] },
   { "API reference" = "reference/index.md" },
 ]
+
+# --------------------------------------------------------------------------
+# Multi-version documentation (via the Zensical-compatible `mike` fork).
+# Publishing is done by .github/workflows/docs-deploy.yml, which commits each
+# version to the `gh-pages` branch as a subdirectory of site_url. Setting the
+# provider here renders the version selector in the header.
+# --------------------------------------------------------------------------
+[project.extra.version]
+provider = "mike"   # enables the selector; reads mike's versions.json on gh-pages
+default = "latest"  # the alias the site root redirects to
+alias = true
 
 # --------------------------------------------------------------------------
 # Theme (Material-style; ships with Zensical).

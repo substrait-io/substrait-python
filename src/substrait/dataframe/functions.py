@@ -2,18 +2,20 @@
 
 ``f`` is a namespace covering *every* function defined by the Substrait default
 extensions -- scalar, aggregate and window -- so anything the specification
-ships is reachable by name and hides the extension-URN / signature plumbing::
+ships is reachable by name and hides the extension-URN / signature plumbing:
 
-    import substrait.dataframe as sub
+```python
+import substrait.dataframe as sub
 
-    sub.f.sum(sub.col("amount"))
-    sub.f.substring(sub.col("name"), 1, 3)
-    sub.f.coalesce(sub.col("a"), sub.col("b"))
-    sub.f.row_number()
+sub.f.sum(sub.col("amount"))
+sub.f.upper(sub.col("name"))
+sub.f.coalesce(sub.col("a"), sub.col("b"))
+sub.f.row_number()
+```
 
-Each helper returns an :class:`~substrait.dataframe.expr.Expr`. The namespace is
+Each helper returns an `Expr`. The namespace is
 built lazily on first attribute access from
-:func:`substrait.dataframe.frame.default_registry`,
+`substrait.dataframe.frame.default_registry`,
 and supports ``dir(sub.f)`` for discovery/tab-completion.
 
 Some function names appear in more than one extension (e.g. ``add`` in
@@ -123,7 +125,7 @@ class _FunctionNamespace:
     """Lazily-populated namespace of a registry's functions.
 
     With no registry it enumerates the default extensions; pass a registry (see
-    :func:`functions_for`) to expose custom extensions registered on it too.
+    `functions_for`) to expose custom extensions registered on it too.
     """
 
     def __init__(self, registry=None):
@@ -161,12 +163,14 @@ def functions_for(registry) -> _FunctionNamespace:
 
     Unlike the global ``f`` (which only knows the default extensions), this
     surfaces every function on ``registry`` -- including custom extensions
-    registered via ``register_extension_yaml`` / ``register_extension_dict``::
+    registered via ``register_extension_yaml`` / ``register_extension_dict``:
 
-        reg = ExtensionRegistry(load_default_extensions=True)
-        reg.register_extension_yaml("my_functions.yaml")
-        myf = sub.functions_for(reg)
-        myf.my_double(sub.col("x"))
+    ```python
+    reg = ExtensionRegistry(load_default_extensions=True)
+    reg.register_extension_yaml("my_functions.yaml")
+    myf = sub.functions_for(reg)
+    myf.my_double(sub.col("x"))
+    ```
     """
     return _FunctionNamespace(registry)
 

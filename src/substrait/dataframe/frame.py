@@ -5,22 +5,24 @@ to build a Substrait plan in Python (analogous to how ``daft.DataFrame`` is
 Daft's own native frame). It is a thin, chainable wrapper over the
 ``substrait.builders.plan`` functions: it carries an ``ExtensionRegistry`` so it
 does not have to be threaded through every call, and it takes
-:class:`~substrait.dataframe.expr.Expr` objects (or bare column names / Python
-scalars) rather than raw ``scalar_function`` invocations::
+`Expr` objects (or bare column names / Python
+scalars) rather than raw ``scalar_function`` invocations:
 
-    import substrait.dataframe as sub
+```python
+import substrait.dataframe as sub
 
-    plan = (
-        sub.read_named_table("people", {"id": sub.i64, "age": sub.i64})
-        .filter(sub.col("age") > 25)
-        .select("id")
-        .to_plan()
-    )
+plan = (
+    sub.read_named_table("people", {"id": sub.i64, "age": sub.i64})
+    .filter(sub.col("age") > 25)
+    .select("id")
+    .to_plan()
+)
+```
 
 Verb naming follows Polars: ``select`` replaces the projection, ``with_columns``
 appends.
 
-Relationship to :mod:`substrait.narwhals`: that module is the **Narwhals
+Relationship to `substrait.narwhals`: that module is the **Narwhals
 integration layer** -- a compliant wrapper that lets ``narwhals`` drive plan
 construction (``nw.from_native(...)``). It adapts Narwhals calls down onto this
 native frame; the two layers compose rather than compete.
@@ -198,7 +200,7 @@ class DataFrame:
     """The Substrait-native fluent DataFrame.
 
     Build plans directly (``df.filter(...).select(...).to_plan()``). For the
-    Narwhals-driven equivalent, see :class:`substrait.narwhals.DataFrame`, which
+    Narwhals-driven equivalent, see `substrait.narwhals.DataFrame`, which
     wraps this frame to satisfy the Narwhals backend protocol.
     """
 
@@ -360,7 +362,7 @@ class DataFrame:
     ) -> "DataFrame":
         """The top ``n`` rows ordered by ``by`` (a fused sort + fetch, TopNRel).
 
-        ``descending``/``nulls_last`` follow :meth:`sort`; ``with_ties`` keeps
+        ``descending``/``nulls_last`` follow `sort`; ``with_ties`` keeps
         rows tied with the n-th.
         """
         keys = [by] if isinstance(by, (str, Expr)) else list(by)
@@ -476,7 +478,7 @@ class DataFrame:
     ) -> "DataFrame":
         """Physical nested-loop join: evaluate ``on`` over the Cartesian product.
 
-        ``how`` accepts the same values as :meth:`join`.
+        ``how`` accepts the same values as `join`.
         """
         if how not in _JOIN_TYPES:
             raise ValueError(
@@ -541,7 +543,7 @@ class DataFrame:
         """Physical hash equi-join on key columns.
 
         ``left_on``/``right_on`` are column names/indices; ``right_on`` defaults
-        to ``left_on``. ``how`` accepts the same values as :meth:`join`.
+        to ``left_on``. ``how`` accepts the same values as `join`.
         ``post_filter`` is an optional predicate applied to the join output;
         ``residual`` is an optional non-equi condition evaluated alongside the
         key equalities. Both bind against the concatenated left+right schema.
@@ -594,7 +596,7 @@ class DataFrame:
         """Apply a custom single-input relation (ExtensionSingleRel).
 
         ``detail`` is an
-        :class:`~substrait.dataframe.extension_relations.ExtensionSingleDetail` (its
+        `ExtensionSingleDetail` (its
         ``derive_schema`` defines the output) or a raw ``google.protobuf.Any``
         (the input schema is then assumed to pass through). Register the detail
         class via ``ExtensionRegistry.register_extension_relation`` for schema
@@ -607,7 +609,7 @@ class DataFrame:
     ) -> "DataFrame":
         """A custom multi-input relation (ExtensionMultiRel) over this frame and
         ``others``; ``detail`` is an
-        :class:`~substrait.dataframe.extension_relations.ExtensionMultiDetail`."""
+        `ExtensionMultiDetail`."""
         inputs = [self._plan, *(o._plan for o in others)]
         return self._next(_plan.extension_multi(inputs, detail))
 
@@ -852,7 +854,7 @@ def extension_leaf(
     """Start a DataFrame from a custom leaf relation (ExtensionLeafRel).
 
     ``detail`` is an
-    :class:`~substrait.dataframe.extension_relations.ExtensionLeafDetail`; its
+    `ExtensionLeafDetail`; its
     ``derive_schema`` defines the source's output columns.
     """
     return DataFrame(_plan.extension_leaf(detail), registry)

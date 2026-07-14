@@ -3,13 +3,15 @@
 The lower-level ``substrait.builders.type`` builders take a ``nullable`` keyword
 that defaults to ``True``, which is easy to apply silently. ``DataType`` wraps a
 primitive builder so nullability is explicit and reads well -- inspired by
-substrait-java's ``N`` (nullable) / ``R`` (required) ``TypeCreator`` constants::
+substrait-java's ``N`` (nullable) / ``R`` (required) ``TypeCreator`` constants:
 
-    sub.i64            # bare: nullable (the safe default) when used in a schema
-    sub.i64.nullable   # explicitly nullable
-    sub.i64.non_null   # required / non-nullable
-    sub.i64()          # still callable, for parity with the builder layer
-    sub.i64(nullable=False)
+```python
+sub.i64            # bare: nullable (the safe default) when used in a schema
+sub.i64.nullable   # explicitly nullable
+sub.i64.non_null   # required / non-nullable
+sub.i64()          # still callable, for parity with the builder layer
+sub.i64(nullable=False)
+```
 
 A ``DataType`` is callable, so anywhere a zero-arg type builder is accepted
 (schema dicts, ``lit``) a bare ``sub.i64`` keeps working and yields a nullable

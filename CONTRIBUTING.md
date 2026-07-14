@@ -7,9 +7,10 @@ cd substrait-python
 ```
 
 ## Development environment
-Activate environment with uv.
+Set up the environment with uv. This installs the default `dev` dependency
+group, which includes everything needed to run the tests.
 ```
-uv sync --extra test
+uv sync
 ```
 
 # Lint & Format

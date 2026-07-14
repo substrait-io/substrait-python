@@ -53,6 +53,11 @@ the standard Substrait extensions:
 pip install "substrait[extensions]"
 ```
 
+**📖 See the [documentation guide](docs/index.md)** for the full walkthrough —
+data sources, types, expressions, joins, aggregations, window functions,
+subqueries, CTEs, DDL/writes, and custom extensions. Build it locally with
+`pixi run docs-serve` (or `uv run zensical serve`).
+
 # Example (low-level API)
 
 The examples below construct plans with the raw `substrait.proto` and

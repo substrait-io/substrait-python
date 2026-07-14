@@ -21,6 +21,7 @@ sql = ["sqloxide", "deepdiff"]
 
 [dependency-groups]
 dev = ["pytest >= 7.0.0", "substrait-antlr==0.99.0", "pyyaml", "sqloxide", "deepdiff", "duckdb<=1.2.2; python_version < '3.14'", "datafusion"]
+docs = ["zensical", "mkdocstrings-python"]
 
 [tool.pytest.ini_options]
 pythonpath = "src"
@@ -45,11 +46,16 @@ platforms = ["win-64", "linux-64", "osx-64", "osx-arm64", "linux-aarch64"]
 dev = { features = ["dev"], solve-group = "default" }
 extensions = { features = ["extensions"], solve-group = "default" }
 sql = { features = ["sql"], solve-group = "default" }
+docs = { features = ["docs"], solve-group = "default" }
 
 [tool.pixi.tasks]
 format = "ruff format"
 lint = "ruff check"
 lint_fix = "ruff check --fix"
+
+[tool.pixi.feature.docs.tasks]
+docs-build = "zensical build"
+docs-serve = "zensical serve"
 
 [tool.pixi.dependencies]
 ruff = ">=0.14.10,<0.15"

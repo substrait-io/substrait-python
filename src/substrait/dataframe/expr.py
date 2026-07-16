@@ -242,7 +242,9 @@ def _resolve_over_urns(
     identically and their error text cannot drift apart.
     """
     signature = [
-        typ for b in bound for typ in infer_extended_expression_schema(b).types
+        typ
+        for b in bound
+        for typ in infer_extended_expression_schema(b, registry=registry).types
     ]
     for urn in urns:
         if registry.lookup_function(urn, name, signature):
@@ -293,9 +295,13 @@ def _numeric_binary(
 
         peer = None
         if left_is_expr:
-            peer = infer_extended_expression_schema(left_val).types[0]
+            peer = infer_extended_expression_schema(left_val, registry=registry).types[
+                0
+            ]
         elif right_is_expr:
-            peer = infer_extended_expression_schema(right_val).types[0]
+            peer = infer_extended_expression_schema(right_val, registry=registry).types[
+                0
+            ]
 
         def as_bound(value, is_expr):
             if is_expr:
@@ -635,7 +641,9 @@ class Expr:
         def resolve(base_schema, registry):
             bound_list = list_unbound(base_schema, registry)
             element_type = (
-                infer_extended_expression_schema(bound_list).types[0].list.type
+                infer_extended_expression_schema(bound_list, registry=registry)
+                .types[0]
+                .list.type
             )
             param_struct = stp.Type.Struct(
                 types=[element_type], nullability=stp.Type.NULLABILITY_REQUIRED

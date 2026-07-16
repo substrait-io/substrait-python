@@ -203,7 +203,7 @@ def project(
 
     def resolve(registry: ExtensionRegistry) -> stp.Plan:
         _plan = plan if isinstance(plan, stp.Plan) else plan(registry)
-        ns = infer_plan_schema(_plan)
+        ns = infer_plan_schema(_plan, registry=registry)
         bound_expressions: Iterable[stee.ExtendedExpression] = [
             resolve_expression(e, ns, registry) for e in expressions
         ]
@@ -252,7 +252,7 @@ def select(
 
     def resolve(registry: ExtensionRegistry) -> stp.Plan:
         _plan = plan if isinstance(plan, stp.Plan) else plan(registry)
-        ns = infer_plan_schema(_plan)
+        ns = infer_plan_schema(_plan, registry=registry)
         bound_expressions: Iterable[stee.ExtendedExpression] = [
             resolve_expression(e, ns, registry) for e in expressions
         ]
@@ -294,7 +294,7 @@ def filter(
 ) -> UnboundPlan:
     def resolve(registry: ExtensionRegistry) -> stp.Plan:
         bound_plan = plan if isinstance(plan, stp.Plan) else plan(registry)
-        ns = infer_plan_schema(bound_plan)
+        ns = infer_plan_schema(bound_plan, registry=registry)
         bound_expression: stee.ExtendedExpression = resolve_expression(
             expression, ns, registry
         )
@@ -330,7 +330,7 @@ def sort(
 ) -> UnboundPlan:
     def resolve(registry: ExtensionRegistry) -> stp.Plan:
         bound_plan = plan if isinstance(plan, stp.Plan) else plan(registry)
-        ns = infer_plan_schema(bound_plan)
+        ns = infer_plan_schema(bound_plan, registry=registry)
 
         bound_expressions = [
             (e, stalg.SortField.SORT_DIRECTION_ASC_NULLS_LAST)
@@ -397,7 +397,7 @@ def fetch(
 ) -> UnboundPlan:
     def resolve(registry: ExtensionRegistry) -> stp.Plan:
         bound_plan = plan if isinstance(plan, stp.Plan) else plan(registry)
-        ns = infer_plan_schema(bound_plan)
+        ns = infer_plan_schema(bound_plan, registry=registry)
 
         bound_offset = resolve_expression(offset, ns, registry) if offset else None
         # count=None means "all remaining rows" (FetchRel leaves count_expr unset).
@@ -445,8 +445,8 @@ def join(
     def resolve(registry: ExtensionRegistry) -> stp.Plan:
         bound_left = left if isinstance(left, stp.Plan) else left(registry)
         bound_right = right if isinstance(right, stp.Plan) else right(registry)
-        left_ns = infer_plan_schema(bound_left)
-        right_ns = infer_plan_schema(bound_right)
+        left_ns = infer_plan_schema(bound_left, registry=registry)
+        right_ns = infer_plan_schema(bound_right, registry=registry)
 
         ns = stt.NamedStruct(
             struct=stt.Type.Struct(
@@ -500,8 +500,8 @@ def cross(
     def resolve(registry: ExtensionRegistry) -> stp.Plan:
         bound_left = left if isinstance(left, stp.Plan) else left(registry)
         bound_right = right if isinstance(right, stp.Plan) else right(registry)
-        left_ns = infer_plan_schema(bound_left)
-        right_ns = infer_plan_schema(bound_right)
+        left_ns = infer_plan_schema(bound_left, registry=registry)
+        right_ns = infer_plan_schema(bound_right, registry=registry)
 
         ns = stt.NamedStruct(
             struct=stt.Type.Struct(
@@ -548,7 +548,7 @@ def aggregate(
 
     def resolve(registry: ExtensionRegistry) -> stp.Plan:
         bound_input = input if isinstance(input, stp.Plan) else input(registry)
-        ns = infer_plan_schema(bound_input)
+        ns = infer_plan_schema(bound_input, registry=registry)
 
         bound_grouping_expressions = [
             resolve_expression(e, ns, registry) for e in grouping_expressions
@@ -618,7 +618,7 @@ def write_named_table(
 ) -> UnboundPlan:
     def resolve(registry: ExtensionRegistry) -> stp.Plan:
         bound_input = input if isinstance(input, stp.Plan) else input(registry)
-        ns = infer_plan_schema(bound_input)
+        ns = infer_plan_schema(bound_input, registry=registry)
         _table_names = [table_names] if isinstance(table_names, str) else table_names
         _create_mode = create_mode or stalg.WriteRel.CREATE_MODE_ERROR_IF_EXISTS
         _op = op if op is not None else stalg.WriteRel.WRITE_OP_CTAS
@@ -673,7 +673,7 @@ def ddl(
             view_rel = view_plan.relations[-1].root.input
             merge_sources.append(view_plan)
             if schema is None:
-                schema = infer_plan_schema(view_plan)
+                schema = infer_plan_schema(view_plan, registry=registry)
 
         ddl_rel = stalg.Rel(
             ddl=stalg.DdlRel(
@@ -764,7 +764,7 @@ def consistent_partition_window(
 ) -> UnboundPlan:
     def resolve(registry: ExtensionRegistry) -> stp.Plan:
         bound_plan = plan if isinstance(plan, stp.Plan) else plan(registry)
-        ns = infer_plan_schema(bound_plan)
+        ns = infer_plan_schema(bound_plan, registry=registry)
 
         bound_partitions = [
             resolve_expression(e, ns, registry) for e in partition_expressions
@@ -859,7 +859,7 @@ def expand(
 
     def resolve(registry: ExtensionRegistry) -> stp.Plan:
         bound_input = plan if isinstance(plan, stp.Plan) else plan(registry)
-        ns = infer_plan_schema(bound_input)
+        ns = infer_plan_schema(bound_input, registry=registry)
 
         expand_fields = []
         merge_sources = [bound_input]
@@ -910,8 +910,8 @@ def nested_loop_join(
     def resolve(registry: ExtensionRegistry) -> stp.Plan:
         bound_left = left if isinstance(left, stp.Plan) else left(registry)
         bound_right = right if isinstance(right, stp.Plan) else right(registry)
-        left_ns = infer_plan_schema(bound_left)
-        right_ns = infer_plan_schema(bound_right)
+        left_ns = infer_plan_schema(bound_left, registry=registry)
+        right_ns = infer_plan_schema(bound_right, registry=registry)
 
         ns = stt.NamedStruct(
             struct=stt.Type.Struct(
@@ -987,8 +987,8 @@ def _physical_equi_join(rel_name, rel_cls):
         def resolve(registry: ExtensionRegistry) -> stp.Plan:
             bound_left = left if isinstance(left, stp.Plan) else left(registry)
             bound_right = right if isinstance(right, stp.Plan) else right(registry)
-            left_ns = infer_plan_schema(bound_left)
-            right_ns = infer_plan_schema(bound_right)
+            left_ns = infer_plan_schema(bound_left, registry=registry)
+            right_ns = infer_plan_schema(bound_right, registry=registry)
             keys = _comparison_join_keys(
                 list(left_keys), list(right_keys), left_ns, right_ns, registry
             )
@@ -1061,7 +1061,7 @@ def extension_single(plan: PlanOrUnbound, detail) -> UnboundPlan:
     def resolve(registry: ExtensionRegistry) -> stp.Plan:
         bound_plan = plan if isinstance(plan, stp.Plan) else plan(registry)
         if hasattr(detail, "derive_schema"):
-            input_struct = infer_plan_schema(bound_plan).struct
+            input_struct = infer_plan_schema(bound_plan, registry=registry).struct
             names = list(detail.derive_schema(input_struct).names)
         else:
             names = list(bound_plan.relations[-1].root.names)
@@ -1084,7 +1084,9 @@ def extension_multi(inputs: Iterable[PlanOrUnbound], detail) -> UnboundPlan:
 
     def resolve(registry: ExtensionRegistry) -> stp.Plan:
         bound_inputs = [i if isinstance(i, stp.Plan) else i(registry) for i in inputs]
-        input_structs = [infer_plan_schema(b).struct for b in bound_inputs]
+        input_structs = [
+            infer_plan_schema(b, registry=registry).struct for b in bound_inputs
+        ]
         names = list(detail.derive_schema(input_structs).names)
         rel = stalg.Rel(
             extension_multi=stalg.ExtensionMultiRel(
@@ -1159,7 +1161,7 @@ def top_n(
 
     def resolve(registry: ExtensionRegistry) -> stp.Plan:
         bound_plan = plan if isinstance(plan, stp.Plan) else plan(registry)
-        ns = infer_plan_schema(bound_plan)
+        ns = infer_plan_schema(bound_plan, registry=registry)
         bound_sorts = [
             (resolve_expression(e, ns, registry), direction) for e, direction in sorts
         ]

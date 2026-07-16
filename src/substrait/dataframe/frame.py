@@ -215,7 +215,7 @@ class DataFrame:
 
         def resolve(registry: ExtensionRegistry):
             bound = inner(registry)
-            names = list(infer_plan_schema(bound).names)
+            names = list(infer_plan_schema(bound, registry=registry).names)
             unknown = set(mapping) - set(names)
             if unknown:
                 raise ValueError(f"rename got unknown columns: {sorted(unknown)}")
@@ -234,7 +234,7 @@ class DataFrame:
 
         def resolve(registry: ExtensionRegistry):
             bound = inner(registry)
-            names = list(infer_plan_schema(bound).names)
+            names = list(infer_plan_schema(bound, registry=registry).names)
             unknown = drop_set - set(names)
             if unknown:
                 raise ValueError(f"drop got unknown columns: {sorted(unknown)}")

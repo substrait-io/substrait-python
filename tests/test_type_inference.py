@@ -66,6 +66,27 @@ def test_inference_project_emit():
     assert infer_rel_schema(rel) == expected
 
 
+def test_inference_set_emit():
+    # A SetRel's own RelCommon.Emit must drive the output schema; regression for
+    # the branch reading rel.fetch.common instead of rel.set.common (issue #217).
+    rel = stalg.Rel(
+        set=stalg.SetRel(
+            inputs=[read_rel, read_rel],
+            op=stalg.SetRel.SET_OP_UNION_ALL,
+            common=stalg.RelCommon(emit=stalg.RelCommon.Emit(output_mapping=[2, 0])),
+        )
+    )
+
+    expected = stt.Type.Struct(
+        types=[
+            stt.Type(fp32=stt.Type.FP32(nullability=stt.Type.NULLABILITY_NULLABLE)),
+            stt.Type(i64=stt.Type.I64(nullability=stt.Type.NULLABILITY_REQUIRED)),
+        ]
+    )
+
+    assert infer_rel_schema(rel) == expected
+
+
 def test_inference_project_literal():
     rel = stalg.Rel(
         project=stalg.ProjectRel(

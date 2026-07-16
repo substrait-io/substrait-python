@@ -1,3 +1,4 @@
+import pytest
 import substrait.algebra_pb2 as stalg
 import substrait.type_pb2 as stt
 
@@ -6,6 +7,9 @@ from substrait.type_inference import (
     infer_nested_type,
     infer_rel_schema,
 )
+
+_REQ = stt.Type.NULLABILITY_REQUIRED
+_NULL = stt.Type.NULLABILITY_NULLABLE
 
 struct = stt.Type.Struct(
     types=[
@@ -480,3 +484,119 @@ def test_infer_nested_type_map():
         )
     )
     assert result == expected
+
+
+# Three set inputs, one i64 column per (required/nullable) combination across
+# them, matching the worked example in the Substrait spec's set-operation
+# "Output Type Derivation" table (issue #219). Columns, per (primary, s1, s2):
+#   RRR  RRN  RNR  RNN  NRR  NRN  NNR  NNN
+_SET_INPUT_NULLABILITIES = [
+    [_REQ, _REQ, _REQ, _REQ, _NULL, _NULL, _NULL, _NULL],  # primary
+    [_REQ, _REQ, _NULL, _NULL, _REQ, _REQ, _NULL, _NULL],  # secondary
+    [_REQ, _NULL, _REQ, _NULL, _REQ, _NULL, _REQ, _NULL],  # secondary
+]
+
+
+@pytest.mark.parametrize(
+    ("op", "expected"),
+    [
+        # MINUS variants inherit the primary input's nullability.
+        (
+            stalg.SetRel.SET_OP_MINUS_PRIMARY,
+            [_REQ, _REQ, _REQ, _REQ, _NULL, _NULL, _NULL, _NULL],
+        ),
+        (
+            stalg.SetRel.SET_OP_MINUS_PRIMARY_ALL,
+            [_REQ, _REQ, _REQ, _REQ, _NULL, _NULL, _NULL, _NULL],
+        ),
+        (
+            stalg.SetRel.SET_OP_MINUS_MULTISET,
+            [_REQ, _REQ, _REQ, _REQ, _NULL, _NULL, _NULL, _NULL],
+        ),
+        # Nullable only if nullable in the primary and some secondary.
+        (
+            stalg.SetRel.SET_OP_INTERSECTION_PRIMARY,
+            [_REQ, _REQ, _REQ, _REQ, _REQ, _NULL, _NULL, _NULL],
+        ),
+        # Required if required in any input.
+        (
+            stalg.SetRel.SET_OP_INTERSECTION_MULTISET,
+            [_REQ, _REQ, _REQ, _REQ, _REQ, _REQ, _REQ, _NULL],
+        ),
+        (
+            stalg.SetRel.SET_OP_INTERSECTION_MULTISET_ALL,
+            [_REQ, _REQ, _REQ, _REQ, _REQ, _REQ, _REQ, _NULL],
+        ),
+        # Nullable if nullable in any input.
+        (
+            stalg.SetRel.SET_OP_UNION_DISTINCT,
+            [_REQ, _NULL, _NULL, _NULL, _NULL, _NULL, _NULL, _NULL],
+        ),
+        (
+            stalg.SetRel.SET_OP_UNION_ALL,
+            [_REQ, _NULL, _NULL, _NULL, _NULL, _NULL, _NULL, _NULL],
+        ),
+    ],
+)
+def test_inference_set_nullability(op, expected):
+    inputs = [
+        stalg.Rel(
+            read=stalg.ReadRel(
+                base_schema=stt.NamedStruct(
+                    names=[f"c{i}" for i in range(len(nullabilities))],
+                    struct=stt.Type.Struct(
+                        types=[
+                            stt.Type(i64=stt.Type.I64(nullability=n))
+                            for n in nullabilities
+                        ]
+                    ),
+                )
+            )
+        )
+        for nullabilities in _SET_INPUT_NULLABILITIES
+    ]
+
+    rel = stalg.Rel(set=stalg.SetRel(inputs=inputs, op=op))
+
+    result = [t.i64.nullability for t in infer_rel_schema(rel).types]
+    assert result == expected
+
+
+def test_inference_set_nullability_preserves_field_types():
+    # Combining nullability must keep each field's full type (parameters and
+    # nested element types) intact -- only the top-level nullability changes.
+    def _struct(dec_null, vc_null, list_null):
+        return stt.Type.Struct(
+            types=[
+                stt.Type(
+                    decimal=stt.Type.Decimal(
+                        precision=10, scale=2, nullability=dec_null
+                    )
+                ),
+                stt.Type(varchar=stt.Type.VarChar(length=5, nullability=vc_null)),
+                stt.Type(
+                    list=stt.Type.List(
+                        type=stt.Type(string=stt.Type.String(nullability=_REQ)),
+                        nullability=list_null,
+                    )
+                ),
+            ],
+            nullability=_REQ,
+        )
+
+    def _read(struct):
+        return stalg.Rel(
+            read=stalg.ReadRel(
+                base_schema=stt.NamedStruct(names=["d", "v", "l"], struct=struct)
+            )
+        )
+
+    primary = _read(_struct(_NULL, _REQ, _REQ))
+    secondary = _read(_struct(_REQ, _NULL, _NULL))
+    rel = stalg.Rel(
+        set=stalg.SetRel(inputs=[primary, secondary], op=stalg.SetRel.SET_OP_UNION_ALL)
+    )
+
+    # UNION -> nullable if nullable in any input; types (decimal 10/2, varchar 5,
+    # list<string>) and the required inner string element are preserved.
+    assert infer_rel_schema(rel) == _struct(_NULL, _NULL, _NULL)

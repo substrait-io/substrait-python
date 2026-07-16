@@ -429,7 +429,7 @@ def infer_rel_schema(rel: stalg.Rel) -> stt.Type.Struct:
 
         (common, struct) = (rel.project.common, raw_schema)
     elif rel_type == "set":
-        (common, struct) = (rel.fetch.common, infer_rel_schema(rel.set.inputs[0]))
+        (common, struct) = (rel.set.common, infer_rel_schema(rel.set.inputs[0]))
     elif rel_type == "cross":
         left_schema = infer_rel_schema(rel.cross.left)
         right_schema = infer_rel_schema(rel.cross.right)

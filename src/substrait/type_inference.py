@@ -398,6 +398,67 @@ def _join_output_struct(
     return stt.Type.Struct(types=types, nullability=required)
 
 
+def _field_nullability(t: stt.Type):
+    """The nullability of a (concrete) field type, or UNSPECIFIED if it has none."""
+    kind = t.WhichOneof("kind")
+    return getattr(t, kind).nullability if kind else stt.Type.NULLABILITY_UNSPECIFIED
+
+
+def _with_field_nullability(t: stt.Type, nullability) -> stt.Type:
+    """A copy of ``t`` with its nullability replaced (unchanged if it has no kind)."""
+    out = stt.Type()
+    out.CopyFrom(t)
+    kind = out.WhichOneof("kind")
+    if kind:
+        getattr(out, kind).nullability = nullability
+    return out
+
+
+def _combine_set_nullability(op_name: str, nullabilities: list):
+    """Combine one field's nullability across a set operation's inputs.
+
+    Set inputs share field *types* but may differ in nullability; the output
+    nullability is combined across all inputs per the operation (matching the
+    Substrait spec's set-operation output-type derivation). ``nullabilities`` is
+    the field's nullability in each input, primary first.
+    """
+    nullable = stt.Type.NULLABILITY_NULLABLE
+    required = stt.Type.NULLABILITY_REQUIRED
+    primary, secondaries = nullabilities[0], nullabilities[1:]
+    if op_name in ("SET_OP_UNION_DISTINCT", "SET_OP_UNION_ALL"):
+        # Nullable if nullable in any input.
+        return nullable if nullable in nullabilities else required
+    if op_name == "SET_OP_INTERSECTION_PRIMARY":
+        # Nullable only if nullable in the primary and in some secondary input.
+        return nullable if primary == nullable and nullable in secondaries else required
+    if op_name in ("SET_OP_INTERSECTION_MULTISET", "SET_OP_INTERSECTION_MULTISET_ALL"):
+        # Required if required in any input.
+        return required if required in nullabilities else nullable
+    # MINUS_* (and unspecified): the same as the primary input.
+    return primary
+
+
+def _set_output_struct(op_name: str, inputs: list) -> stt.Type.Struct:
+    """The output struct of a set operation over already-inferred ``inputs``.
+
+    Field types are taken from the primary input (the spec requires identical
+    field types across inputs); each field's nullability is combined across all
+    inputs according to ``op_name`` via :func:`_combine_set_nullability`.
+    """
+    primary = inputs[0]
+    types = [
+        _with_field_nullability(
+            field,
+            _combine_set_nullability(
+                op_name,
+                [_field_nullability(s.types[i]) for s in inputs if i < len(s.types)],
+            ),
+        )
+        for i, field in enumerate(primary.types)
+    ]
+    return stt.Type.Struct(types=types, nullability=primary.nullability)
+
+
 def infer_rel_schema(rel: stalg.Rel, *, registry=None) -> stt.Type.Struct:
     rel_type = rel.WhichOneof("rel_type")
 
@@ -451,9 +512,10 @@ def infer_rel_schema(rel: stalg.Rel, *, registry=None) -> stt.Type.Struct:
 
         (common, struct) = (rel.project.common, raw_schema)
     elif rel_type == "set":
+        input_structs = [infer_rel_schema(i, registry=registry) for i in rel.set.inputs]
         (common, struct) = (
             rel.set.common,
-            infer_rel_schema(rel.set.inputs[0], registry=registry),
+            _set_output_struct(stalg.SetRel.SetOp.Name(rel.set.op), input_structs),
         )
     elif rel_type == "cross":
         left_schema = infer_rel_schema(rel.cross.left, registry=registry)

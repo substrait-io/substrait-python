@@ -37,7 +37,7 @@ import substrait.type_pb2 as stp
 
 from substrait.builders import plan as _plan
 from substrait.builders import type as _type
-from substrait.dataframe.expr import Expr, Measure, col, lit
+from substrait.dataframe.expr import Expr, Measure, col, lit, sort_direction
 from substrait.extension_registry import ExtensionRegistry
 from substrait.type_inference import infer_plan_schema
 
@@ -73,14 +73,6 @@ _WRITE_OPS = {
     "insert": stalg.WriteRel.WRITE_OP_INSERT,
     "delete": stalg.WriteRel.WRITE_OP_DELETE,
     "update": stalg.WriteRel.WRITE_OP_UPDATE,
-}
-
-# Sort direction keyed by (descending, nulls_last).
-_SORT_DIRECTIONS = {
-    (False, False): stalg.SortField.SORT_DIRECTION_ASC_NULLS_FIRST,
-    (False, True): stalg.SortField.SORT_DIRECTION_ASC_NULLS_LAST,
-    (True, False): stalg.SortField.SORT_DIRECTION_DESC_NULLS_FIRST,
-    (True, True): stalg.SortField.SORT_DIRECTION_DESC_NULLS_LAST,
 }
 
 # How often execution context variables (current_timestamp, ...) are evaluated.
@@ -296,7 +288,7 @@ class DataFrame:
         desc = _per_column(descending, n, "descending")
         nulls = _per_column(nulls_last, n, "nulls_last")
         expressions = [
-            (_unbound(c), _SORT_DIRECTIONS[(desc[i], nulls[i])])
+            (_unbound(c), sort_direction(desc[i], nulls[i]))
             for i, c in enumerate(columns)
         ]
         return self._next(_plan.sort(self._plan, expressions=expressions))
@@ -340,8 +332,7 @@ class DataFrame:
         desc = _per_column(descending, count, "descending")
         nulls = _per_column(nulls_last, count, "nulls_last")
         sorts = [
-            (_unbound(c), _SORT_DIRECTIONS[(desc[i], nulls[i])])
-            for i, c in enumerate(keys)
+            (_unbound(c), sort_direction(desc[i], nulls[i])) for i, c in enumerate(keys)
         ]
         return self._next(
             _plan.top_n(

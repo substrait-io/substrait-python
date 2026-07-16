@@ -1,27 +1,10 @@
-import substrait.extended_expression_pb2 as stee
-import substrait.type_pb2 as stp
-
 from substrait.builders.extended_expression import (
-    ExtendedExpressionOrUnbound,
     UnboundExtendedExpression,
-    resolve_expression,
     scalar_function,
 )
-from substrait.extension_registry import ExtensionRegistry
-
-
-def _alias(
-    expr: ExtendedExpressionOrUnbound,
-    alias: str = None,
-):
-    def resolve(
-        base_schema: stp.NamedStruct, registry: ExtensionRegistry
-    ) -> stee.ExtendedExpression:
-        bound_expression = resolve_expression(expr, base_schema, registry)
-        bound_expression.referred_expr[0].output_names[0] = alias
-        return bound_expression
-
-    return resolve
+from substrait.builders.extended_expression import (
+    alias as _alias,
+)
 
 
 class Expression:

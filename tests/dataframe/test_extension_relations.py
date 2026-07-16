@@ -78,7 +78,10 @@ for _cls in (MySource, AddFlag, Zip):
 
 
 def _kinds(plan):
-    return [t.WhichOneof("kind") for t in infer_plan_schema(plan).struct.types]
+    return [
+        t.WhichOneof("kind")
+        for t in infer_plan_schema(plan, registry=registry).struct.types
+    ]
 
 
 def test_extension_leaf_source():
@@ -126,3 +129,20 @@ def test_unregistered_extension_leaf_chain_raises():
     df = sub.extension_leaf(Any(type_url="example.com/Unknown", value=b""))
     with pytest.raises(Exception, match="no schema deriver"):
         df.filter(sub.col("x") > 0).to_plan()
+
+
+def test_deriver_registration_is_scoped_to_registry():
+    # Derivers live on the ExtensionRegistry instance, not a process-global: a
+    # detail class registered on one registry must not derive on an independent
+    # one (issue #206).
+    plan = sub.extension_leaf(MySource(), registry=registry).to_plan()
+
+    other = sub.ExtensionRegistry(load_default_extensions=True)
+    with pytest.raises(Exception, match="no schema deriver"):
+        infer_plan_schema(plan, registry=other)
+
+    # ...and the registry it was registered on still derives it.
+    assert [
+        t.WhichOneof("kind")
+        for t in infer_plan_schema(plan, registry=registry).struct.types
+    ] == ["i64"]

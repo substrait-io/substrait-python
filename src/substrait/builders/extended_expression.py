@@ -447,7 +447,8 @@ def scalar_function(
         ]
 
         expression_schemas = [
-            infer_extended_expression_schema(b) for b in bound_expressions
+            infer_extended_expression_schema(b, registry=registry)
+            for b in bound_expressions
         ]
 
         signature = [typ for es in expression_schemas for typ in es.types]
@@ -543,7 +544,8 @@ def aggregate_function(
         ]
 
         expression_schemas = [
-            infer_extended_expression_schema(b) for b in bound_expressions
+            infer_extended_expression_schema(b, registry=registry)
+            for b in bound_expressions
         ]
 
         signature = [typ for es in expression_schemas for typ in es.types]
@@ -640,7 +642,8 @@ def window_function(
         ]
 
         expression_schemas = [
-            infer_extended_expression_schema(b) for b in bound_expressions
+            infer_extended_expression_schema(b, registry=registry)
+            for b in bound_expressions
         ]
 
         signature = [typ for es in expression_schemas for typ in es.types]

@@ -13,25 +13,20 @@ outer_schemas: contextvars.ContextVar = contextvars.ContextVar(
 )
 
 
-# Registered extension-relation detail classes ({type_url: class}) so an
-# extension relation's schema can be derived by reconstructing the user's detail
-# object from the plan's opaque Any. Populated via register_extension_relation
-# (also reachable as ExtensionRegistry.register_extension_relation).
-_extension_relation_derivers: dict = {}
-
-
-def register_extension_relation(detail_cls) -> None:
-    """Register an extension-relation detail class by its ``type_url``."""
-    _extension_relation_derivers[detail_cls.type_url] = detail_cls
-
-
-def _derive_extension_schema(detail, inputs):
+def _derive_extension_schema(detail, inputs, registry):
     """Derive a registered extension relation's output NamedStruct, or None.
 
-    ``inputs`` is ``None`` (leaf), a single ``Type.Struct`` (single), or a list
-    of ``Type.Struct`` (multi).
+    The detail class is looked up on ``registry`` (an ``ExtensionRegistry``, or
+    ``None`` when inference wasn't given one), so derivation is scoped to that
+    registry instance rather than shared process-wide. ``inputs`` is ``None``
+    (leaf), a single ``Type.Struct`` (single), or a list of ``Type.Struct``
+    (multi).
     """
-    detail_cls = _extension_relation_derivers.get(detail.type_url)
+    detail_cls = (
+        registry.lookup_extension_relation(detail.type_url)
+        if registry is not None
+        else None
+    )
     if detail_cls is None:
         return None
     reconstructed = detail_cls.from_any(detail)
@@ -163,7 +158,9 @@ def infer_literal_type(literal: stalg.Expression.Literal) -> stt.Type:
         raise Exception(f"Unknown literal_type {literal_type}")
 
 
-def infer_nested_type(nested: stalg.Expression.Nested, parent_schema) -> stt.Type:
+def infer_nested_type(
+    nested: stalg.Expression.Nested, parent_schema, *, registry=None
+) -> stt.Type:
     nested_type = nested.WhichOneof("nested_type")
 
     nullability = (
@@ -176,7 +173,7 @@ def infer_nested_type(nested: stalg.Expression.Nested, parent_schema) -> stt.Typ
         return stt.Type(
             struct=stt.Type.Struct(
                 types=[
-                    infer_expression_type(f, parent_schema)
+                    infer_expression_type(f, parent_schema, registry=registry)
                     for f in nested.struct.fields
                 ],
                 nullability=nullability,
@@ -185,16 +182,20 @@ def infer_nested_type(nested: stalg.Expression.Nested, parent_schema) -> stt.Typ
     elif nested_type == "list":
         return stt.Type(
             list=stt.Type.List(
-                type=infer_expression_type(nested.list.values[0], parent_schema),
+                type=infer_expression_type(
+                    nested.list.values[0], parent_schema, registry=registry
+                ),
                 nullability=nullability,
             )
         )
     elif nested_type == "map":
         return stt.Type(
             map=stt.Type.Map(
-                key=infer_expression_type(nested.map.key_values[0].key, parent_schema),
+                key=infer_expression_type(
+                    nested.map.key_values[0].key, parent_schema, registry=registry
+                ),
                 value=infer_expression_type(
-                    nested.map.key_values[0].value, parent_schema
+                    nested.map.key_values[0].value, parent_schema, registry=registry
                 ),
                 nullability=nullability,
             )
@@ -204,7 +205,7 @@ def infer_nested_type(nested: stalg.Expression.Nested, parent_schema) -> stt.Typ
 
 
 def infer_expression_type(
-    expression: stalg.Expression, parent_schema: stt.Type.Struct
+    expression: stalg.Expression, parent_schema: stt.Type.Struct, *, registry=None
 ) -> stt.Type:
     rex_type = expression.WhichOneof("rex_type")
     if rex_type == "selection":
@@ -245,10 +246,12 @@ def infer_expression_type(
     elif rex_type == "window_function":
         return expression.window_function.output_type
     elif rex_type == "if_then":
-        return infer_expression_type(expression.if_then.ifs[0].then, parent_schema)
+        return infer_expression_type(
+            expression.if_then.ifs[0].then, parent_schema, registry=registry
+        )
     elif rex_type == "switch_expression":
         return infer_expression_type(
-            expression.switch_expression.ifs[0].then, parent_schema
+            expression.switch_expression.ifs[0].then, parent_schema, registry=registry
         )
     elif rex_type == "cast":
         return expression.cast.type
@@ -257,12 +260,12 @@ def infer_expression_type(
             bool=stt.Type.Boolean(nullability=stt.Type.Nullability.NULLABILITY_NULLABLE)
         )
     elif rex_type == "nested":
-        return infer_nested_type(expression.nested, parent_schema)
+        return infer_nested_type(expression.nested, parent_schema, registry=registry)
     elif rex_type == "lambda":
         # A lambda's type is func<param_types -> body_type>; the body's parameter
         # references resolve against the lambda's own parameter struct.
         lam = getattr(expression, "lambda")
-        body_type = infer_expression_type(lam.body, lam.parameters)
+        body_type = infer_expression_type(lam.body, lam.parameters, registry=registry)
         return stt.Type(
             func=stt.Type.Func(
                 parameter_types=list(lam.parameters.types),
@@ -283,7 +286,9 @@ def infer_expression_type(
         token = outer_schemas.set((*stack, stt.NamedStruct(struct=parent_schema)))
         try:
             if subquery_type == "scalar":
-                scalar_rel = infer_rel_schema(expression.subquery.scalar.input)
+                scalar_rel = infer_rel_schema(
+                    expression.subquery.scalar.input, registry=registry
+                )
                 return scalar_rel.types[0]
             elif (
                 subquery_type == "in_predicate"
@@ -317,10 +322,15 @@ def infer_expression_type(
         raise Exception(f"Unknown rex_type {rex_type}")
 
 
-def infer_extended_expression_schema(ee: stee.ExtendedExpression) -> stt.Type.Struct:
+def infer_extended_expression_schema(
+    ee: stee.ExtendedExpression, *, registry=None
+) -> stt.Type.Struct:
     exprs = [e for e in ee.referred_expr]
 
-    types = [infer_expression_type(e.expression, ee.base_schema.struct) for e in exprs]
+    types = [
+        infer_expression_type(e.expression, ee.base_schema.struct, registry=registry)
+        for e in exprs
+    ]
 
     return stt.Type.Struct(
         types=types,
@@ -360,11 +370,13 @@ def join_output_names(type_name: str, left_names, right_names) -> list:
     return list(left_names) + list(right_names)
 
 
-def _join_output_struct(type_name: str, left_rel, right_rel) -> stt.Type.Struct:
+def _join_output_struct(
+    type_name: str, left_rel, right_rel, *, registry=None
+) -> stt.Type.Struct:
     """Join output column types by join-type NAME (shared across all join
     relations, whose enum integer values differ)."""
-    left = infer_rel_schema(left_rel)
-    right = infer_rel_schema(right_rel)
+    left = infer_rel_schema(left_rel, registry=registry)
+    right = infer_rel_schema(right_rel, registry=registry)
     required = stt.Type.Nullability.NULLABILITY_REQUIRED
     shape = _join_column_shape(type_name)
     if shape == "left":
@@ -447,19 +459,25 @@ def _set_output_struct(op_name: str, inputs: list) -> stt.Type.Struct:
     return stt.Type.Struct(types=types, nullability=primary.nullability)
 
 
-def infer_rel_schema(rel: stalg.Rel) -> stt.Type.Struct:
+def infer_rel_schema(rel: stalg.Rel, *, registry=None) -> stt.Type.Struct:
     rel_type = rel.WhichOneof("rel_type")
 
     if rel_type == "read":
         (common, struct) = (rel.read.common, rel.read.base_schema.struct)
     elif rel_type == "filter":
-        (common, struct) = (rel.filter.common, infer_rel_schema(rel.filter.input))
+        (common, struct) = (
+            rel.filter.common,
+            infer_rel_schema(rel.filter.input, registry=registry),
+        )
     elif rel_type == "fetch":
-        (common, struct) = (rel.fetch.common, infer_rel_schema(rel.fetch.input))
+        (common, struct) = (
+            rel.fetch.common,
+            infer_rel_schema(rel.fetch.input, registry=registry),
+        )
     elif rel_type == "aggregate":
-        parent_schema = infer_rel_schema(rel.aggregate.input)
+        parent_schema = infer_rel_schema(rel.aggregate.input, registry=registry)
         grouping_types = [
-            infer_expression_type(g, parent_schema)
+            infer_expression_type(g, parent_schema, registry=registry)
             for g in rel.aggregate.grouping_expressions
         ]
         measure_types = [m.measure.output_type for m in rel.aggregate.measures]
@@ -477,11 +495,15 @@ def infer_rel_schema(rel: stalg.Rel) -> stt.Type.Struct:
 
         (common, struct) = (rel.aggregate.common, raw_schema)
     elif rel_type == "sort":
-        (common, struct) = (rel.sort.common, infer_rel_schema(rel.sort.input))
+        (common, struct) = (
+            rel.sort.common,
+            infer_rel_schema(rel.sort.input, registry=registry),
+        )
     elif rel_type == "project":
-        parent_schema = infer_rel_schema(rel.project.input)
+        parent_schema = infer_rel_schema(rel.project.input, registry=registry)
         expression_types = [
-            infer_expression_type(e, parent_schema) for e in rel.project.expressions
+            infer_expression_type(e, parent_schema, registry=registry)
+            for e in rel.project.expressions
         ]
         raw_schema = stt.Type.Struct(
             types=list(parent_schema.types) + expression_types,
@@ -490,14 +512,14 @@ def infer_rel_schema(rel: stalg.Rel) -> stt.Type.Struct:
 
         (common, struct) = (rel.project.common, raw_schema)
     elif rel_type == "set":
-        input_structs = [infer_rel_schema(i) for i in rel.set.inputs]
+        input_structs = [infer_rel_schema(i, registry=registry) for i in rel.set.inputs]
         (common, struct) = (
             rel.set.common,
             _set_output_struct(stalg.SetRel.SetOp.Name(rel.set.op), input_structs),
         )
     elif rel_type == "cross":
-        left_schema = infer_rel_schema(rel.cross.left)
-        right_schema = infer_rel_schema(rel.cross.right)
+        left_schema = infer_rel_schema(rel.cross.left, registry=registry)
+        right_schema = infer_rel_schema(rel.cross.right, registry=registry)
 
         raw_schema = stt.Type.Struct(
             types=list(left_schema.types) + list(right_schema.types),
@@ -510,10 +532,11 @@ def infer_rel_schema(rel: stalg.Rel) -> stt.Type.Struct:
             stalg.JoinRel.JoinType.Name(rel.join.type),
             rel.join.left,
             rel.join.right,
+            registry=registry,
         )
         (common, struct) = (rel.join.common, raw_schema)
     elif rel_type == "window":
-        parent_schema = infer_rel_schema(rel.window.input)
+        parent_schema = infer_rel_schema(rel.window.input, registry=registry)
         window_output_types = [wf.output_type for wf in rel.window.window_functions]
         raw_schema = stt.Type.Struct(
             types=list(parent_schema.types) + window_output_types,
@@ -521,12 +544,14 @@ def infer_rel_schema(rel: stalg.Rel) -> stt.Type.Struct:
         )
         (common, struct) = (rel.window.common, raw_schema)
     elif rel_type == "expand":
-        parent_schema = infer_rel_schema(rel.expand.input)
+        parent_schema = infer_rel_schema(rel.expand.input, registry=registry)
         field_types = []
         for field in rel.expand.fields:
             if field.HasField("consistent_field"):
                 field_types.append(
-                    infer_expression_type(field.consistent_field, parent_schema)
+                    infer_expression_type(
+                        field.consistent_field, parent_schema, registry=registry
+                    )
                 )
             else:
                 duplicates = field.switching_field.duplicates
@@ -537,7 +562,11 @@ def infer_rel_schema(rel: stalg.Rel) -> stt.Type.Struct:
                     )
                 # All duplicates of a switching field share one type; the first
                 # determines the output column type.
-                field_types.append(infer_expression_type(duplicates[0], parent_schema))
+                field_types.append(
+                    infer_expression_type(
+                        duplicates[0], parent_schema, registry=registry
+                    )
+                )
         # Expand appends an i32 column with the index of the duplicate the row
         # is derived from.
         field_types.append(
@@ -550,27 +579,38 @@ def infer_rel_schema(rel: stalg.Rel) -> stt.Type.Struct:
     elif rel_type == "nested_loop_join":
         name = stalg.NestedLoopJoinRel.JoinType.Name(rel.nested_loop_join.type)
         raw_schema = _join_output_struct(
-            name, rel.nested_loop_join.left, rel.nested_loop_join.right
+            name,
+            rel.nested_loop_join.left,
+            rel.nested_loop_join.right,
+            registry=registry,
         )
         (common, struct) = (rel.nested_loop_join.common, raw_schema)
     elif rel_type == "hash_join":
         name = stalg.HashJoinRel.JoinType.Name(rel.hash_join.type)
-        raw_schema = _join_output_struct(name, rel.hash_join.left, rel.hash_join.right)
+        raw_schema = _join_output_struct(
+            name, rel.hash_join.left, rel.hash_join.right, registry=registry
+        )
         (common, struct) = (rel.hash_join.common, raw_schema)
     elif rel_type == "merge_join":
         name = stalg.MergeJoinRel.JoinType.Name(rel.merge_join.type)
         raw_schema = _join_output_struct(
-            name, rel.merge_join.left, rel.merge_join.right
+            name, rel.merge_join.left, rel.merge_join.right, registry=registry
         )
         (common, struct) = (rel.merge_join.common, raw_schema)
     elif rel_type == "exchange":
         # Exchange redistributes rows without changing the schema.
-        (common, struct) = (rel.exchange.common, infer_rel_schema(rel.exchange.input))
+        (common, struct) = (
+            rel.exchange.common,
+            infer_rel_schema(rel.exchange.input, registry=registry),
+        )
     elif rel_type == "top_n":
         # TopN is a fused sort+fetch; the schema is unchanged from the input.
-        (common, struct) = (rel.top_n.common, infer_rel_schema(rel.top_n.input))
+        (common, struct) = (
+            rel.top_n.common,
+            infer_rel_schema(rel.top_n.input, registry=registry),
+        )
     elif rel_type == "extension_leaf":
-        derived = _derive_extension_schema(rel.extension_leaf.detail, None)
+        derived = _derive_extension_schema(rel.extension_leaf.detail, None, registry)
         if derived is None:
             raise Exception(
                 "no schema deriver registered for extension leaf relation "
@@ -578,16 +618,22 @@ def infer_rel_schema(rel: stalg.Rel) -> stt.Type.Struct:
             )
         (common, struct) = (rel.extension_leaf.common, derived.struct)
     elif rel_type == "extension_single":
-        input_struct = infer_rel_schema(rel.extension_single.input)
-        derived = _derive_extension_schema(rel.extension_single.detail, input_struct)
+        input_struct = infer_rel_schema(rel.extension_single.input, registry=registry)
+        derived = _derive_extension_schema(
+            rel.extension_single.detail, input_struct, registry
+        )
         # Fall back to a pass-through schema when no deriver is registered.
         (common, struct) = (
             rel.extension_single.common,
             derived.struct if derived is not None else input_struct,
         )
     elif rel_type == "extension_multi":
-        input_structs = [infer_rel_schema(i) for i in rel.extension_multi.inputs]
-        derived = _derive_extension_schema(rel.extension_multi.detail, input_structs)
+        input_structs = [
+            infer_rel_schema(i, registry=registry) for i in rel.extension_multi.inputs
+        ]
+        derived = _derive_extension_schema(
+            rel.extension_multi.detail, input_structs, registry
+        )
         if derived is None:
             raise Exception(
                 "no schema deriver registered for extension multi relation "
@@ -608,7 +654,7 @@ def infer_rel_schema(rel: stalg.Rel) -> stt.Type.Struct:
         )
 
 
-def infer_plan_schema(plan: stp.Plan) -> stt.NamedStruct:
-    schema = infer_rel_schema(plan.relations[-1].root.input)
+def infer_plan_schema(plan: stp.Plan, *, registry=None) -> stt.NamedStruct:
+    schema = infer_rel_schema(plan.relations[-1].root.input, registry=registry)
 
     return stt.NamedStruct(names=plan.relations[-1].root.names, struct=schema)

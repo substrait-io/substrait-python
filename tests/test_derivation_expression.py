@@ -1,6 +1,9 @@
+import re
+
+import pytest
 from substrait.type_pb2 import NamedStruct, Type
 
-from substrait.derivation_expression import evaluate
+from substrait.derivation_expression import DerivationExpressionParseError, evaluate
 
 
 def test_simple_arithmetic():
@@ -146,7 +149,7 @@ def test_struct_simple():
 
 def test_nstruct_simple():
     """Test named struct with field names and types."""
-    result = evaluate("nStruct<a i32, b i32>", {})
+    result = evaluate("nStruct<a: i32, b: i32>", {})
     expected = NamedStruct(
         names=["a", "b"],
         struct=Type.Struct(
@@ -160,9 +163,33 @@ def test_nstruct_simple():
     assert result == expected
 
 
+@pytest.mark.parametrize(
+    "expression",
+    [
+        "decimal",
+        "interval_day",
+        "interval_compound",
+        "precision_time",
+        "precision_timestamp",
+        "precision_timestamp_tz",
+    ],
+)
+def test_parameterized_type_without_arguments_raises(expression):
+    """Precision-parameterized types used without their required arguments are
+    syntax errors and should raise a clear parse error, not fall through to the
+    confusing "Unknown token type <class 'NoneType'>" exception (see #216)."""
+    with pytest.raises(DerivationExpressionParseError, match=re.escape(expression)):
+        evaluate(expression)
+
+
+def test_invalid_syntax_raises():
+    with pytest.raises(DerivationExpressionParseError):
+        evaluate("i8 +")
+
+
 def test_nstruct_nested():
     """Test named struct with nested struct field."""
-    result = evaluate("nStruct<a i32, b i32, c struct<i32, fp32>>", {})
+    result = evaluate("nStruct<a: i32, b: i32, c: struct<i32, fp32>>", {})
     expected = NamedStruct(
         names=["a", "b", "c"],
         struct=Type.Struct(

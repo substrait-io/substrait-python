@@ -45,12 +45,51 @@ def _create_default_version():
 _create_default_version()
 
 
-def _merge_extensions(*objs):
-    """Merge extension URNs and declarations from multiple plan/expression objects."""
-    return {
+def _merge_plan_metadata(*objs):
+    """Collect the plan-level metadata a builder carries over from its inputs.
+
+    ``objs`` is a mix of input Plans and bound ExtendedExpressions. Extension
+    URNs and declarations are merged from all of them; the plan-level execution
+    behavior is carried over from the first input Plan that declares one
+    (expressions have no such field). Because every relational builder routes
+    its inputs through here, an execution behavior set anywhere upstream is
+    preserved on the freshly-constructed output Plan -- so it is order
+    independent across a pipeline rather than only surviving as the last step.
+    """
+    metadata = {
         "extension_urns": merge_extension_urns(*[b.extension_urns for b in objs if b]),
         "extensions": merge_extension_declarations(*[b.extensions for b in objs if b]),
     }
+    for b in objs:
+        if isinstance(b, stp.Plan) and b.HasField("execution_behavior"):
+            metadata["execution_behavior"] = b.execution_behavior
+            break
+    return metadata
+
+
+def with_execution_behavior(
+    plan: PlanOrUnbound,
+    variable_eval_mode: "stp.ExecutionBehavior.VariableEvaluationMode.ValueType",
+) -> UnboundPlan:
+    """Return a copy of ``plan`` with its plan-level execution behavior set.
+
+    ``variable_eval_mode`` controls how often execution context variables (such
+    as those from ``extended_expression.execution_context_variable``) are
+    evaluated: once per plan (``VARIABLE_EVALUATION_MODE_PER_PLAN``) or once per
+    record (``VARIABLE_EVALUATION_MODE_PER_RECORD``). The setting is carried over
+    by subsequent builders (see ``_merge_plan_metadata``), so it may be applied
+    at any point in a pipeline rather than only as the final step.
+    """
+
+    def resolve(registry: ExtensionRegistry) -> stp.Plan:
+        bound_plan = plan if isinstance(plan, stp.Plan) else plan(registry)
+
+        result = stp.Plan()
+        result.CopyFrom(bound_plan)
+        result.execution_behavior.variable_eval_mode = variable_eval_mode
+        return result
+
+    return resolve
 
 
 def read_named_table(
@@ -225,7 +264,7 @@ def project(
         return stp.Plan(
             version=default_version,
             relations=[stp.PlanRel(root=stalg.RelRoot(input=rel, names=names))],
-            **_merge_extensions(_plan, *bound_expressions),
+            **_merge_plan_metadata(_plan, *bound_expressions),
         )
 
     return resolve
@@ -281,7 +320,7 @@ def select(
         return stp.Plan(
             version=default_version,
             relations=[stp.PlanRel(root=stalg.RelRoot(input=rel, names=names))],
-            **_merge_extensions(_plan, *bound_expressions),
+            **_merge_plan_metadata(_plan, *bound_expressions),
         )
 
     return resolve
@@ -312,7 +351,7 @@ def filter(
         return stp.Plan(
             version=default_version,
             relations=[stp.PlanRel(root=stalg.RelRoot(input=rel, names=names))],
-            **_merge_extensions(bound_plan, bound_expression),
+            **_merge_plan_metadata(bound_plan, bound_expression),
         )
 
     return resolve
@@ -359,7 +398,7 @@ def sort(
         return stp.Plan(
             version=default_version,
             relations=[stp.PlanRel(root=stalg.RelRoot(input=rel, names=ns.names))],
-            **_merge_extensions(bound_plan, *[e[0] for e in bound_expressions]),
+            **_merge_plan_metadata(bound_plan, *[e[0] for e in bound_expressions]),
         )
 
     return resolve
@@ -383,7 +422,7 @@ def set(inputs: Iterable[PlanOrUnbound], op: stalg.SetRel.SetOp) -> UnboundPlan:
                     )
                 )
             ],
-            **_merge_extensions(*bound_inputs),
+            **_merge_plan_metadata(*bound_inputs),
         )
 
     return resolve
@@ -427,7 +466,7 @@ def fetch(
                     )
                 )
             ],
-            **_merge_extensions(bound_plan, bound_offset, bound_count),
+            **_merge_plan_metadata(bound_plan, bound_offset, bound_count),
         )
 
     return resolve
@@ -486,7 +525,9 @@ def join(
         return stp.Plan(
             version=default_version,
             relations=[stp.PlanRel(root=stalg.RelRoot(input=rel, names=out_names))],
-            **_merge_extensions(bound_left, bound_right, bound_expression, bound_post),
+            **_merge_plan_metadata(
+                bound_left, bound_right, bound_expression, bound_post
+            ),
         )
 
     return resolve
@@ -522,7 +563,7 @@ def cross(
         return stp.Plan(
             version=default_version,
             relations=[stp.PlanRel(root=stalg.RelRoot(input=rel, names=ns.names))],
-            **_merge_extensions(bound_left, bound_right),
+            **_merge_plan_metadata(bound_left, bound_right),
         )
 
     return resolve
@@ -598,7 +639,7 @@ def aggregate(
         return stp.Plan(
             version=default_version,
             relations=[stp.PlanRel(root=stalg.RelRoot(input=rel, names=names))],
-            **_merge_extensions(
+            **_merge_plan_metadata(
                 bound_input,
                 *bound_grouping_expressions,
                 *bound_measures,
@@ -639,7 +680,7 @@ def write_named_table(
             relations=[
                 stp.PlanRel(root=stalg.RelRoot(input=write_rel, names=ns.names))
             ],
-            **_merge_extensions(bound_input),
+            **_merge_plan_metadata(bound_input),
         )
 
     return resolve
@@ -689,7 +730,7 @@ def ddl(
         return stp.Plan(
             version=default_version,
             relations=[stp.PlanRel(root=stalg.RelRoot(input=ddl_rel, names=out_names))],
-            **_merge_extensions(*merge_sources),
+            **_merge_plan_metadata(*merge_sources),
         )
 
     return resolve
@@ -744,7 +785,7 @@ def update(
                     )
                 )
             ],
-            **_merge_extensions(*merge_sources),
+            **_merge_plan_metadata(*merge_sources),
         )
 
     return resolve
@@ -833,7 +874,7 @@ def consistent_partition_window(
         return stp.Plan(
             version=default_version,
             relations=[stp.PlanRel(root=stalg.RelRoot(input=rel, names=names))],
-            **_merge_extensions(
+            **_merge_plan_metadata(
                 bound_plan,
                 *bound_partitions,
                 *[e[0] for e in bound_sorts],
@@ -892,7 +933,7 @@ def expand(
         return stp.Plan(
             version=default_version,
             relations=[stp.PlanRel(root=stalg.RelRoot(input=rel, names=list(names)))],
-            **_merge_extensions(*merge_sources),
+            **_merge_plan_metadata(*merge_sources),
         )
 
     return resolve
@@ -939,7 +980,7 @@ def nested_loop_join(
         return stp.Plan(
             version=default_version,
             relations=[stp.PlanRel(root=stalg.RelRoot(input=rel, names=out_names))],
-            **_merge_extensions(bound_left, bound_right, bound_expression),
+            **_merge_plan_metadata(bound_left, bound_right, bound_expression),
         )
 
     return resolve
@@ -1009,7 +1050,7 @@ def _physical_equi_join(rel_name, rel_cls):
             return stp.Plan(
                 version=default_version,
                 relations=[stp.PlanRel(root=stalg.RelRoot(input=rel, names=names))],
-                **_merge_extensions(bound_left, bound_right),
+                **_merge_plan_metadata(bound_left, bound_right),
             )
 
         return resolve
@@ -1073,7 +1114,7 @@ def extension_single(plan: PlanOrUnbound, detail) -> UnboundPlan:
         return stp.Plan(
             version=default_version,
             relations=[stp.PlanRel(root=stalg.RelRoot(input=rel, names=names))],
-            **_merge_extensions(bound_plan),
+            **_merge_plan_metadata(bound_plan),
         )
 
     return resolve
@@ -1097,7 +1138,7 @@ def extension_multi(inputs: Iterable[PlanOrUnbound], detail) -> UnboundPlan:
         return stp.Plan(
             version=default_version,
             relations=[stp.PlanRel(root=stalg.RelRoot(input=rel, names=names))],
-            **_merge_extensions(*bound_inputs),
+            **_merge_plan_metadata(*bound_inputs),
         )
 
     return resolve
@@ -1137,7 +1178,7 @@ def exchange(
                     )
                 )
             ],
-            **_merge_extensions(bound_plan),
+            **_merge_plan_metadata(bound_plan),
         )
 
     return resolve
@@ -1198,7 +1239,7 @@ def top_n(
                     )
                 )
             ],
-            **_merge_extensions(
+            **_merge_plan_metadata(
                 bound_plan,
                 *[s for s, _ in bound_sorts],
                 bound_count,

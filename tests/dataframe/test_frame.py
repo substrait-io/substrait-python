@@ -20,8 +20,10 @@ from substrait.builders.plan import cross as b_cross
 from substrait.builders.plan import extension_table as b_extension_table
 from substrait.builders.plan import fetch as b_fetch
 from substrait.builders.plan import filter as b_filter
+from substrait.builders.plan import hash_join as b_hash_join
 from substrait.builders.plan import join as b_join
 from substrait.builders.plan import local_files as b_local_files
+from substrait.builders.plan import merge_join as b_merge_join
 from substrait.builders.plan import read_named_table as b_read
 from substrait.builders.plan import select as b_select
 from substrait.builders.plan import set as b_set
@@ -984,6 +986,73 @@ def test_merge_join_default_right_on():
     mj = left.merge_join(right, "id").to_plan().relations[-1].root.input.merge_join
     assert mj.type == stalg.MergeJoinRel.JOIN_TYPE_INNER
     assert len(mj.keys) == 1
+
+
+def _equi_join_tables():
+    left_ns = named_struct(
+        names=["cust_id", "name"],
+        struct=struct(types=[i64(), string()], nullable=False),
+    )
+    right_ns = named_struct(
+        names=["order_id", "cust_ref", "amount"],
+        struct=struct(types=[i64(), i64(), fp64()], nullable=False),
+    )
+    left = sub.read_named_table("customers", {"cust_id": sub.i64, "name": sub.string})
+    right = sub.read_named_table(
+        "orders", {"order_id": sub.i64, "cust_ref": sub.i64, "amount": sub.fp64}
+    )
+    return left, right, left_ns, right_ns
+
+
+# "amount" is a right column; for right_semi the fluent and raw pipelines route
+# through the same builder, so this checks the DataFrame layer forwards
+# post_filter/residual correctly regardless of join type.
+@pytest.mark.parametrize("how", ["inner", "right_semi"])
+@pytest.mark.parametrize(
+    "method, b_builder, rel_cls",
+    [
+        ("hash_join", b_hash_join, stalg.HashJoinRel),
+        ("merge_join", b_merge_join, stalg.MergeJoinRel),
+    ],
+)
+def test_equi_join_post_filter_and_residual_match_builder(
+    method, b_builder, rel_cls, how
+):
+    left, right, left_ns, right_ns = _equi_join_tables()
+    fluent = getattr(left, method)(
+        right,
+        "cust_id",
+        "cust_ref",
+        how=how,
+        post_filter=sub.col("amount") > 100.0,
+        residual=sub.col("amount") > 50.0,
+    ).to_plan()
+    raw = b_builder(
+        b_read("customers", left_ns),
+        b_read("orders", right_ns),
+        ["cust_id"],
+        ["cust_ref"],
+        getattr(rel_cls, "JOIN_TYPE_" + how.upper()),
+        post_join_filter=scalar_function(
+            COMPARISON, "gt", expressions=[column("amount"), literal(100.0, fp64())]
+        ),
+        residual_expression=scalar_function(
+            COMPARISON, "gt", expressions=[column("amount"), literal(50.0, fp64())]
+        ),
+    )(registry)
+    assert fluent.SerializeToString() == raw.SerializeToString()
+
+
+def test_hash_join_without_predicates_leaves_them_unset():
+    left, right, _, _ = _equi_join_tables()
+    hj = (
+        left.hash_join(right, "cust_id", "cust_ref")
+        .to_plan()
+        .relations[-1]
+        .root.input.hash_join
+    )
+    assert not hj.HasField("post_join_filter")
+    assert not hj.HasField("residual_expression")
 
 
 def test_dynamic_parameter():

@@ -6,6 +6,7 @@ byte-identical protobuf output.
 
 import pytest
 import substrait.algebra_pb2 as stalg
+import substrait.plan_pb2 as stp
 
 import substrait.dataframe as sub
 from substrait.builders.extended_expression import (
@@ -1345,3 +1346,79 @@ def test_drop_unknown_column_raises():
 def test_drop_all_columns_raises():
     with pytest.raises(ValueError, match="every column"):
         people_df().drop("id", "age", "name").to_plan()
+
+
+# -- Execution behavior (Plan.execution_behavior) -------------------------
+
+
+@pytest.mark.parametrize(
+    "mode, expected",
+    [
+        ("per_plan", stp.ExecutionBehavior.VARIABLE_EVALUATION_MODE_PER_PLAN),
+        ("per_record", stp.ExecutionBehavior.VARIABLE_EVALUATION_MODE_PER_RECORD),
+    ],
+)
+def test_with_execution_behavior(mode, expected):
+    plan = (
+        sub.read_named_table("t", {"id": sub.i64})
+        .with_execution_behavior(mode)
+        .to_plan()
+    )
+    assert plan.execution_behavior.variable_eval_mode == expected
+
+
+def test_execution_behavior_preserved_through_later_ops():
+    # Set it first, then keep building -- the setting must survive downstream ops.
+    plan = (
+        sub.read_named_table("t", {"id": sub.i64, "age": sub.i64})
+        .with_execution_behavior("per_record")
+        .filter(sub.col("age") > 25)
+        .select("id")
+        .to_plan()
+    )
+    assert (
+        plan.execution_behavior.variable_eval_mode
+        == stp.ExecutionBehavior.VARIABLE_EVALUATION_MODE_PER_RECORD
+    )
+
+
+def test_execution_behavior_set_mid_chain():
+    # Applying it in the middle of a chain is equivalent -- it is order independent.
+    plan = (
+        sub.read_named_table("t", {"id": sub.i64, "age": sub.i64})
+        .filter(sub.col("age") > 25)
+        .with_execution_behavior("per_plan")
+        .select("id")
+        .to_plan()
+    )
+    assert (
+        plan.execution_behavior.variable_eval_mode
+        == stp.ExecutionBehavior.VARIABLE_EVALUATION_MODE_PER_PLAN
+    )
+
+
+def test_execution_behavior_unset_by_default():
+    plan = sub.read_named_table("t", {"id": sub.i64}).to_plan()
+    assert not plan.HasField("execution_behavior")
+
+
+def test_with_execution_behavior_invalid_mode():
+    with pytest.raises(ValueError, match="unknown execution behavior mode 'nonsense'"):
+        sub.read_named_table("t", {"id": sub.i64}).with_execution_behavior("nonsense")
+
+
+def test_execution_behavior_with_context_variable_end_to_end():
+    # The common pairing: a per-record execution behavior alongside a
+    # current_timestamp execution context variable.
+    plan = (
+        sub.read_named_table("t", {"id": sub.i64})
+        .with_columns(now=sub.current_timestamp())
+        .with_execution_behavior("per_record")
+        .to_plan()
+    )
+    assert (
+        plan.execution_behavior.variable_eval_mode
+        == stp.ExecutionBehavior.VARIABLE_EVALUATION_MODE_PER_RECORD
+    )
+    projected = plan.relations[-1].root.input.project.expressions[0]
+    assert projected.WhichOneof("rex_type") == "execution_context_variable"

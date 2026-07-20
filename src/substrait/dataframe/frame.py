@@ -32,6 +32,7 @@ from itertools import combinations
 from typing import Any, Iterable, Optional, Union
 
 import substrait.algebra_pb2 as stalg
+import substrait.plan_pb2 as stplan
 import substrait.type_pb2 as stp
 
 from substrait.builders import plan as _plan
@@ -80,6 +81,12 @@ _SORT_DIRECTIONS = {
     (False, True): stalg.SortField.SORT_DIRECTION_ASC_NULLS_LAST,
     (True, False): stalg.SortField.SORT_DIRECTION_DESC_NULLS_FIRST,
     (True, True): stalg.SortField.SORT_DIRECTION_DESC_NULLS_LAST,
+}
+
+# How often execution context variables (current_timestamp, ...) are evaluated.
+_VARIABLE_EVAL_MODES = {
+    "per_plan": stplan.ExecutionBehavior.VARIABLE_EVALUATION_MODE_PER_PLAN,
+    "per_record": stplan.ExecutionBehavior.VARIABLE_EVALUATION_MODE_PER_RECORD,
 }
 
 
@@ -515,6 +522,24 @@ class DataFrame:
             return bound
 
         return self._next(resolve)
+
+    def with_execution_behavior(self, variable_eval_mode: str) -> "DataFrame":
+        """Set how often execution context variables are evaluated (plan-level).
+
+        ``variable_eval_mode`` is ``"per_plan"`` (evaluate once for the whole
+        plan) or ``"per_record"`` (evaluate once per record), controlling
+        variables such as :func:`substrait.dataframe.current_timestamp`. The
+        setting is carried across subsequent operations, so it may be applied at
+        any point in the chain.
+        """
+        try:
+            eval_mode = _VARIABLE_EVAL_MODES[variable_eval_mode]
+        except KeyError:
+            raise ValueError(
+                f"unknown execution behavior mode {variable_eval_mode!r}; "
+                f"expected one of {sorted(_VARIABLE_EVAL_MODES)}"
+            ) from None
+        return self._next(_plan.with_execution_behavior(self._plan, eval_mode))
 
     def union(self, *others: "DataFrame", distinct: bool = False) -> "DataFrame":
         """Concatenate rows of this DataFrame with ``others``.

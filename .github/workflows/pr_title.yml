@@ -1,19 +1,22 @@
 name: PR Title Check
 
 on:
-  # Only the PR title and description are validated, and neither changes on a
-  # push (synchronize). Including synchronize caused a race: a Dependabot rebase
-  # force-pushes and edits the PR body at the same time, firing synchronize and
-  # edited together. Both land in the same concurrency group, so one run is
-  # cancelled, leaving a cancelled check-run on the head commit that fails the
-  # status rollup.
+  # synchronize is required even though a push changes neither the title nor the
+  # description: "PR title / description conforms to semantic-release" is a
+  # required status check, and GitHub keys required checks to the head commit.
+  # Without synchronize, pushing a new commit strands the check on the previous
+  # commit and blocks the PR indefinitely.
   pull_request_target:
-    types: [opened, edited, reopened]
+    types: [opened, edited, synchronize, reopened]
 
-# Most recent PR change supersedes previous changes.
+# Serialize runs for the same PR so the comment job can't race with itself, but
+# never cancel in progress: a Dependabot rebase force-pushes and edits the PR
+# body at once, firing synchronize and edited on the same commit. Cancelling one
+# leaves a cancelled check-run on the head commit that fails the status rollup
+# (#198). Letting both finish yields two harmless successes instead.
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 # Default to the minimum read-only token for all jobs.
 permissions:

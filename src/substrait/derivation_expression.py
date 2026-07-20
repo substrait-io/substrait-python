@@ -2,9 +2,35 @@ import operator
 from typing import Optional
 
 from antlr4 import CommonTokenStream, InputStream
+from antlr4.error.ErrorListener import ErrorListener
 from substrait.type_pb2 import NamedStruct, Type
 from substrait_antlr.substrait_type.SubstraitTypeLexer import SubstraitTypeLexer
 from substrait_antlr.substrait_type.SubstraitTypeParser import SubstraitTypeParser
+
+
+class DerivationExpressionParseError(Exception):
+    """Raised when a derivation expression cannot be parsed."""
+
+
+class _RaisingErrorListener(ErrorListener):
+    """ANTLR error listener that raises instead of recovering.
+
+    ANTLR's default behaviour on a syntax error is to print a warning to
+    stderr and continue with a partial (possibly ``None``-containing) parse
+    tree.  We want the parse to fail loudly with a message naming the offending
+    input instead.
+    """
+
+    def __init__(self, expression: str):
+        super().__init__()
+        self._expression = expression
+
+    def syntaxError(self, recognizer, offendingSymbol, line, column, msg, e):
+        raise DerivationExpressionParseError(
+            f"Could not parse derivation expression {self._expression!r} "
+            f"at line {line}:{column}: {msg}"
+        ) from e
+
 
 # Binary operators keyed by the token text the grammar attaches to `op`.
 # (Integer division: type parameters like precision/scale are integers.)
@@ -245,9 +271,18 @@ def _evaluate(x, values: dict):
 
 
 def _parse(x: str):
+    error_listener = _RaisingErrorListener(x)
+
     lexer = SubstraitTypeLexer(InputStream(x))
+    lexer.removeErrorListeners()
+    lexer.addErrorListener(error_listener)
+
     stream = CommonTokenStream(lexer)
+
     parser = SubstraitTypeParser(stream)
+    parser.removeErrorListeners()
+    parser.addErrorListener(error_listener)
+
     return parser.expr()
 
 

@@ -345,6 +345,169 @@ def test_inference_join_left_mark():
     assert infer_rel_schema(rel) == expected
 
 
+def test_inference_lateral_join_inner():
+    # A lateral join emits the same columns as the equivalent JoinRel; only the
+    # right input's evaluation semantics differ.
+    rel = stalg.Rel(
+        lateral_join=stalg.LateralJoinRel(
+            left=read_rel,
+            right=right_read_rel,
+            type=stalg.JoinRel.JOIN_TYPE_INNER,
+        )
+    )
+
+    expected = stt.Type.Struct(
+        types=[
+            stt.Type(i64=stt.Type.I64(nullability=stt.Type.NULLABILITY_REQUIRED)),
+            stt.Type(string=stt.Type.String(nullability=stt.Type.NULLABILITY_NULLABLE)),
+            stt.Type(fp32=stt.Type.FP32(nullability=stt.Type.NULLABILITY_NULLABLE)),
+            stt.Type(i64=stt.Type.I64(nullability=stt.Type.NULLABILITY_REQUIRED)),
+            stt.Type(bool=stt.Type.Boolean(nullability=stt.Type.NULLABILITY_NULLABLE)),
+        ],
+        nullability=stt.Type.Nullability.NULLABILITY_REQUIRED,
+    )
+
+    assert infer_rel_schema(rel) == expected
+
+
+def test_inference_lateral_join_left_semi():
+    # Left-oriented semi/anti joins drop the right side, just like JoinRel.
+    rel = stalg.Rel(
+        lateral_join=stalg.LateralJoinRel(
+            left=read_rel,
+            right=right_read_rel,
+            type=stalg.JoinRel.JOIN_TYPE_LEFT_SEMI,
+        )
+    )
+
+    expected = stt.Type.Struct(
+        types=[
+            stt.Type(i64=stt.Type.I64(nullability=stt.Type.NULLABILITY_REQUIRED)),
+            stt.Type(string=stt.Type.String(nullability=stt.Type.NULLABILITY_NULLABLE)),
+            stt.Type(fp32=stt.Type.FP32(nullability=stt.Type.NULLABILITY_NULLABLE)),
+        ],
+        nullability=stt.Type.Nullability.NULLABILITY_REQUIRED,
+    )
+
+    assert infer_rel_schema(rel) == expected
+
+
+def test_inference_lateral_join_left_mark():
+    # Left-mark joins append a nullable boolean marker column.
+    rel = stalg.Rel(
+        lateral_join=stalg.LateralJoinRel(
+            left=read_rel,
+            right=right_read_rel,
+            type=stalg.JoinRel.JOIN_TYPE_LEFT_MARK,
+        )
+    )
+
+    expected = stt.Type.Struct(
+        types=[
+            stt.Type(i64=stt.Type.I64(nullability=stt.Type.NULLABILITY_REQUIRED)),
+            stt.Type(string=stt.Type.String(nullability=stt.Type.NULLABILITY_NULLABLE)),
+            stt.Type(fp32=stt.Type.FP32(nullability=stt.Type.NULLABILITY_NULLABLE)),
+            stt.Type(i64=stt.Type.I64(nullability=stt.Type.NULLABILITY_REQUIRED)),
+            stt.Type(bool=stt.Type.Boolean(nullability=stt.Type.NULLABILITY_NULLABLE)),
+            stt.Type(bool=stt.Type.Boolean(nullability=stt.Type.NULLABILITY_NULLABLE)),
+        ],
+        nullability=stt.Type.Nullability.NULLABILITY_REQUIRED,
+    )
+
+    assert infer_rel_schema(rel) == expected
+
+
+def _outer_rel_reference(anchor: int, field: int) -> stalg.Expression:
+    """An OuterReference resolved by id: rel_reference -> the given rel_anchor,
+    selecting the struct field at ``field``."""
+    return stalg.Expression(
+        selection=stalg.Expression.FieldReference(
+            outer_reference=stalg.Expression.FieldReference.OuterReference(
+                rel_reference=anchor
+            ),
+            direct_reference=stalg.Expression.ReferenceSegment(
+                struct_field=stalg.Expression.ReferenceSegment.StructField(field=field)
+            ),
+        )
+    )
+
+
+def test_inference_lateral_join_correlated_rel_reference():
+    # The right (dependent) input references the current left row via an
+    # OuterReference.rel_reference pointing to the lateral join's rel_anchor.
+    # Inference must resolve that against the left schema registered under the
+    # anchor. Here the right input projects the left's first column (i64) on top
+    # of its own columns.
+    anchor = 7
+    correlated_right = stalg.Rel(
+        project=stalg.ProjectRel(
+            input=right_read_rel,
+            expressions=[_outer_rel_reference(anchor, 0)],
+        )
+    )
+    rel = stalg.Rel(
+        lateral_join=stalg.LateralJoinRel(
+            common=stalg.RelCommon(rel_anchor=anchor),
+            left=read_rel,
+            right=correlated_right,
+            type=stalg.JoinRel.JOIN_TYPE_INNER,
+        )
+    )
+
+    expected = stt.Type.Struct(
+        types=[
+            # left columns
+            stt.Type(i64=stt.Type.I64(nullability=stt.Type.NULLABILITY_REQUIRED)),
+            stt.Type(string=stt.Type.String(nullability=stt.Type.NULLABILITY_NULLABLE)),
+            stt.Type(fp32=stt.Type.FP32(nullability=stt.Type.NULLABILITY_NULLABLE)),
+            # right columns
+            stt.Type(i64=stt.Type.I64(nullability=stt.Type.NULLABILITY_REQUIRED)),
+            stt.Type(bool=stt.Type.Boolean(nullability=stt.Type.NULLABILITY_NULLABLE)),
+            # right's projected OuterReference to the left's first column (i64)
+            stt.Type(i64=stt.Type.I64(nullability=stt.Type.NULLABILITY_REQUIRED)),
+        ],
+        nullability=stt.Type.Nullability.NULLABILITY_REQUIRED,
+    )
+
+    assert infer_rel_schema(rel) == expected
+
+
+def test_inference_lateral_join_unknown_rel_anchor_raises():
+    # A rel_reference that does not match the (only) enclosing lateral join's
+    # rel_anchor cannot be resolved.
+    correlated_right = stalg.Rel(
+        project=stalg.ProjectRel(
+            input=right_read_rel,
+            expressions=[_outer_rel_reference(99, 0)],
+        )
+    )
+    rel = stalg.Rel(
+        lateral_join=stalg.LateralJoinRel(
+            common=stalg.RelCommon(rel_anchor=7),
+            left=read_rel,
+            right=correlated_right,
+            type=stalg.JoinRel.JOIN_TYPE_INNER,
+        )
+    )
+
+    with pytest.raises(Exception, match="unknown rel_anchor 99"):
+        infer_rel_schema(rel)
+
+
+def test_infer_expression_type_rel_reference_resolves_against_anchor():
+    # infer_expression_type resolves an id-based OuterReference against the schema
+    # bound to the matching rel_anchor in the current anchor scope.
+    from substrait.type_inference import _outer_anchor_binding
+
+    # rel_anchor 5 -> `struct` ([i64, string, fp32]); field 1 is the string.
+    with _outer_anchor_binding(5, struct):
+        result = infer_expression_type(_outer_rel_reference(5, 1), right_struct)
+
+    assert result == stt.Type(
+        string=stt.Type.String(nullability=stt.Type.NULLABILITY_NULLABLE)
+    )
+
+
 def test_infer_expression_type_literal():
     """Test infer_expression_type with a literal expression."""
     expr = stalg.Expression(literal=stalg.Expression.Literal(i64=42, nullable=False))

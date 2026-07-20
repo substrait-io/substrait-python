@@ -1,4 +1,6 @@
 import calendar
+import contextlib
+import contextvars
 import itertools
 import uuid as uuid_module
 from datetime import date, datetime, time, timedelta, timezone
@@ -19,6 +21,33 @@ from substrait.utils import (
     plan_subtrees,
     type_num_names,
 )
+
+# Monotonic source of unique RelCommon.rel_anchor values within a single build.
+# Not reset between builds by default; reset at each top-level materialization
+# (see fresh_rel_anchors) so a plan built the same way twice numbers alike.
+_rel_anchor_counter: contextvars.ContextVar = contextvars.ContextVar(
+    "_rel_anchor_counter", default=0
+)
+
+
+def next_rel_anchor() -> int:
+    """Allocate a fresh RelCommon.rel_anchor, unique within the current build."""
+    n = _rel_anchor_counter.get() + 1
+    _rel_anchor_counter.set(n)
+    return n
+
+
+@contextlib.contextmanager
+def fresh_rel_anchors():
+    """Number rel_anchors from 1 within this block, restoring the prior counter
+    afterwards. Wrap a top-level materialization so repeated builds of the same
+    plan assign identical anchors."""
+    token = _rel_anchor_counter.set(0)
+    try:
+        yield
+    finally:
+        _rel_anchor_counter.reset(token)
+
 
 UnboundExtendedExpression = Callable[
     [stp.NamedStruct, ExtensionRegistry], stee.ExtendedExpression
@@ -402,6 +431,52 @@ def outer_reference(field: Union[str, int], steps_out: int = 1):
         )
 
     return resolve
+
+
+class LateralInput:
+    """A handle to a lateral join's left input, passed to the ``right`` builder
+    by :func:`~substrait.builders.plan.lateral_join`.
+
+    Its :meth:`column` references resolve against the left row via an id-based
+    ``OuterReference`` (``rel_reference`` naming the join's
+    ``RelCommon.rel_anchor``), so the right (dependent) input can correlate on
+    the current left row by capturing the handle -- no nesting-depth bookkeeping.
+    """
+
+    def __init__(self, rel_anchor: int, schema: stp.NamedStruct):
+        self._rel_anchor = rel_anchor
+        self._schema = schema
+
+    def column(self, field: Union[str, int]):
+        """A correlated reference to the left row's ``field`` (name or index)."""
+        rel_anchor = self._rel_anchor
+        schema = self._schema
+
+        def resolve(
+            base_schema: stp.NamedStruct, registry: ExtensionRegistry
+        ) -> stee.ExtendedExpression:
+            # Resolve the column against the left schema, then re-root it as an
+            # id-based outer reference (keeping the resolved struct-field segment).
+            resolved = column(field)(schema, registry).referred_expr[0]
+            segment = resolved.expression.selection.direct_reference
+            expr = stalg.Expression(
+                selection=stalg.Expression.FieldReference(
+                    outer_reference=stalg.Expression.FieldReference.OuterReference(
+                        rel_reference=rel_anchor
+                    ),
+                    direct_reference=segment,
+                )
+            )
+            return stee.ExtendedExpression(
+                referred_expr=[
+                    stee.ExpressionReference(
+                        expression=expr, output_names=resolved.output_names
+                    )
+                ],
+                base_schema=base_schema,
+            )
+
+        return resolve
 
 
 def column(field: Union[str, int], alias: Union[Iterable[str], str, None] = None):

@@ -424,6 +424,44 @@ def test_convert_reducing_join_condition_left_as_steps_out():
     assert ref.steps_out == 1
 
 
+def _lateral_join(
+    left: stalg.Rel,
+    right: stalg.Rel,
+    *,
+    rel_anchor: int,
+    type=stalg.JoinRel.JOIN_TYPE_INNER,
+) -> stalg.Rel:
+    return stalg.Rel(
+        lateral_join=stalg.LateralJoinRel(
+            common=stalg.RelCommon(rel_anchor=rel_anchor),
+            left=left,
+            right=right,
+            type=type,
+        )
+    )
+
+
+def test_convert_correlation_above_lateral_join_left_as_steps_out():
+    # A LateralJoinRel's rel_anchor is reserved (per the Substrait spec) for its
+    # right input's reference to the current *left* row, so it does not name the
+    # join's output row. A correlation stacked above the lateral join (into its
+    # output) must not reuse that anchor -- doing so would alias the left-row anchor
+    # and corrupt any reference beyond the left columns. Such a reference is left
+    # offset-based (still spec-valid), like a reducing join's condition.
+    lj = _lateral_join(_read("l", ncols=2), _read("r", ncols=2), rel_anchor=5)
+    plan = _plan(_filter(lj, _exists(_filter(_read("i"), _outer(1, field=3)))))
+    out = to_id_based_outer_references(plan)
+
+    top = out.relations[-1].root.input
+    ref = top.filter.condition.subquery.set_predicate.tuples.filter.condition.selection.outer_reference
+    assert ref.WhichOneof("outer_reference_type") == "steps_out"
+    assert ref.steps_out == 1
+    # The lateral join keeps its own (left-row) anchor; no new anchor is minted for
+    # the un-rewritable correlation.
+    assert rel_anchor_of(top.filter.input) == 5
+    assert {a for r in iter_plan_rels(out) if (a := rel_anchor_of(r))} == {5}
+
+
 def test_convert_binding_without_rel_common_raises():
     # A binding relation that carries no RelCommon at all (an UpdateRel) cannot hold
     # an anchor. No correlated-subquery shape produces this, but the converter

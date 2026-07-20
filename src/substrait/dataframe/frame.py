@@ -29,7 +29,7 @@ native frame; the two layers compose rather than compete.
 from __future__ import annotations
 
 from itertools import combinations
-from typing import Any, Iterable, Optional, Union
+from typing import Any, Callable, Iterable, Optional, Union
 
 import substrait.algebra_pb2 as stalg
 import substrait.plan_pb2 as stplan
@@ -37,6 +37,7 @@ import substrait.type_pb2 as stp
 
 from substrait.builders import plan as _plan
 from substrait.builders import type as _type
+from substrait.builders.extended_expression import LateralInput, fresh_rel_anchors
 from substrait.dataframe.expr import Expr, Measure, col, lit, sort_direction
 from substrait.extension_registry import ExtensionRegistry
 from substrait.type_inference import infer_plan_schema
@@ -58,6 +59,20 @@ _JOIN_TYPES = {
     "right_single": stalg.JoinRel.JOIN_TYPE_RIGHT_SINGLE,
     "left_mark": stalg.JoinRel.JOIN_TYPE_LEFT_MARK,
     "right_mark": stalg.JoinRel.JOIN_TYPE_RIGHT_MARK,
+}
+
+# Lateral joins evaluate the right input per left row, so only INNER and
+# left-oriented join types are valid (RIGHT-oriented and OUTER have no meaning).
+_LATERAL_JOIN_TYPES = {
+    how: _JOIN_TYPES[how]
+    for how in (
+        "inner",
+        "left",
+        "left_semi",
+        "left_anti",
+        "left_single",
+        "left_mark",
+    )
 }
 
 # Write create-modes: what to do when the target table already exists.
@@ -157,6 +172,26 @@ def _unbound(value: Any):
     if isinstance(value, str):
         return col(value).unbound
     return value  # assume already an unbound expression callable
+
+
+class LateralLeft:
+    """Handle to a lateral join's left input, passed to the ``right`` builder of
+    :meth:`DataFrame.lateral_join`.
+
+    Its columns are correlated references to the current left row (an id-based
+    ``OuterReference``), so the right frame can be built as a function of the
+    left without counting nesting levels.
+    """
+
+    def __init__(self, handle: LateralInput):
+        self._handle = handle
+
+    def col(self, name: Union[str, int]) -> Expr:
+        """A correlated reference to the left row's column ``name`` (or index)."""
+        return Expr(self._handle.column(name))
+
+    def __getitem__(self, name: Union[str, int]) -> Expr:
+        return self.col(name)
 
 
 class DataFrame:
@@ -388,6 +423,53 @@ class DataFrame:
         """Cartesian product with ``other`` (every left row paired with every
         right row)."""
         return self._next(_plan.cross(self._plan, other._plan))
+
+    def lateral_join(
+        self,
+        right: "Callable[[LateralLeft], DataFrame]",
+        how: str = "inner",
+        *,
+        on: Union[Expr, Any, None] = None,
+        post_filter: Union[Expr, Any, None] = None,
+    ) -> "DataFrame":
+        """Lateral join: evaluate the right frame once per row of this frame.
+
+        ``right`` is a function of a :class:`LateralLeft` handle to this frame;
+        use ``left.col(...)`` inside it to correlate on the current left row::
+
+            left.lateral_join(lambda lat: inner.filter(sub.col("k") == lat.col("k")))
+
+        Capturing the handle avoids counting nesting levels -- an inner lateral
+        join can reference an outer one via its own handle.
+
+        ``on`` is an optional match condition over the combined left+right
+        schema. Only ``inner`` and left-oriented join types are valid for
+        lateral joins: ``inner``, ``left``, ``left_semi``, ``left_anti``,
+        ``left_single``, ``left_mark``. ``post_filter`` is an optional predicate
+        applied to the join output.
+        """
+        try:
+            join_type = _LATERAL_JOIN_TYPES[how]
+        except KeyError:
+            raise ValueError(
+                f"unknown lateral join type {how!r}; expected one of "
+                f"{sorted(_LATERAL_JOIN_TYPES)}"
+            ) from None
+
+        def build_right(handle: LateralInput):
+            return right(LateralLeft(handle))._plan
+
+        return self._next(
+            _plan.lateral_join(
+                self._plan,
+                build_right,
+                type=join_type,
+                expression=_unbound(on) if on is not None else None,
+                post_join_filter=(
+                    _unbound(post_filter) if post_filter is not None else None
+                ),
+            )
+        )
 
     def nested_loop_join(
         self, other: "DataFrame", on: Union[Expr, Any], how: str = "inner"
@@ -718,9 +800,14 @@ class DataFrame:
 
     def _finalize(self, registry: Optional[ExtensionRegistry]) -> stplan.Plan:
         """Build the plan and normalize it for output. The DataFrame layer emits
-        correlated (outer) references in the id-based form (``rel_reference``), so
-        any offset-based ``steps_out`` the builders produced is rewritten here."""
-        return to_id_based_outer_references(self._plan(registry))
+        correlated (outer) references in the id-based form (``rel_reference``): a
+        lateral join's builder assigns them directly, and any offset-based
+        ``steps_out`` a correlated subquery produced is rewritten here. Building
+        under ``fresh_rel_anchors`` numbers lateral-join anchors from 1 per
+        materialization, so building the same frame twice yields identical plans."""
+        with fresh_rel_anchors():
+            plan = self._plan(registry)
+        return to_id_based_outer_references(plan)
 
     def to_plan(self) -> stplan.Plan:
         """Materialize to a ``substrait.proto.Plan``."""

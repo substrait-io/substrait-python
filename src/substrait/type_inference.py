@@ -215,12 +215,19 @@ def infer_expression_type(
         # the lambda's parameter struct; otherwise against the input row.
         if root_type == "outer_reference":
             stack = outer_schemas.get()
+            # steps_out is 1-based per the Substrait spec (1 = the immediately
+            # enclosing query), so it indexes back from the top of the stack.
             steps = expression.selection.outer_reference.steps_out
-            if steps >= len(stack):
+            if steps < 1:
+                raise Exception(
+                    f"outer reference has steps_out={steps}; Substrait requires "
+                    "steps_out >= 1 (1 = the immediately enclosing query)"
+                )
+            if steps > len(stack):
                 raise Exception(
                     "outer reference outside an enclosing (correlated) query"
                 )
-            schema = stack[len(stack) - 1 - steps].struct
+            schema = stack[len(stack) - steps].struct
         else:
             assert root_type in ("root_reference", "lambda_parameter_reference")
             schema = parent_schema

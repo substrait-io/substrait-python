@@ -523,20 +523,20 @@ class DataFrame:
 
         return self._next(resolve)
 
-    def with_execution_behavior(self, mode: str) -> "DataFrame":
+    def with_execution_behavior(self, variable_eval_mode: str) -> "DataFrame":
         """Set how often execution context variables are evaluated (plan-level).
 
-        ``mode`` is ``"per_plan"`` (evaluate once for the whole plan) or
-        ``"per_record"`` (evaluate once per record), controlling variables such
-        as :func:`substrait.dataframe.current_timestamp`. The setting is carried
-        across subsequent operations, so it may be applied at any point in the
-        chain.
+        ``variable_eval_mode`` is ``"per_plan"`` (evaluate once for the whole
+        plan) or ``"per_record"`` (evaluate once per record), controlling
+        variables such as :func:`substrait.dataframe.current_timestamp`. The
+        setting is carried across subsequent operations, so it may be applied at
+        any point in the chain.
         """
         try:
-            eval_mode = _VARIABLE_EVAL_MODES[mode]
+            eval_mode = _VARIABLE_EVAL_MODES[variable_eval_mode]
         except KeyError:
             raise ValueError(
-                f"unknown execution behavior mode {mode!r}; "
+                f"unknown execution behavior mode {variable_eval_mode!r}; "
                 f"expected one of {sorted(_VARIABLE_EVAL_MODES)}"
             ) from None
         return self._next(_plan.with_execution_behavior(self._plan, eval_mode))

@@ -13,19 +13,14 @@ across frames. To use custom functions, build your own registry and register
 extensions on it:
 
 ```python
-import substrait.dataframe as sub
-
-reg = sub.ExtensionRegistry(load_default_extensions=True)
-reg.register_extension_yaml("my_functions.yaml")   # from a YAML file
-# or, from an already-parsed dict (must contain a "urn" field):
-reg.register_extension_dict(definitions)
+--8<-- "examples/guide/custom_extensions.py:registry_setup"
 ```
 
 Pass the registry to a [source function](data-sources.md) so the whole chain
 uses it:
 
 ```python
-df = sub.read_named_table("t", {"x": sub.i64}, registry=reg)
+--8<-- "examples/guide/custom_extensions.py:pass_registry"
 ```
 
 ### Reaching custom functions by name
@@ -35,11 +30,7 @@ registry, build a bound namespace with `functions_for`, or use `df.f` (which is
 bound to that frame's registry automatically):
 
 ```python
-myf = sub.functions_for(reg)
-myf.my_double(sub.col("x"))
-
-# equivalently, off a frame built with `reg`:
-df.f.my_double(sub.col("x"))
+--8<-- "examples/guide/custom_extensions.py:reach_functions"
 ```
 
 See [The function namespace](functions.md) for more.
@@ -62,26 +53,7 @@ Each requires `to_any()`, `from_any(cls, detail)`, and `derive_schema(...)`, plu
 a `type_url` identifying the payload.
 
 ```python
-import substrait.dataframe as sub
-import substrait.type_pb2 as stt
-from google.protobuf.any_pb2 import Any
-
-
-class MyLeaf(sub.ExtensionLeafDetail):
-    type_url = "example.com/my.LeafDetail"
-
-    def to_any(self) -> Any:
-        payload = Any()
-        payload.type_url = self.type_url
-        # payload.value = ... serialize your fields ...
-        return payload
-
-    @classmethod
-    def from_any(cls, detail: Any) -> "MyLeaf":
-        return cls()  # ... deserialize your fields ...
-
-    def derive_schema(self) -> stt.NamedStruct:
-        return sub.named_struct(names=["x"], struct=sub.struct([sub.i64.non_null]))
+--8<-- "examples/guide/custom_extensions.py:detail_class"
 ```
 
 ### Building the relation
@@ -89,14 +61,7 @@ class MyLeaf(sub.ExtensionLeafDetail):
 Use the frame verbs / entry point matching the arity:
 
 ```python
-# leaf (a source): starts a new DataFrame
-df = sub.extension_leaf(MyLeaf())
-
-# single-input: applied to an existing frame
-df = base.extension(MySingle(...))
-
-# multi-input: this frame plus others
-df = base.extension_multi([other1, other2], MyMulti(...))
+--8<-- "examples/guide/custom_extensions.py:build_relation"
 ```
 
 `DataFrame.extension` also accepts a raw `google.protobuf.Any` directly, in
@@ -110,7 +75,7 @@ class — then inference reconstructs it from the plan's `Any` and calls
 `derive_schema`:
 
 ```python
-reg.register_extension_relation(MyLeaf)
+--8<-- "examples/guide/custom_extensions.py:register_relation"
 ```
 
 Registration is process-global (type URLs are globally unique), so inference

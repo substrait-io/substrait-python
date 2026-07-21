@@ -8,18 +8,13 @@ plan-level analog of a SQL bind parameter (`?` / `:name`). `index` is the
 `proto.Type` or a bare type builder:
 
 ```python
-import substrait.dataframe as sub
-
-orders = sub.read_named_table("orders", {"amount": sub.fp64, "region": sub.string})
-
-# keep rows above a threshold provided at runtime
-orders.filter(sub.col("amount") > sub.parameter(0, sub.fp64))
+--8<-- "examples/guide/parameters_and_context.py:parameter"
 ```
 
 Give it a readable name with the optional `alias`:
 
 ```python
-sub.parameter(0, sub.fp64, alias="min_amount")
+--8<-- "examples/guide/parameters_and_context.py:parameter_alias"
 ```
 
 ## Execution context variables
@@ -27,23 +22,20 @@ sub.parameter(0, sub.fp64, alias="min_amount")
 These resolve to values from the execution environment, not from the data:
 
 ```python
-sub.current_timestamp()   # the query's execution timestamp (precision_timestamp_tz)
-sub.current_date()         # the query's execution date
-sub.current_timezone()     # the query's execution timezone (a string)
+--8<-- "examples/guide/parameters_and_context.py:context_vars"
 ```
 
 `current_timestamp` takes an optional `precision` (default `6`,
 microseconds); all three take an optional `alias`:
 
 ```python
-orders.with_columns(loaded_at=sub.current_timestamp(precision=3, alias="loaded_at"))
+--8<-- "examples/guide/parameters_and_context.py:stamp_loaded_at"
 ```
 
 A typical use is stamping rows or filtering by "today":
 
 ```python
-events = sub.read_named_table("events", {"ts": sub.date, "kind": sub.string})
-events.filter(sub.col("ts") == sub.current_date())
+--8<-- "examples/guide/parameters_and_context.py:filter_today"
 ```
 
 ## Next

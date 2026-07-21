@@ -6,20 +6,14 @@ Summarize rows with `group_by(...).agg(...)`. Aggregate functions come from the
 ## Group by and aggregate
 
 ```python
-import substrait.dataframe as sub
-
-df.group_by("region").agg(
-    sub.f.sum(sub.col("amount")).alias("total"),
-    sub.f.count(sub.col("amount")).alias("n"),
-)
+--8<-- "examples/guide/aggregations.py:group_agg"
 ```
 
 Group by multiple keys by passing several, and group the whole frame (a grand
 total) by passing none:
 
 ```python
-df.group_by("region", "product").agg(sub.f.sum(sub.col("amount")).alias("total"))
-df.group_by().agg(sub.f.count(sub.col("id")).alias("rows"))
+--8<-- "examples/guide/aggregations.py:multi_key_and_grand_total"
 ```
 
 `group_by` keys may be column names or expressions.
@@ -30,8 +24,7 @@ df.group_by().agg(sub.f.count(sub.col("id")).alias("rows"))
 the measures:
 
 ```python
-df.aggregate("region", sub.f.sum(sub.col("amount")).alias("total"))
-df.aggregate(["region", "product"], sub.f.count(sub.col("id")).alias("n"))
+--8<-- "examples/guide/aggregations.py:one_shot"
 ```
 
 ## Modifying a measure
@@ -39,9 +32,7 @@ df.aggregate(["region", "product"], sub.f.count(sub.col("id")).alias("n"))
 Aggregate measures support several modifiers, which chain:
 
 ```python
-sub.f.count(sub.col("customer")).distinct().alias("unique_customers")
-sub.f.sum(sub.col("amount")).filter(sub.col("status") == "paid").alias("paid_total")
-sub.f.string_agg(sub.col("name"), sub.lit(", ")).order_by("name").alias("names")
+--8<-- "examples/guide/aggregations.py:measure_modifiers"
 ```
 
 - **`.distinct()`** — operate on distinct inputs (`COUNT(DISTINCT x)`).
@@ -59,15 +50,7 @@ For multiple grouping levels in one aggregation, pass explicit `grouping_sets`
 shortcuts:
 
 ```python
-# explicit grouping sets: by (region, product), by (region), and the grand total
-df.group_by("region", "product", grouping_sets=[["region", "product"], ["region"], []]) \
-  .agg(sub.f.sum(sub.col("amount")).alias("total"))
-
-# ROLLUP: (region, product), (region), ()
-df.rollup("region", "product").agg(sub.f.sum(sub.col("amount")).alias("total"))
-
-# CUBE: every subset of the keys
-df.cube("region", "product").agg(sub.f.sum(sub.col("amount")).alias("total"))
+--8<-- "examples/guide/aggregations.py:grouping_sets"
 ```
 
 ## Next

@@ -9,18 +9,7 @@ when you need to pin a specific algorithm.
 `join` takes another DataFrame, an `on` expression, and a `how` string:
 
 ```python
-import substrait.dataframe as sub
-
-customers = sub.read_named_table("customers", {"cust_id": sub.i64, "name": sub.string})
-orders = sub.read_named_table(
-    "orders", {"order_id": sub.i64, "cust_ref": sub.i64, "amount": sub.fp64}
-)
-
-joined = customers.join(
-    orders,
-    on=sub.col("cust_id") == sub.col("cust_ref"),
-    how="inner",
-)
+--8<-- "examples/guide/joins.py:logical_join"
 ```
 
 The `on` expression is evaluated against the **concatenation** of the left and
@@ -28,8 +17,7 @@ right schemas — columns from both inputs are referenced by name. An optional
 `post_filter` predicate is applied to the join output:
 
 ```python
-customers.join(orders, on=sub.col("cust_id") == sub.col("cust_ref"),
-               post_filter=sub.col("amount") > 100)
+--8<-- "examples/guide/joins.py:post_filter"
 ```
 
 ### Join types
@@ -51,7 +39,7 @@ customers.join(orders, on=sub.col("cust_id") == sub.col("cust_ref"),
 The Cartesian product — every left row paired with every right row:
 
 ```python
-customers.cross_join(regions)
+--8<-- "examples/guide/joins.py:cross_join"
 ```
 
 ## Column disambiguation
@@ -62,9 +50,7 @@ with [`rename`](transformations.md#renaming-and-dropping) / `drop` on either
 input before joining, or on the result:
 
 ```python
-left = customers.rename({"id": "cust_id"})
-right = orders.rename({"id": "order_id"})
-left.join(right, on=sub.col("cust_id") == sub.col("cust_ref"))
+--8<-- "examples/guide/joins.py:disambiguation"
 ```
 
 ## Physical joins
@@ -77,8 +63,7 @@ consumer, use the physical variants. All of them accept the same `how` values as
 (the only physical join that supports non-equi conditions):
 
 ```python
-customers.nested_loop_join(orders, on=sub.col("cust_id") == sub.col("cust_ref"),
-                           how="inner")
+--8<-- "examples/guide/joins.py:nested_loop_join"
 ```
 
 **Hash join** and **merge join** are equi-joins on key columns. `left_on` /
@@ -86,8 +71,7 @@ customers.nested_loop_join(orders, on=sub.col("cust_id") == sub.col("cust_ref"),
 join assumes its inputs are already sorted on the keys:
 
 ```python
-customers.hash_join(orders, left_on="cust_id", right_on="cust_ref")
-customers.merge_join(orders, left_on=["a", "b"], right_on=["x", "y"], how="left")
+--8<-- "examples/guide/joins.py:physical_equi_joins"
 ```
 
 ## Next

@@ -9,19 +9,13 @@ Concatenate rows. The default keeps duplicates (`UNION ALL`); pass
 `distinct=True` for a set `UNION`:
 
 ```python
-import substrait.dataframe as sub
-
-q1 = sub.read_named_table("sales_q1", {"region": sub.string, "amount": sub.fp64})
-q2 = sub.read_named_table("sales_q2", {"region": sub.string, "amount": sub.fp64})
-
-q1.union(q2)                 # UNION ALL (keeps duplicates)
-q1.union(q2, distinct=True)  # UNION (deduplicated)
+--8<-- "examples/guide/set_operations.py:union"
 ```
 
 You can pass more than one other frame:
 
 ```python
-q1.union(q2, q3, q4)
+--8<-- "examples/guide/set_operations.py:union_many"
 ```
 
 ## Intersect
@@ -30,8 +24,7 @@ Rows present in this frame **and** in every other. Defaults to the deduplicated
 `INTERSECT`; pass `distinct=False` for `INTERSECT ALL`:
 
 ```python
-active.intersect(subscribed)
-active.intersect(subscribed, distinct=False)
+--8<-- "examples/guide/set_operations.py:intersect"
 ```
 
 ## Except
@@ -41,8 +34,7 @@ Defaults to deduplicated; pass `distinct=False` for `EXCEPT ALL`. The method is
 `except_` (with a trailing underscore, since `except` is a Python keyword):
 
 ```python
-all_users.except_(banned_users)
-all_users.except_(banned_users, distinct=False)
+--8<-- "examples/guide/set_operations.py:except_op"
 ```
 
 ## Next

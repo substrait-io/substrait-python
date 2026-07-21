@@ -28,21 +28,13 @@ Everything is reachable from a single import. The convention used throughout
 this guide is:
 
 ```python
-import substrait.dataframe as sub
+--8<-- "examples/guide/getting_started.py:import"
 ```
 
 Build a plan by chaining verbs off a data source and finishing with `.to_plan()`:
 
 ```python
-import substrait.dataframe as sub
-
-plan = (
-    sub.read_named_table("people", {"id": sub.i64, "age": sub.i64, "name": sub.string})
-    .filter(sub.col("age") > 25)
-    .with_columns(next_year=sub.col("age") + 1)
-    .select("id", "name", "next_year")
-    .to_plan()
-)
+--8<-- "examples/guide/getting_started.py:first_plan"
 ```
 
 `plan` is a `substrait.proto.Plan` — the same protobuf message you would get from
@@ -59,16 +51,14 @@ A `proto.Plan` prints as protobuf text, which is verbose. For a compact,
 readable tree, use the bundled pretty printer:
 
 ```python
-from substrait.utils.display import pretty_print_plan
-
-pretty_print_plan(plan, use_colors=True)
+--8<-- "examples/guide/getting_started.py:pretty_print"
 ```
 
 You can also serialize it to bytes to hand to a consumer (see
 [Consuming plans](consuming-plans.md)):
 
 ```python
-payload = plan.SerializeToString()
+--8<-- "examples/guide/getting_started.py:serialize"
 ```
 
 ## Two things to know up front
@@ -79,7 +69,7 @@ Schema types are [`DataType`](types-and-schemas.md) objects. A bare `sub.i64` is
 **nullable** (the safe default); `sub.i64.non_null` is required:
 
 ```python
-sub.read_named_table("sales", {"region": sub.string.non_null, "amount": sub.fp64})
+--8<-- "examples/guide/getting_started.py:nullability"
 ```
 
 ### The registry is handled for you

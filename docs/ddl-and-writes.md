@@ -10,15 +10,7 @@ materialize it.
 write operation and `mode` controls what happens when the table already exists:
 
 ```python
-import substrait.dataframe as sub
-
-summary = (
-    sub.read_named_table("orders", {"region": sub.string, "amount": sub.fp64})
-    .group_by("region")
-    .agg(sub.f.sum(sub.col("amount")).alias("total"))
-)
-
-plan = summary.write_named_table("region_totals", op="ctas", mode="replace").to_plan()
+--8<-- "examples/guide/ddl_and_writes.py:write_named_table"
 ```
 
 - **`op`** — `ctas` (create-table-as-select, default) or `insert`.
@@ -28,16 +20,7 @@ plan = summary.write_named_table("region_totals", op="ctas", mode="replace").to_
 ## Create table / view
 
 ```python
-# CREATE TABLE region_totals (region string, total fp64)
-sub.create_table("region_totals", {"region": sub.string, "total": sub.fp64})
-
-# CREATE OR REPLACE
-sub.create_table("region_totals", {"region": sub.string}, replace=True)
-
-# CREATE VIEW backed by a query (a DataFrame)
-big_orders = sub.read_named_table("orders", {"amount": sub.fp64}) \
-    .filter(sub.col("amount") > 1000)
-sub.create_view("big_orders", big_orders)
+--8<-- "examples/guide/ddl_and_writes.py:create_table_view"
 ```
 
 ## Drop table / view
@@ -45,9 +28,7 @@ sub.create_view("big_orders", big_orders)
 Pass `if_exists=True` for the `IF EXISTS` variant:
 
 ```python
-sub.drop_table("region_totals")
-sub.drop_table("region_totals", if_exists=True)
-sub.drop_view("big_orders", if_exists=True)
+--8<-- "examples/guide/ddl_and_writes.py:drop"
 ```
 
 ## Update
@@ -57,12 +38,7 @@ sub.drop_view("big_orders", if_exists=True)
 rows if omitted):
 
 ```python
-sub.update_table(
-    "orders",
-    {"id": sub.i64, "amount": sub.fp64, "status": sub.string},
-    assignments={"amount": sub.col("amount") * 1.1},
-    where=sub.col("status") == "pending",
-)
+--8<-- "examples/guide/ddl_and_writes.py:update"
 ```
 
 The schema you pass describes the target table so the assignment targets and

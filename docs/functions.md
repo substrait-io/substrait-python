@@ -5,12 +5,7 @@ Operators cover arithmetic, comparison, and boolean logic. Everything else —
 functions the Substrait extensions define — lives on the **`f` namespace**:
 
 ```python
-import substrait.dataframe as sub
-
-sub.f.sum(sub.col("amount"))
-sub.f.upper(sub.col("name"))
-sub.f.coalesce(sub.col("a"), sub.col("b"))
-sub.f.row_number()
+--8<-- "examples/guide/functions.py:namespace_intro"
 ```
 
 Each helper returns an [`Expr`](expressions.md), so it composes with operators
@@ -27,8 +22,7 @@ Discover what's available with `dir` / tab-completion, and membership-test with
 `in`:
 
 ```python
-dir(sub.f)              # sorted list of every function name
-"sum" in sub.f          # True
+--8<-- "examples/guide/functions.py:discover"
 ```
 
 ## Hidden plumbing
@@ -55,12 +49,7 @@ helpers do **not**. Pass typed operands or a `lit(...)` when a specific overload
 is required:
 
 ```python
-# operator: the 2 is coerced to the column's type
-sub.col("price_fp64") * 2
-
-# f.* helper: pass a typed operand so the fp64 overload resolves
-sub.f.multiply(sub.col("price_fp64"), 2.0)
-sub.f.multiply(sub.col("price_fp64"), sub.lit(2, sub.fp64))
+--8<-- "examples/guide/functions.py:coercion"
 ```
 
 This bites most often when a function's overload is typed narrower than the
@@ -68,8 +57,7 @@ default `i64`. For example, `substring` expects `i32` offsets, so a bare `1`/`3`
 (inferred `i64`) fails to resolve — pass `i32` literals:
 
 ```python
-# sub.f.substring(sub.col("name"), 1, 3)          # no substring(string, i64, i64) overload
-sub.f.substring(sub.col("name"), sub.lit(1, sub.i32), sub.lit(3, sub.i32))
+--8<-- "examples/guide/functions.py:substring"
 ```
 
 If no overload matches the argument types, resolution raises an error naming the
@@ -82,11 +70,7 @@ inside [`group_by().agg()`](aggregations.md); window functions become windowed
 expressions with [`.over(...)`](window-functions.md):
 
 ```python
-# aggregate
-df.group_by("region").agg(sub.f.sum(sub.col("amount")).alias("total"))
-
-# window
-df.with_columns(rn=sub.f.row_number().over(partition_by="region", order_by="ts"))
+--8<-- "examples/guide/functions.py:agg_and_window"
 ```
 
 Aggregate measures also support `.alias()`, `.distinct()`, `.order_by(...)`, and
@@ -98,7 +82,7 @@ Some functions accept configurable behaviors (e.g. overflow handling). Pass them
 as keyword arguments to the helper; they are attached as function options:
 
 ```python
-sub.f.add(sub.col("a"), sub.col("b"), overflow="ERROR")
+--8<-- "examples/guide/functions.py:options"
 ```
 
 ## Custom extensions
@@ -107,11 +91,7 @@ The global `sub.f` knows only the *default* extensions. To reach functions from
 your own registered extensions, build a namespace bound to a specific registry:
 
 ```python
-reg = sub.ExtensionRegistry(load_default_extensions=True)
-reg.register_extension_yaml("my_functions.yaml")
-
-myf = sub.functions_for(reg)
-myf.my_double(sub.col("x"))
+--8<-- "examples/guide/functions.py:custom_registry"
 ```
 
 A `DataFrame` built with that registry also exposes it as `df.f`, so

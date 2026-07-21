@@ -9,14 +9,7 @@ resolved lazily against the schema and registry when the plan is materialized.
 ## Columns and literals
 
 ```python
-import substrait.dataframe as sub
-
-sub.col("age")        # reference a column by name
-sub.col(0)            # ...or by position
-sub.lit(25)           # a literal (type inferred: i64)
-sub.lit(3.5)          # fp64
-sub.lit("draft")      # string
-sub.lit(None, sub.i64)  # a typed null — the type is required for None
+--8<-- "examples/guide/expressions.py:columns_and_literals"
 ```
 
 `lit` infers the Substrait type from the Python value (see the table under
@@ -38,10 +31,7 @@ against the registry at build time.
 | `&` `\|` `~` | `and` `or` `not` (boolean) |
 
 ```python
-(sub.col("age") > 25) & sub.col("name").is_not_null()
-(sub.col("x") + sub.col("y")) * 2
--sub.col("balance")
-~sub.col("is_active")
+--8<-- "examples/guide/expressions.py:operators"
 ```
 
 !!! warning "Use `&` `|` `~`, not `and` `or` `not`"
@@ -62,8 +52,7 @@ cases working, a **bare Python number** on one side of an operator is typed to
 match the **column** on the other side at resolve time:
 
 ```python
-sub.col("price_fp64") * 2      # the 2 is typed fp64, so multiply resolves
-sub.col("count_i32") > 25      # the 25 is typed i32, so gt resolves
+--8<-- "examples/guide/expressions.py:numeric_coercion"
 ```
 
 A `float` literal always stays floating point (it is never narrowed into an
@@ -72,7 +61,7 @@ column-to-column type mismatch must be bridged explicitly with
 [`cast`](#casting):
 
 ```python
-sub.col("small_i32").cast(sub.i64) + sub.col("big_i64")
+--8<-- "examples/guide/expressions.py:cast_bridge"
 ```
 
 Decimal operands are handled too: arithmetic keeps a decimal literal's natural
@@ -83,19 +72,13 @@ rounding — wrap it with `sub.lit(value, <decimal type>)` or cast the column).
 ## Null and membership tests
 
 ```python
-sub.col("x").is_null()
-sub.col("x").is_not_null()
-sub.col("x").is_nan()
-sub.col("x").is_in(["active", "pending"])          # SQL IN
-sub.col("x").between(1, 10)                          # inclusive low <= x <= high
-sub.col("x").is_distinct_from(sub.col("y"))          # null-safe !=
-sub.col("x").is_not_distinct_from(sub.col("y"))      # null-safe ==
+--8<-- "examples/guide/expressions.py:null_membership"
 ```
 
 `coalesce` returns the first non-null argument:
 
 ```python
-sub.coalesce(sub.col("preferred"), sub.col("fallback"), sub.lit("n/a"))
+--8<-- "examples/guide/expressions.py:coalesce"
 ```
 
 !!! note "`between` / `is_in` bounds are not coerced"
@@ -108,18 +91,13 @@ sub.coalesce(sub.col("preferred"), sub.col("fallback"), sub.lit("n/a"))
 Chain `when().then()` and finish with `.otherwise()`, PySpark/Polars-style:
 
 ```python
-tier = (
-    sub.when(sub.col("score") >= 90).then("A")
-    .when(sub.col("score") >= 80).then("B")
-    .otherwise("C")
-)
-df.with_columns(tier=tier)
+--8<-- "examples/guide/expressions.py:case_when"
 ```
 
 For a value-match against literal keys, `Expr.switch` is more compact:
 
 ```python
-sub.col("code").switch({1: "one", 2: "two"}, default="other")
+--8<-- "examples/guide/expressions.py:switch"
 ```
 
 ## Casting
@@ -128,8 +106,7 @@ sub.col("code").switch({1: "one", 2: "two"}, default="other")
 enough — most often between two columns of different numeric types:
 
 ```python
-sub.col("small_i32").cast(sub.i64)
-sub.col("amount").cast(sub.decimal(2, 12))
+--8<-- "examples/guide/expressions.py:casting"
 ```
 
 It accepts a `proto.Type` or a bare type builder / `DataType`.
@@ -139,10 +116,7 @@ It accepts a `proto.Type` or a bare type builder / `DataType`.
 Reach into struct, list, and map columns:
 
 ```python
-sub.col("address").struct_field(0)   # struct field by position
-sub.col("tags").list_element(2)       # list element by offset
-sub.col("tags")[2]                     # same, via []  (integer offset only)
-sub.col("attrs").map_key("color")     # map value by key
+--8<-- "examples/guide/expressions.py:nested_access"
 ```
 
 These chain, so `sub.col("a").struct_field(1).list_element(0)` walks a nested
@@ -154,8 +128,7 @@ Apply a lambda over the elements of a `list` column. The callback receives an
 `Expr` bound to the current element:
 
 ```python
-sub.col("xs").list_transform(lambda x: x + 1)      # map over elements
-sub.col("xs").list_filter(lambda x: x > 0)          # keep matching elements
+--8<-- "examples/guide/expressions.py:higher_order"
 ```
 
 ## Naming
@@ -164,8 +137,7 @@ sub.col("xs").list_filter(lambda x: x > 0)          # keep matching elements
 projection would otherwise produce a generated name:
 
 ```python
-df.with_columns(total=sub.col("qty") * sub.col("price"))
-df.select(sub.col("qty").alias("quantity"))
+--8<-- "examples/guide/expressions.py:naming"
 ```
 
 ## Literal type inference

@@ -9,16 +9,7 @@ substrait-python **produces** plans; it does not execute them. Once you have a
 into the bytes a consumer accepts:
 
 ```python
-import substrait.dataframe as sub
-
-plan = (
-    sub.read_named_table("customer", {"c_name": sub.string, "c_nationkey": sub.i32})
-    .filter(sub.col("c_nationkey") == 3)
-    .select("c_name")
-    .to_plan()
-)
-
-payload = plan.SerializeToString()
+--8<-- "examples/guide/consuming_plans.py:materialize"
 ```
 
 `DataFrame.to_substrait(registry=...)` is an alias kept for parity with the
@@ -31,9 +22,7 @@ The bundled pretty printer renders the plan as a compact tree — far more
 readable than the raw protobuf text:
 
 ```python
-from substrait.utils.display import pretty_print_plan
-
-pretty_print_plan(plan, use_colors=True)
+--8<-- "examples/guide/consuming_plans.py:pretty_print"
 ```
 
 ## Handing off to an engine
@@ -80,10 +69,7 @@ A serialized plan loads back with the generated protobuf class — useful for
 tests and for consuming plans other producers emit:
 
 ```python
-from substrait.proto import Plan
-
-restored = Plan()
-restored.ParseFromString(payload)
+--8<-- "examples/guide/consuming_plans.py:roundtrip"
 ```
 
 ## Relationship to Narwhals

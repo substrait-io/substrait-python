@@ -6,11 +6,7 @@ function from the [`f` namespace](functions.md) and turn it into a windowed
 expression with `.over(...)`:
 
 ```python
-import substrait.dataframe as sub
-
-df.with_columns(
-    rn=sub.f.row_number().over(partition_by="region", order_by="ts"),
-)
+--8<-- "examples/guide/window_functions.py:basic"
 ```
 
 This is the SQL `OVER (PARTITION BY region ORDER BY ts)`.
@@ -29,11 +25,7 @@ This is the SQL `OVER (PARTITION BY region ORDER BY ts)`.
 list of them. `descending` / `nulls_last` control the ordering:
 
 ```python
-sub.f.rank().over(
-    partition_by=["region", "product"],
-    order_by="amount",
-    descending=True,
-)
+--8<-- "examples/guide/window_functions.py:partition_order"
 ```
 
 Both are optional — omit `partition_by` for a single window over all rows, and
@@ -51,14 +43,7 @@ offsets); specify at most one. Each endpoint is:
 - a positive int — that many rows **following**.
 
 ```python
-# the latest amount seen so far: start of partition through the current row
-sub.f.last_value(sub.col("amount")).over(order_by="ts", rows=(None, 0))
-
-# value from the immediately preceding row within a 3-row window
-sub.f.first_value(sub.col("amount")).over(order_by="ts", rows=(-1, 1))
-
-# the final amount in the partition: current row onward
-sub.f.last_value(sub.col("amount")).over(order_by="ts", rows=(0, None))
+--8<-- "examples/guide/window_functions.py:frames"
 ```
 
 ## Next

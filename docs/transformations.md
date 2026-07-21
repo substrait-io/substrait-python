@@ -10,13 +10,7 @@ column-name strings, and (where sensible) Python scalars.
 `with_columns` **appends** new columns to the existing ones (Polars naming):
 
 ```python
-import substrait.dataframe as sub
-
-df.select("id", "name")                       # keep only these two
-df.select(sub.col("qty").alias("quantity"))    # rename via alias
-
-df.with_columns(next_year=sub.col("age") + 1)   # append a computed column
-df.with_columns(sub.col("a"), doubled=sub.col("a") * 2)  # positional + named
+--8<-- "examples/guide/transformations.py:project"
 ```
 
 With `with_columns`, keyword arguments name the new columns; positional
@@ -25,8 +19,7 @@ arguments pass expressions through unchanged (alias them yourself if needed).
 ## Renaming and dropping
 
 ```python
-df.rename({"old": "new", "qty": "quantity"})   # rename some; others pass through
-df.drop("debug", "internal")                     # keep the rest, in order
+--8<-- "examples/guide/transformations.py:rename_drop"
 ```
 
 Both resolve the input schema, so an unknown column name raises rather than
@@ -37,8 +30,7 @@ silently doing nothing.
 `filter` keeps rows where the predicate is true:
 
 ```python
-df.filter(sub.col("age") > 25)
-df.filter((sub.col("age") > 25) & sub.col("name").is_not_null())
+--8<-- "examples/guide/transformations.py:filter_rows"
 ```
 
 ## Sorting
@@ -48,27 +40,20 @@ each either a single bool (applied to every key) or a per-column list matching
 the columns:
 
 ```python
-df.sort("amount")                                   # ascending, nulls last
-df.sort("amount", descending=True)
-df.sort("region", "amount", descending=[False, True])
-df.sort("amount", nulls_last=False)
+--8<-- "examples/guide/transformations.py:sort"
 ```
 
 ## Limiting and paging
 
 ```python
-df.limit(10)             # first 10 rows
-df.limit(10, offset=20)  # 10 rows starting after the first 20
-df.head(5)               # alias for limit(5)
-df.offset(100)           # skip the first 100, keep the rest
+--8<-- "examples/guide/transformations.py:limit_paging"
 ```
 
 `top_n` fuses an order-by and a limit into a single `TopNRel` — the efficient
 way to ask for "the N largest/smallest":
 
 ```python
-df.top_n(10, by="amount", descending=True)
-df.top_n(10, by=["region", "amount"], descending=[False, True], with_ties=True)
+--8<-- "examples/guide/transformations.py:top_n"
 ```
 
 `with_ties` keeps rows tied with the n-th; `offset` is also supported.
@@ -80,12 +65,7 @@ Polars-style. `index` columns are repeated on every output row, and the `on`
 columns must share a type:
 
 ```python
-df.unpivot(
-    on=["jan", "feb", "mar"],
-    index="region",
-    variable_name="month",
-    value_name="sales",
-)
+--8<-- "examples/guide/transformations.py:unpivot"
 ```
 
 ## Hints
@@ -95,8 +75,7 @@ df.unpivot(
 and do not change results:
 
 ```python
-df.hint(row_count=1_000_000, record_size=64, alias="big_scan")
-df.hint(output_names=["a", "b", "c"])
+--8<-- "examples/guide/transformations.py:hints"
 ```
 
 ## Physical distribution
@@ -104,8 +83,7 @@ df.hint(output_names=["a", "b", "c"])
 For engines that model partitioning, `ExchangeRel` verbs redistribute rows:
 
 ```python
-df.repartition(8)   # round-robin into 8 partitions
-df.broadcast()       # broadcast every row to all partitions
+--8<-- "examples/guide/transformations.py:distribution"
 ```
 
 ## Next

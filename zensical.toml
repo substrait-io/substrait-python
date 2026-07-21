@@ -141,3 +141,11 @@ combine_header_slug = true
 [project.markdown_extensions.pymdownx.tasklist]
 custom_checkbox = true
 [project.markdown_extensions.pymdownx.tilde]
+# Include guide code from runnable, CI-executed scripts under examples/ via
+# `--8<-- "examples/guide/<page>.py:section"`. This keeps every documented
+# snippet in a real .py file that examples.yml / the docs-snippet test run, so a
+# stale example fails CI instead of silently rendering. See CONTRIBUTING.md.
+[project.markdown_extensions.pymdownx.snippets]
+base_path = ["."]          # resolve snippet paths from the repo root (zensical build cwd)
+check_paths = true         # a missing file or section name fails the build
+dedent_subsections = true  # dedent extracted sections (safety if ever nested)

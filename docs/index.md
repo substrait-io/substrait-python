@@ -9,15 +9,7 @@ specification for data compute operations. This site documents the **ergonomic
 DataFrame API** (`substrait.dataframe`) for authoring Substrait plans in Python.
 
 ```python
-import substrait.dataframe as sub
-
-plan = (
-    sub.read_named_table("people", {"id": sub.i64, "age": sub.i64, "name": sub.string})
-    .filter(sub.col("age") > 25)
-    .with_columns(adult=sub.col("age") >= 18)
-    .select("id", "name", "adult")
-    .to_plan()
-)
+--8<-- "examples/guide/index.py:first_plan"
 ```
 
 That expression builds a complete `substrait.proto.Plan` — a read, a filter, a

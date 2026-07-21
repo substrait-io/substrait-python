@@ -1,8 +1,10 @@
+import pytest
 import substrait.extended_expression_pb2 as stee
 import substrait.extensions.extensions_pb2 as ste
 import substrait.type_pb2 as stt
 
 from substrait.utils import (
+    merge_extension_declarations,
     merge_extension_urns,
     merge_extensions_into,
     type_num_names,
@@ -163,3 +165,15 @@ def test_merge_extensions_into_merges_multiple_sources():
 
     assert [u.urn for u in target.extension_urns] == ["A", "B"]
     assert [d.extension_function.name for d in target.extensions] == ["f:i8", "g:i8"]
+
+
+def test_merge_extension_declarations_rejects_non_function_mapping():
+    """Only ``extension_function`` declarations are supported so far; a type /
+    type-variation declaration raises an informative NotImplementedError naming
+    the unsupported mapping type."""
+    declaration = ste.SimpleExtensionDeclaration(
+        extension_type=ste.SimpleExtensionDeclaration.ExtensionType()
+    )
+
+    with pytest.raises(NotImplementedError, match="extension_type"):
+        merge_extension_declarations([declaration])

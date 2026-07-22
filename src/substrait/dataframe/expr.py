@@ -41,6 +41,9 @@ from substrait.builders.extended_expression import (
     switch,
 )
 from substrait.builders.extended_expression import (
+    alias as _alias,
+)
+from substrait.builders.extended_expression import (
     dynamic_parameter as _dynamic_parameter,
 )
 from substrait.builders.extended_expression import (
@@ -62,6 +65,7 @@ from substrait.builders.extended_expression import (
     set_predicate as _set_predicate,
 )
 from substrait.type_inference import infer_extended_expression_schema
+from substrait.utils import merge_extensions_into
 
 # Standard Substrait function-extension URNs used by the operators below.
 FUNCTIONS_COMPARISON = "extension:io.substrait:functions_comparison"
@@ -239,18 +243,21 @@ def _resolve_over_urns(
     raises a uniform error if none do. Shared by the operator path
     (:func:`_numeric_binary`) and the ``f.*`` namespace's multi-URN helper
     (``substrait.dataframe.functions._multi_urn_helper``) so both resolve
-    identically and their error text cannot drift apart.
+    identically and their error text cannot drift apart. The registry finds the
+    winning extension across every candidate URN in one call; ``entry.urn``
+    recovers it so ``builder`` can rebuild against the concrete overload.
     """
     signature = [
         typ
         for b in bound
         for typ in infer_extended_expression_schema(b, registry=registry).types
     ]
-    for urn in urns:
-        if registry.lookup_function(urn, name, signature):
-            return builder(urn, name, expressions=bound, alias=alias, options=options)(
-                base_schema, registry
-            )
+    match = registry.find_function(name, signature, urns)
+    if match is not None:
+        winning_urn = match[0].urn
+        return builder(
+            winning_urn, name, expressions=bound, alias=alias, options=options
+        )(base_schema, registry)
     kinds = [t.WhichOneof("kind") for t in signature]
     raise Exception(
         f"No matching overload for '{name}' across {urns} with signature {kinds}"
@@ -357,28 +364,19 @@ def _plan_of(query: Any):
     return plan
 
 
-def _sort_direction(descending: bool, nulls_last: bool):
-    if descending:
-        return (
-            stalg.SortField.SORT_DIRECTION_DESC_NULLS_LAST
-            if nulls_last
-            else stalg.SortField.SORT_DIRECTION_DESC_NULLS_FIRST
-        )
-    return (
-        stalg.SortField.SORT_DIRECTION_ASC_NULLS_LAST
-        if nulls_last
-        else stalg.SortField.SORT_DIRECTION_ASC_NULLS_FIRST
-    )
+# Sort direction keyed by (descending, nulls_last); the canonical mapping for the
+# DataFrame/Expr layer, shared with ``substrait.dataframe.frame``.
+_SORT_DIRECTIONS = {
+    (False, False): stalg.SortField.SORT_DIRECTION_ASC_NULLS_FIRST,
+    (False, True): stalg.SortField.SORT_DIRECTION_ASC_NULLS_LAST,
+    (True, False): stalg.SortField.SORT_DIRECTION_DESC_NULLS_FIRST,
+    (True, True): stalg.SortField.SORT_DIRECTION_DESC_NULLS_LAST,
+}
 
 
-def _merge_extensions_into(target, source):
-    """Append any extension URNs/declarations from ``source`` not already present."""
-    for urn in source.extension_urns:
-        if urn not in target.extension_urns:
-            target.extension_urns.append(urn)
-    for decl in source.extensions:
-        if decl not in target.extensions:
-            target.extensions.append(decl)
+def sort_direction(descending: bool, nulls_last: bool):
+    """The ``SortField.SortDirection`` for a ``(descending, nulls_last)`` pair."""
+    return _SORT_DIRECTIONS[(bool(descending), bool(nulls_last))]
 
 
 def _window_bound(value):
@@ -751,7 +749,7 @@ class Expr:
         ``keys`` are column names or expressions; ``descending``/``nulls_last``
         apply to all of them. Only meaningful on an aggregate measure.
         """
-        direction = _sort_direction(descending, nulls_last)
+        direction = sort_direction(descending, nulls_last)
         inner = self._unbound
 
         def resolve(base_schema, registry):
@@ -768,7 +766,7 @@ class Expr:
                     )
                 )
                 # Carry over any extensions a (function-valued) sort key introduced.
-                _merge_extensions_into(bound, bound_key)
+                merge_extensions_into(bound, bound_key)
             return bound
 
         return Expr(resolve)
@@ -799,7 +797,7 @@ class Expr:
             else list(partition_by)
         )
         order_keys = [order_by] if isinstance(order_by, (str, Expr)) else list(order_by)
-        direction = _sort_direction(descending, nulls_last)
+        direction = sort_direction(descending, nulls_last)
         inner = self._unbound
 
         def resolve(base_schema, registry):
@@ -812,7 +810,7 @@ class Expr:
                 key = p.unbound if isinstance(p, Expr) else column(p)
                 bound_p = resolve_expression(key, base_schema, registry)
                 wf.partitions.append(bound_p.referred_expr[0].expression)
-                _merge_extensions_into(bound, bound_p)
+                merge_extensions_into(bound, bound_p)
             for k in order_keys:
                 key = k.unbound if isinstance(k, Expr) else column(k)
                 bound_k = resolve_expression(key, base_schema, registry)
@@ -821,7 +819,7 @@ class Expr:
                         expr=bound_k.referred_expr[0].expression, direction=direction
                     )
                 )
-                _merge_extensions_into(bound, bound_k)
+                merge_extensions_into(bound, bound_k)
             frame = rows if rows is not None else range
             if frame is not None:
                 wf.bounds_type = (
@@ -860,14 +858,7 @@ class Expr:
 
     def alias(self, name: str) -> "Expr":
         """Return a copy of this expression with its output name set to ``name``."""
-        inner = self._unbound
-
-        def resolve(base_schema, registry):
-            bound = inner(base_schema, registry)
-            bound.referred_expr[0].output_names[0] = name
-            return bound
-
-        return Expr(resolve)
+        return Expr(_alias(self._unbound, name))
 
     def __repr__(self) -> str:  # pragma: no cover - debugging aid
         return "Expr(<unbound>)"

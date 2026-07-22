@@ -154,6 +154,27 @@ class ExtensionRegistry:
         """List all matching functions across all URNs."""
         return self._find_matching_functions(function_name, signature)
 
+    def find_function(
+        self,
+        function_name: str,
+        signature: tuple[Type] | list[Type],
+        urns: Optional[list[str]] = None,
+    ) -> Optional[tuple[FunctionEntry, Type]]:
+        """Find the best-matching function for ``function_name`` across ``urns``.
+
+        Searches ``urns`` in order (every registered URN when ``None``) and returns
+        the first ``(FunctionEntry, output_type)`` whose overload satisfies
+        ``signature``, or ``None``. The winning extension URN is ``entry.urn``.
+
+        Generalizes :meth:`lookup_function` (a single URN) and
+        :meth:`list_functions_across_urns` (every URN) to an ordered subset, so a
+        caller resolving a name that lives in several extensions -- preferring, say,
+        the base arithmetic extension over its decimal variant -- needs one call
+        rather than a per-URN ``lookup_function`` loop.
+        """
+        matches = self._find_matching_functions(function_name, signature, urns)
+        return matches[0] if matches else None
+
     def lookup_urn(self, urn: str) -> Optional[int]:
         return self._urn_mapping.get(urn, None)
 

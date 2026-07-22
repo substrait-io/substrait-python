@@ -177,3 +177,41 @@ def test_function_with_discrete_nullability_nonexisting(registry):
         )
         is None
     )
+
+
+# ``add`` exists both in the test extension and in the default
+# functions_arithmetic, so it exercises resolution across several URNs.
+_ARITHMETIC = "extension:io.substrait:functions_arithmetic"
+_TEST = "extension:test:functions"
+
+
+def test_find_function_single_urn_matches_lookup(registry):
+    signature = [i8(nullable=False), i8(nullable=False)]
+    match = registry.find_function("add", signature, [_TEST])
+    assert match is not None
+    assert match[0].urn == _TEST
+    assert match == registry.lookup_function(_TEST, "add", signature)
+
+
+def test_find_function_respects_candidate_urn_order(registry):
+    signature = [i8(nullable=False), i8(nullable=False)]
+    # The winning extension is the first candidate URN that has a matching
+    # overload; ``entry.urn`` recovers it.
+    assert registry.find_function("add", signature, [_ARITHMETIC, _TEST])[0].urn == (
+        _ARITHMETIC
+    )
+    assert registry.find_function("add", signature, [_TEST, _ARITHMETIC])[0].urn == (
+        _TEST
+    )
+
+
+def test_find_function_no_matching_overload_returns_none(registry):
+    # ``add`` has no single-argument overload in any extension.
+    assert registry.find_function("add", [i8(nullable=False)], [_ARITHMETIC]) is None
+
+
+def test_find_function_searches_all_urns_when_unspecified(registry):
+    signature = [i8(nullable=False), i8(nullable=False)]
+    match = registry.find_function("add", signature)
+    assert match is not None
+    assert match == registry.list_functions_across_urns("add", signature)[0]

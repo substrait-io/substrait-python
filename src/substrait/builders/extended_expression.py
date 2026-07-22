@@ -61,6 +61,27 @@ def resolve_expression(
     )
 
 
+def alias(
+    expression: ExtendedExpressionOrUnbound,
+    name: str,
+) -> UnboundExtendedExpression:
+    """Rename the first output column of ``expression`` to ``name``.
+
+    Returns a resolver that binds ``expression`` and rewrites its top-level output
+    name. Shared by the DataFrame/Expr ``.alias`` and the Narwhals expression
+    wrapper so the single-column rename lives in one place.
+    """
+
+    def resolve(
+        base_schema: stp.NamedStruct, registry: ExtensionRegistry
+    ) -> stee.ExtendedExpression:
+        bound_expression = resolve_expression(expression, base_schema, registry)
+        bound_expression.referred_expr[0].output_names[0] = name
+        return bound_expression
+
+    return resolve
+
+
 _EPOCH_DATE = date(1970, 1, 1)
 
 

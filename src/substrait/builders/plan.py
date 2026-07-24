@@ -27,6 +27,8 @@ from substrait.type_inference import (
 from substrait.utils import (
     merge_extension_declarations,
     merge_extension_urns,
+    plan_subtrees,
+    rebase_reference_ordinals,
 )
 from substrait.version import substrait_version
 
@@ -69,6 +71,80 @@ def _merge_plan_metadata(*objs):
             metadata["execution_behavior"] = b.execution_behavior
             break
     return metadata
+
+
+def _is_identity(remap: dict) -> bool:
+    return all(old == new for old, new in remap.items())
+
+
+def _merge_input_subtrees(bound_inputs):
+    """Combine the leading shared subtrees carried in-band by resolved input plans.
+
+    Returns ``(subtree_planrels, rebased_root_inputs)``: the deduplicated combined
+    subtrees as leading ``PlanRel(rel=...)`` entries, and, per input, its root's
+    input Rel with ReferenceRel ordinals rebased into the combined list. Mirrors how
+    ``_merge_plan_metadata`` carries extension declarations upward.
+
+    Structurally-identical subtrees (byte-equal serialized ``Rel``) collapse to a
+    single ordinal, so a cached frame reused across branches that later meet at a
+    multi-input relation is emitted once and referenced many times. Inputs that
+    carry no subtrees pass their root input through untouched, keeping output for
+    the (overwhelmingly common) no-subtree case byte-identical.
+    """
+    combined: "list[stalg.Rel]" = []
+    key_to_ordinal: dict = {}  # serialized subtree bytes -> ordinal in `combined`
+    rebased_root_inputs = []
+    for plan in bound_inputs:
+        remap: dict = {}
+        for old_ordinal, subtree in enumerate(plan_subtrees(plan)):
+            # Rebase the subtree's own references (to earlier subtrees in this same
+            # input) before deduping, so structurally-equal subtrees compare equal.
+            rebased = (
+                subtree
+                if _is_identity(remap)
+                else rebase_reference_ordinals(subtree, remap)
+            )
+            key = rebased.SerializeToString(deterministic=True)
+            new_ordinal = key_to_ordinal.get(key)
+            if new_ordinal is None:
+                new_ordinal = len(combined)
+                key_to_ordinal[key] = new_ordinal
+                combined.append(rebased)
+            remap[old_ordinal] = new_ordinal
+        root_input = plan.relations[-1].root.input
+        rebased_root_inputs.append(
+            root_input
+            if _is_identity(remap)
+            else rebase_reference_ordinals(root_input, remap)
+        )
+    subtree_planrels = [stp.PlanRel(rel=r) for r in combined]
+    return subtree_planrels, rebased_root_inputs
+
+
+def _plan_from(
+    bound_inputs, make_rel, names, metadata_sources, *, include_version=True
+):
+    """Assemble a relational builder's output Plan.
+
+    Merges the shared subtrees carried by ``bound_inputs`` (deduping and rebasing
+    ordinals), builds the output ``Rel`` by calling ``make_rel`` with the list of
+    rebased input rels (one per bound input, in order), and prepends the combined
+    subtrees as leading ``rel`` entries ahead of the query root. Metadata (extension
+    declarations / execution behavior) is merged from ``metadata_sources`` (input
+    plans and bound expressions). This is the single place the CTE subtree
+    propagation and Plan assembly live, so every relational builder is one call.
+    """
+    subtree_planrels, input_rels = _merge_input_subtrees(bound_inputs)
+    root = stp.PlanRel(
+        root=stalg.RelRoot(input=make_rel(input_rels), names=list(names))
+    )
+    kwargs = {
+        "relations": [*subtree_planrels, root],
+        **_merge_plan_metadata(*metadata_sources),
+    }
+    if include_version:
+        kwargs["version"] = default_version
+    return stp.Plan(**kwargs)
 
 
 def with_execution_behavior(
@@ -255,20 +331,21 @@ def project(
             e.output_names[0] for ee in bound_expressions for e in ee.referred_expr
         ]
 
-        rel = stalg.Rel(
-            project=stalg.ProjectRel(
-                input=_plan.relations[-1].root.input,
-                expressions=[
-                    e.expression for ee in bound_expressions for e in ee.referred_expr
-                ],
-                advanced_extension=extension,
-            )
-        )
-
-        return stp.Plan(
-            version=default_version,
-            relations=[stp.PlanRel(root=stalg.RelRoot(input=rel, names=names))],
-            **_merge_plan_metadata(_plan, *bound_expressions),
+        return _plan_from(
+            [_plan],
+            lambda inp: stalg.Rel(
+                project=stalg.ProjectRel(
+                    input=inp[0],
+                    expressions=[
+                        e.expression
+                        for ee in bound_expressions
+                        for e in ee.referred_expr
+                    ],
+                    advanced_extension=extension,
+                )
+            ),
+            names,
+            (_plan, *bound_expressions),
         )
 
     return resolve
@@ -306,25 +383,26 @@ def select(
             e.output_names[0] for ee in bound_expressions for e in ee.referred_expr
         ]
 
-        rel = stalg.Rel(
-            project=stalg.ProjectRel(
-                common=stalg.RelCommon(
-                    emit=stalg.RelCommon.Emit(
-                        output_mapping=[i + start_index for i in range(len(names))]
-                    )
-                ),
-                input=_plan.relations[-1].root.input,
-                expressions=[
-                    e.expression for ee in bound_expressions for e in ee.referred_expr
-                ],
-                advanced_extension=extension,
-            )
-        )
-
-        return stp.Plan(
-            version=default_version,
-            relations=[stp.PlanRel(root=stalg.RelRoot(input=rel, names=names))],
-            **_merge_plan_metadata(_plan, *bound_expressions),
+        return _plan_from(
+            [_plan],
+            lambda inp: stalg.Rel(
+                project=stalg.ProjectRel(
+                    common=stalg.RelCommon(
+                        emit=stalg.RelCommon.Emit(
+                            output_mapping=[i + start_index for i in range(len(names))]
+                        )
+                    ),
+                    input=inp[0],
+                    expressions=[
+                        e.expression
+                        for ee in bound_expressions
+                        for e in ee.referred_expr
+                    ],
+                    advanced_extension=extension,
+                )
+            ),
+            names,
+            (_plan, *bound_expressions),
         )
 
     return resolve
@@ -342,20 +420,17 @@ def filter(
             expression, ns, registry
         )
 
-        rel = stalg.Rel(
-            filter=stalg.FilterRel(
-                input=bound_plan.relations[-1].root.input,
-                condition=bound_expression.referred_expr[0].expression,
-                advanced_extension=extension,
-            )
-        )
-
-        names = ns.names
-
-        return stp.Plan(
-            version=default_version,
-            relations=[stp.PlanRel(root=stalg.RelRoot(input=rel, names=names))],
-            **_merge_plan_metadata(bound_plan, bound_expression),
+        return _plan_from(
+            [bound_plan],
+            lambda inp: stalg.Rel(
+                filter=stalg.FilterRel(
+                    input=inp[0],
+                    condition=bound_expression.referred_expr[0].expression,
+                    advanced_extension=extension,
+                )
+            ),
+            ns.names,
+            (bound_plan, bound_expression),
         )
 
     return resolve
@@ -385,24 +460,23 @@ def sort(
             (resolve_expression(e[0], ns, registry), e[1]) for e in bound_expressions
         ]
 
-        rel = stalg.Rel(
-            sort=stalg.SortRel(
-                input=bound_plan.relations[-1].root.input,
-                sorts=[
-                    stalg.SortField(
-                        expr=e[0].referred_expr[0].expression,
-                        direction=e[1],
-                    )
-                    for e in bound_expressions
-                ],
-                advanced_extension=extension,
+        return _plan_from(
+            [bound_plan],
+            lambda inp: stalg.Rel(
+                sort=stalg.SortRel(
+                    input=inp[0],
+                    sorts=[
+                        stalg.SortField(
+                            expr=e[0].referred_expr[0].expression,
+                            direction=e[1],
+                        )
+                        for e in bound_expressions
+                    ],
+                    advanced_extension=extension,
+                ),
             ),
-        )
-
-        return stp.Plan(
-            version=default_version,
-            relations=[stp.PlanRel(root=stalg.RelRoot(input=rel, names=ns.names))],
-            **_merge_plan_metadata(bound_plan, *[e[0] for e in bound_expressions]),
+            ns.names,
+            (bound_plan, *[e[0] for e in bound_expressions]),
         )
 
     return resolve
@@ -411,22 +485,45 @@ def sort(
 def set(inputs: Iterable[PlanOrUnbound], op: stalg.SetRel.SetOp) -> UnboundPlan:
     def resolve(registry: ExtensionRegistry) -> stp.Plan:
         bound_inputs = [i if isinstance(i, stp.Plan) else i(registry) for i in inputs]
-        rel = stalg.Rel(
-            set=stalg.SetRel(
-                inputs=[plan.relations[-1].root.input for plan in bound_inputs], op=op
-            )
+        return _plan_from(
+            bound_inputs,
+            lambda inp: stalg.Rel(set=stalg.SetRel(inputs=inp, op=op)),
+            bound_inputs[0].relations[-1].root.names,
+            tuple(bound_inputs),
         )
 
+    return resolve
+
+
+def reference(plan: PlanOrUnbound) -> UnboundPlan:
+    """Promote a plan to a shared subtree (a CTE) and reference it.
+
+    Returns a plan whose query root is a ``ReferenceRel`` pointing at ``plan``'s
+    root, which is carried along as a leading shared subtree (a ``PlanRel(rel=...)``
+    entry). Any subtrees ``plan`` already carries are preserved ahead of it, so
+    their ordinals stay valid; the promoted root takes the next ordinal.
+
+    Every downstream use of the returned plan carries the subtree upward; when two
+    branches that share the subtree later meet at a multi-input builder, the copies
+    collapse to one (see :func:`_merge_input_subtrees`). This is the building block
+    for :meth:`substrait.dataframe.DataFrame.cache`.
+    """
+
+    def resolve(registry: ExtensionRegistry) -> stp.Plan:
+        bound = plan if isinstance(plan, stp.Plan) else plan(registry)
+        nested = [stp.PlanRel(rel=s) for s in plan_subtrees(bound)]
+        ordinal = len(nested)  # the promoted root sits after the plan's own subtrees
+        promoted = stp.PlanRel(rel=bound.relations[-1].root.input)
+        names = list(bound.relations[-1].root.names)
+        ref = stalg.Rel(reference=stalg.ReferenceRel(subtree_ordinal=ordinal))
         return stp.Plan(
             version=default_version,
             relations=[
-                stp.PlanRel(
-                    root=stalg.RelRoot(
-                        input=rel, names=bound_inputs[0].relations[-1].root.names
-                    )
-                )
+                *nested,
+                promoted,
+                stp.PlanRel(root=stalg.RelRoot(input=ref, names=names)),
             ],
-            **_merge_plan_metadata(*bound_inputs),
+            **_merge_plan_metadata(bound),
         )
 
     return resolve
@@ -448,29 +545,22 @@ def fetch(
             resolve_expression(count, ns, registry) if count is not None else None
         )
 
-        rel = stalg.Rel(
-            fetch=stalg.FetchRel(
-                input=bound_plan.relations[-1].root.input,
-                offset_expr=bound_offset.referred_expr[0].expression
-                if bound_offset
-                else None,
-                count_expr=bound_count.referred_expr[0].expression
-                if bound_count
-                else None,
-                advanced_extension=extension,
-            )
-        )
-
-        return stp.Plan(
-            version=default_version,
-            relations=[
-                stp.PlanRel(
-                    root=stalg.RelRoot(
-                        input=rel, names=bound_plan.relations[-1].root.names
-                    )
+        return _plan_from(
+            [bound_plan],
+            lambda inp: stalg.Rel(
+                fetch=stalg.FetchRel(
+                    input=inp[0],
+                    offset_expr=bound_offset.referred_expr[0].expression
+                    if bound_offset
+                    else None,
+                    count_expr=bound_count.referred_expr[0].expression
+                    if bound_count
+                    else None,
+                    advanced_extension=extension,
                 )
-            ],
-            **_merge_plan_metadata(bound_plan, bound_offset, bound_count),
+            ),
+            bound_plan.relations[-1].root.names,
+            (bound_plan, bound_offset, bound_count),
         )
 
     return resolve
@@ -525,25 +615,22 @@ def join(
             )
             bound_post = resolve_expression(post_join_filter, output_ns, registry)
 
-        rel = stalg.Rel(
-            join=stalg.JoinRel(
-                left=bound_left.relations[-1].root.input,
-                right=bound_right.relations[-1].root.input,
-                expression=bound_expression.referred_expr[0].expression,
-                post_join_filter=bound_post.referred_expr[0].expression
-                if bound_post
-                else None,
-                type=type,
-                advanced_extension=extension,
-            )
-        )
-
-        return stp.Plan(
-            version=default_version,
-            relations=[stp.PlanRel(root=stalg.RelRoot(input=rel, names=out_names))],
-            **_merge_plan_metadata(
-                bound_left, bound_right, bound_expression, bound_post
+        return _plan_from(
+            [bound_left, bound_right],
+            lambda inp: stalg.Rel(
+                join=stalg.JoinRel(
+                    left=inp[0],
+                    right=inp[1],
+                    expression=bound_expression.referred_expr[0].expression,
+                    post_join_filter=bound_post.referred_expr[0].expression
+                    if bound_post
+                    else None,
+                    type=type,
+                    advanced_extension=extension,
+                )
             ),
+            out_names,
+            (bound_left, bound_right, bound_expression, bound_post),
         )
 
     return resolve
@@ -568,18 +655,17 @@ def cross(
             names=list(left_ns.names) + list(right_ns.names),
         )
 
-        rel = stalg.Rel(
-            cross=stalg.CrossRel(
-                left=bound_left.relations[-1].root.input,
-                right=bound_right.relations[-1].root.input,
-                advanced_extension=extension,
-            )
-        )
-
-        return stp.Plan(
-            version=default_version,
-            relations=[stp.PlanRel(root=stalg.RelRoot(input=rel, names=ns.names))],
-            **_merge_plan_metadata(bound_left, bound_right),
+        return _plan_from(
+            [bound_left, bound_right],
+            lambda inp: stalg.Rel(
+                cross=stalg.CrossRel(
+                    left=inp[0],
+                    right=inp[1],
+                    advanced_extension=extension,
+                )
+            ),
+            ns.names,
+            (bound_left, bound_right),
         )
 
     return resolve
@@ -627,35 +713,35 @@ def aggregate(
             else [list(range(len(bound_grouping_expressions)))]
         )
 
-        rel = stalg.Rel(
-            aggregate=stalg.AggregateRel(
-                input=bound_input.relations[-1].root.input,
-                grouping_expressions=[
-                    e.referred_expr[0].expression for e in bound_grouping_expressions
-                ],
-                groupings=[
-                    stalg.AggregateRel.Grouping(expression_references=refs)
-                    for refs in sets
-                ],
-                measures=[
-                    stalg.AggregateRel.Measure(
-                        measure=m.referred_expr[0].measure,
-                        filter=bf.referred_expr[0].expression if bf else None,
-                    )
-                    for m, bf in zip(bound_measures, bound_filters)
-                ],
-                advanced_extension=extension,
-            )
-        )
-
         names = [
             e.referred_expr[0].output_names[0] for e in bound_grouping_expressions
         ] + [e.referred_expr[0].output_names[0] for e in bound_measures]
 
-        return stp.Plan(
-            version=default_version,
-            relations=[stp.PlanRel(root=stalg.RelRoot(input=rel, names=names))],
-            **_merge_plan_metadata(
+        return _plan_from(
+            [bound_input],
+            lambda inp: stalg.Rel(
+                aggregate=stalg.AggregateRel(
+                    input=inp[0],
+                    grouping_expressions=[
+                        e.referred_expr[0].expression
+                        for e in bound_grouping_expressions
+                    ],
+                    groupings=[
+                        stalg.AggregateRel.Grouping(expression_references=refs)
+                        for refs in sets
+                    ],
+                    measures=[
+                        stalg.AggregateRel.Measure(
+                            measure=m.referred_expr[0].measure,
+                            filter=bf.referred_expr[0].expression if bf else None,
+                        )
+                        for m, bf in zip(bound_measures, bound_filters)
+                    ],
+                    advanced_extension=extension,
+                )
+            ),
+            names,
+            (
                 bound_input,
                 *bound_grouping_expressions,
                 *bound_measures,
@@ -680,23 +766,23 @@ def write_named_table(
         _create_mode = create_mode or stalg.WriteRel.CREATE_MODE_ERROR_IF_EXISTS
         _op = op if op is not None else stalg.WriteRel.WRITE_OP_CTAS
 
-        write_rel = stalg.Rel(
-            write=stalg.WriteRel(
-                input=bound_input.relations[-1].root.input,
-                table_schema=ns,
-                op=_op,
-                create_mode=_create_mode,
-                output=output_mode
-                if output_mode is not None
-                else stalg.WriteRel.OUTPUT_MODE_UNSPECIFIED,
-                named_table=stalg.NamedObjectWrite(names=_table_names),
-            )
-        )
-        return stp.Plan(
-            relations=[
-                stp.PlanRel(root=stalg.RelRoot(input=write_rel, names=ns.names))
-            ],
-            **_merge_plan_metadata(bound_input),
+        return _plan_from(
+            [bound_input],
+            lambda inp: stalg.Rel(
+                write=stalg.WriteRel(
+                    input=inp[0],
+                    table_schema=ns,
+                    op=_op,
+                    create_mode=_create_mode,
+                    output=output_mode
+                    if output_mode is not None
+                    else stalg.WriteRel.OUTPUT_MODE_UNSPECIFIED,
+                    named_table=stalg.NamedObjectWrite(names=_table_names),
+                )
+            ),
+            ns.names,
+            (bound_input,),
+            include_version=False,
         )
 
     return resolve
@@ -719,7 +805,7 @@ def ddl(
 
     def resolve(registry: ExtensionRegistry) -> stp.Plan:
         merge_sources = []
-        view_rel = None
+        bound_inputs = []
         schema = table_schema
         if view_definition is not None:
             view_plan = (
@@ -727,26 +813,26 @@ def ddl(
                 if isinstance(view_definition, stp.Plan)
                 else view_definition(registry)
             )
-            view_rel = view_plan.relations[-1].root.input
+            bound_inputs = [view_plan]
             merge_sources.append(view_plan)
             if schema is None:
                 schema = infer_plan_schema(view_plan, registry=registry)
 
-        ddl_rel = stalg.Rel(
-            ddl=stalg.DdlRel(
-                named_object=stalg.NamedObjectWrite(names=_names),
-                table_schema=schema,
-                object=object_type,
-                op=op,
-                view_definition=view_rel,
-                advanced_extension=extension,
-            )
-        )
         out_names = list(schema.names) if schema is not None else []
-        return stp.Plan(
-            version=default_version,
-            relations=[stp.PlanRel(root=stalg.RelRoot(input=ddl_rel, names=out_names))],
-            **_merge_plan_metadata(*merge_sources),
+        return _plan_from(
+            bound_inputs,
+            lambda inp: stalg.Rel(
+                ddl=stalg.DdlRel(
+                    named_object=stalg.NamedObjectWrite(names=_names),
+                    table_schema=schema,
+                    object=object_type,
+                    op=op,
+                    view_definition=inp[0] if inp else None,
+                    advanced_extension=extension,
+                )
+            ),
+            out_names,
+            tuple(merge_sources),
         )
 
     return resolve
@@ -869,28 +955,27 @@ def consistent_partition_window(
             for i, wf_ee in enumerate(bound_window_fns)
         ]
 
-        rel = stalg.Rel(
-            window=stalg.ConsistentPartitionWindowRel(
-                input=bound_plan.relations[-1].root.input,
-                window_functions=window_rel_functions,
-                partition_expressions=[
-                    e.referred_expr[0].expression for e in bound_partitions
-                ],
-                sorts=[
-                    stalg.SortField(
-                        expr=e[0].referred_expr[0].expression,
-                        direction=e[1],
-                    )
-                    for e in bound_sorts
-                ],
-                advanced_extension=extension,
-            )
-        )
-
-        return stp.Plan(
-            version=default_version,
-            relations=[stp.PlanRel(root=stalg.RelRoot(input=rel, names=names))],
-            **_merge_plan_metadata(
+        return _plan_from(
+            [bound_plan],
+            lambda inp: stalg.Rel(
+                window=stalg.ConsistentPartitionWindowRel(
+                    input=inp[0],
+                    window_functions=window_rel_functions,
+                    partition_expressions=[
+                        e.referred_expr[0].expression for e in bound_partitions
+                    ],
+                    sorts=[
+                        stalg.SortField(
+                            expr=e[0].referred_expr[0].expression,
+                            direction=e[1],
+                        )
+                        for e in bound_sorts
+                    ],
+                    advanced_extension=extension,
+                )
+            ),
+            names,
+            (
                 bound_plan,
                 *bound_partitions,
                 *[e[0] for e in bound_sorts],
@@ -940,16 +1025,16 @@ def expand(
                     )
                 )
 
-        rel = stalg.Rel(
-            expand=stalg.ExpandRel(
-                input=bound_input.relations[-1].root.input,
-                fields=expand_fields,
-            )
-        )
-        return stp.Plan(
-            version=default_version,
-            relations=[stp.PlanRel(root=stalg.RelRoot(input=rel, names=list(names)))],
-            **_merge_plan_metadata(*merge_sources),
+        return _plan_from(
+            [bound_input],
+            lambda inp: stalg.Rel(
+                expand=stalg.ExpandRel(
+                    input=inp[0],
+                    fields=expand_fields,
+                )
+            ),
+            list(names),
+            tuple(merge_sources),
         )
 
     return resolve
@@ -979,24 +1064,24 @@ def nested_loop_join(
         )
         bound_expression = resolve_expression(expression, ns, registry)
 
-        rel = stalg.Rel(
-            nested_loop_join=stalg.NestedLoopJoinRel(
-                left=bound_left.relations[-1].root.input,
-                right=bound_right.relations[-1].root.input,
-                expression=bound_expression.referred_expr[0].expression,
-                type=type,
-                advanced_extension=extension,
-            )
-        )
         out_names = join_output_names(
             stalg.NestedLoopJoinRel.JoinType.Name(type),
             left_ns.names,
             right_ns.names,
         )
-        return stp.Plan(
-            version=default_version,
-            relations=[stp.PlanRel(root=stalg.RelRoot(input=rel, names=out_names))],
-            **_merge_plan_metadata(bound_left, bound_right, bound_expression),
+        return _plan_from(
+            [bound_left, bound_right],
+            lambda inp: stalg.Rel(
+                nested_loop_join=stalg.NestedLoopJoinRel(
+                    left=inp[0],
+                    right=inp[1],
+                    expression=bound_expression.referred_expr[0].expression,
+                    type=type,
+                    advanced_extension=extension,
+                )
+            ),
+            out_names,
+            (bound_left, bound_right, bound_expression),
         )
 
     return resolve
@@ -1088,29 +1173,29 @@ def _physical_equi_join(rel_name, rel_cls):
                     residual_expression, combined_ns, registry
                 )
 
-            rel = stalg.Rel(
-                **{
-                    rel_name: rel_cls(
-                        left=bound_left.relations[-1].root.input,
-                        right=bound_right.relations[-1].root.input,
-                        keys=keys,
-                        type=type,
-                        post_join_filter=bound_post.referred_expr[0].expression
-                        if bound_post
-                        else None,
-                        residual_expression=bound_residual.referred_expr[0].expression
-                        if bound_residual
-                        else None,
-                        advanced_extension=extension,
-                    )
-                }
-            )
-            return stp.Plan(
-                version=default_version,
-                relations=[stp.PlanRel(root=stalg.RelRoot(input=rel, names=names))],
-                **_merge_plan_metadata(
-                    bound_left, bound_right, bound_post, bound_residual
+            return _plan_from(
+                [bound_left, bound_right],
+                lambda inp: stalg.Rel(
+                    **{
+                        rel_name: rel_cls(
+                            left=inp[0],
+                            right=inp[1],
+                            keys=keys,
+                            type=type,
+                            post_join_filter=bound_post.referred_expr[0].expression
+                            if bound_post
+                            else None,
+                            residual_expression=bound_residual.referred_expr[
+                                0
+                            ].expression
+                            if bound_residual
+                            else None,
+                            advanced_extension=extension,
+                        )
+                    }
                 ),
+                names,
+                (bound_left, bound_right, bound_post, bound_residual),
             )
 
         return resolve
@@ -1166,15 +1251,15 @@ def extension_single(plan: PlanOrUnbound, detail) -> UnboundPlan:
             names = list(detail.derive_schema(input_struct).names)
         else:
             names = list(bound_plan.relations[-1].root.names)
-        rel = stalg.Rel(
-            extension_single=stalg.ExtensionSingleRel(
-                input=bound_plan.relations[-1].root.input, detail=_detail_any(detail)
-            )
-        )
-        return stp.Plan(
-            version=default_version,
-            relations=[stp.PlanRel(root=stalg.RelRoot(input=rel, names=names))],
-            **_merge_plan_metadata(bound_plan),
+        return _plan_from(
+            [bound_plan],
+            lambda inp: stalg.Rel(
+                extension_single=stalg.ExtensionSingleRel(
+                    input=inp[0], detail=_detail_any(detail)
+                )
+            ),
+            names,
+            (bound_plan,),
         )
 
     return resolve
@@ -1189,16 +1274,16 @@ def extension_multi(inputs: Iterable[PlanOrUnbound], detail) -> UnboundPlan:
             infer_plan_schema(b, registry=registry).struct for b in bound_inputs
         ]
         names = list(detail.derive_schema(input_structs).names)
-        rel = stalg.Rel(
-            extension_multi=stalg.ExtensionMultiRel(
-                inputs=[b.relations[-1].root.input for b in bound_inputs],
-                detail=_detail_any(detail),
-            )
-        )
-        return stp.Plan(
-            version=default_version,
-            relations=[stp.PlanRel(root=stalg.RelRoot(input=rel, names=names))],
-            **_merge_plan_metadata(*bound_inputs),
+        return _plan_from(
+            bound_inputs,
+            lambda inp: stalg.Rel(
+                extension_multi=stalg.ExtensionMultiRel(
+                    inputs=inp,
+                    detail=_detail_any(detail),
+                )
+            ),
+            names,
+            tuple(bound_inputs),
         )
 
     return resolve
@@ -1222,23 +1307,17 @@ def exchange(
             if broadcast
             else {"round_robin": stalg.ExchangeRel.RoundRobin()}
         )
-        rel = stalg.Rel(
-            exchange=stalg.ExchangeRel(
-                input=bound_plan.relations[-1].root.input,
-                partition_count=partition_count,
-                **kind,
-            )
-        )
-        return stp.Plan(
-            version=default_version,
-            relations=[
-                stp.PlanRel(
-                    root=stalg.RelRoot(
-                        input=rel, names=bound_plan.relations[-1].root.names
-                    )
+        return _plan_from(
+            [bound_plan],
+            lambda inp: stalg.Rel(
+                exchange=stalg.ExchangeRel(
+                    input=inp[0],
+                    partition_count=partition_count,
+                    **kind,
                 )
-            ],
-            **_merge_plan_metadata(bound_plan),
+            ),
+            bound_plan.relations[-1].root.names,
+            (bound_plan,),
         )
 
     return resolve
@@ -1271,40 +1350,29 @@ def top_n(
             resolve_expression(offset, ns, registry) if offset is not None else None
         )
 
-        rel = stalg.Rel(
-            top_n=stalg.TopNRel(
-                input=bound_plan.relations[-1].root.input,
-                sorts=[
-                    stalg.SortField(
-                        expr=s.referred_expr[0].expression, direction=direction
-                    )
-                    for s, direction in bound_sorts
-                ],
-                count=bound_count.referred_expr[0].expression,
-                offset=bound_offset.referred_expr[0].expression
-                if bound_offset
-                else None,
-                mode=stalg.FetchMode.FETCH_MODE_WITH_TIES
-                if with_ties
-                else stalg.FetchMode.FETCH_MODE_ROWS_ONLY,
-                advanced_extension=extension,
-            )
-        )
-        return stp.Plan(
-            version=default_version,
-            relations=[
-                stp.PlanRel(
-                    root=stalg.RelRoot(
-                        input=rel, names=bound_plan.relations[-1].root.names
-                    )
+        return _plan_from(
+            [bound_plan],
+            lambda inp: stalg.Rel(
+                top_n=stalg.TopNRel(
+                    input=inp[0],
+                    sorts=[
+                        stalg.SortField(
+                            expr=s.referred_expr[0].expression, direction=direction
+                        )
+                        for s, direction in bound_sorts
+                    ],
+                    count=bound_count.referred_expr[0].expression,
+                    offset=bound_offset.referred_expr[0].expression
+                    if bound_offset
+                    else None,
+                    mode=stalg.FetchMode.FETCH_MODE_WITH_TIES
+                    if with_ties
+                    else stalg.FetchMode.FETCH_MODE_ROWS_ONLY,
+                    advanced_extension=extension,
                 )
-            ],
-            **_merge_plan_metadata(
-                bound_plan,
-                *[s for s, _ in bound_sorts],
-                bound_count,
-                bound_offset,
             ),
+            bound_plan.relations[-1].root.names,
+            (bound_plan, *[s for s, _ in bound_sorts], bound_count, bound_offset),
         )
 
     return resolve

@@ -13,8 +13,10 @@ import substrait.type_pb2 as stp
 from substrait.extension_registry import ExtensionRegistry
 from substrait.type_inference import infer_extended_expression_schema, outer_schemas
 from substrait.utils import (
+    inline_reference_rels,
     merge_extension_declarations,
     merge_extension_urns,
+    plan_subtrees,
     type_num_names,
 )
 
@@ -1041,7 +1043,17 @@ def _inner_rel(query, registry: ExtensionRegistry, base_schema):
         plan = query(registry) if callable(query) else query
     finally:
         outer_schemas.reset(token)
-    return plan, plan.relations[-1].root.input
+    rel = plan.relations[-1].root.input
+    # An Expression.Subquery embeds only a bare Rel, but a ReferenceRel is
+    # plan-global -- it cannot resolve once lifted out of its plan. So if the
+    # subquery's plan carries shared subtrees (e.g. it uses a cached frame),
+    # inline them into the subquery Rel, making it self-contained. A cached frame
+    # used inside a subquery is thus inlined there rather than shared across the
+    # subquery boundary.
+    subtrees = plan_subtrees(plan)
+    if subtrees:
+        rel = inline_reference_rels(rel, subtrees)
+    return plan, rel
 
 
 def scalar_subquery(query, alias: Union[str, None] = None):

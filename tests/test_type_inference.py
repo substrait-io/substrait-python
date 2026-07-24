@@ -600,3 +600,29 @@ def test_inference_set_nullability_preserves_field_types():
     # UNION -> nullable if nullable in any input; types (decimal 10/2, varchar 5,
     # list<string>) and the required inner string element are preserved.
     assert infer_rel_schema(rel) == _struct(_NULL, _NULL, _NULL)
+
+
+def test_inference_reference_resolves_against_subtree():
+    # A ReferenceRel's schema is the schema of the shared subtree its
+    # subtree_ordinal indexes into, taken from the `subtrees` list.
+    ref = stalg.Rel(reference=stalg.ReferenceRel(subtree_ordinal=1))
+    assert infer_rel_schema(ref, subtrees=[right_read_rel, read_rel]) == struct
+
+
+def test_inference_reference_through_wrapping_relation():
+    # A reference nested under another relation resolves too (subtrees thread down).
+    filt = stalg.Rel(
+        filter=stalg.FilterRel(
+            input=stalg.Rel(reference=stalg.ReferenceRel(subtree_ordinal=0))
+        )
+    )
+    assert infer_rel_schema(filt, subtrees=[read_rel]) == struct
+
+
+def test_inference_reference_out_of_range_raises():
+    ref = stalg.Rel(reference=stalg.ReferenceRel(subtree_ordinal=3))
+    with pytest.raises(Exception, match="out of range"):
+        infer_rel_schema(ref, subtrees=[read_rel])
+    # No subtrees in scope at all is also out of range.
+    with pytest.raises(Exception, match="out of range"):
+        infer_rel_schema(ref)

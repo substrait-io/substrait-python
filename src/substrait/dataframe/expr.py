@@ -1014,15 +1014,16 @@ def col(name: Union[str, int]) -> Expr:
     return Expr(column(name))
 
 
-def outer(name: Union[str, int], steps_out: int = 0) -> Expr:
+def outer(name: Union[str, int], steps_out: int = 1) -> Expr:
     """Reference a column from an enclosing query (a correlated reference).
 
     Only valid inside a subquery, e.g. a correlated ``exists``::
 
         outer_df.filter(sub.exists(inner_df.filter(sub.col("k") == sub.outer("k"))))
 
-    ``steps_out`` counts query-nesting levels outward (0 = the immediately
-    enclosing query).
+    ``steps_out`` counts query-nesting levels outward (1 = the immediately
+    enclosing query), matching Substrait's requirement that ``steps_out`` be
+    >= 1.
     """
     return Expr(_outer_reference(name, steps_out))
 

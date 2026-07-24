@@ -1060,7 +1060,7 @@ def test_correlated_exists():
     lhs, rhs = (a.value.selection for a in inner_cond.scalar_function.arguments)
     assert lhs.WhichOneof("root_type") == "root_reference"  # inner.k
     assert rhs.WhichOneof("root_type") == "outer_reference"  # outer.k
-    assert rhs.outer_reference.steps_out == 0
+    assert rhs.outer_reference.steps_out == 1  # 1 = the immediately enclosing query
     assert rhs.direct_reference.struct_field.field == 0  # "k" in the outer schema
 
 
@@ -1076,8 +1076,8 @@ def test_nested_correlation_steps_out():
     outer = sub.read_named_table("o", {"k": sub.i64})
     mid = sub.read_named_table("m", {"k": sub.i64})
     inner = sub.read_named_table("i", {"k": sub.i64})
-    # innermost references the outermost query -> steps_out=1
-    inner_corr = inner.filter(sub.col("k") == sub.outer("k", steps_out=1))
+    # innermost references the outermost query -> steps_out=2 (two levels out)
+    inner_corr = inner.filter(sub.col("k") == sub.outer("k", steps_out=2))
     mid_corr = mid.filter(sub.exists(inner_corr))
     plan = outer.filter(sub.exists(mid_corr)).to_plan()
 
@@ -1085,13 +1085,22 @@ def test_nested_correlation_steps_out():
         -1
     ].root.input.filter.condition.subquery.set_predicate.tuples.filter.condition.subquery.set_predicate.tuples.filter.condition  # mid  # inner
     rhs = inner_cond.scalar_function.arguments[1].value.selection
-    assert rhs.outer_reference.steps_out == 1  # two levels out -> the outermost
+    assert rhs.outer_reference.steps_out == 2  # two levels out -> the outermost
 
 
 def test_outer_outside_subquery_raises():
     df = sub.read_named_table("t", {"x": sub.i64})
     with pytest.raises(Exception, match="correlated subquery"):
         df.filter(sub.col("x") == sub.outer("x")).to_plan()
+
+
+def test_outer_steps_out_below_one_raises():
+    # Substrait requires steps_out >= 1; the 0-based convention is rejected.
+    outer = sub.read_named_table("o", {"k": sub.i64})
+    inner = sub.read_named_table("i", {"k": sub.i64})
+    corr = inner.filter(sub.col("k") == sub.outer("k", steps_out=0))
+    with pytest.raises(ValueError, match="steps_out must be >= 1"):
+        outer.filter(sub.exists(corr)).to_plan()
 
 
 def test_correlated_subquery_projecting_outer_column_then_chaining():

@@ -358,21 +358,26 @@ def literal(
     return resolve
 
 
-def outer_reference(field: Union[str, int], steps_out: int = 0):
+def outer_reference(field: Union[str, int], steps_out: int = 1):
     """A field reference to an enclosing query's column (a correlated reference).
 
     Only valid inside a subquery; ``steps_out`` counts query-nesting levels
-    outward (0 = the immediately enclosing query). ``field`` is resolved against
-    that enclosing query's schema.
+    outward (1 = the immediately enclosing query), matching Substrait's
+    requirement that ``steps_out`` be >= 1. ``field`` is resolved against that
+    enclosing query's schema.
     """
 
     def resolve(
         base_schema: stp.NamedStruct, registry: ExtensionRegistry
     ) -> stee.ExtendedExpression:
+        if steps_out < 1:
+            raise ValueError(
+                "steps_out must be >= 1 (1 = the immediately enclosing query)"
+            )
         stack = outer_schemas.get()
-        if steps_out >= len(stack):
+        if steps_out > len(stack):
             raise Exception("outer() is only valid inside a correlated subquery")
-        outer_ns = stack[len(stack) - 1 - steps_out]
+        outer_ns = stack[len(stack) - steps_out]
         # Resolve the column against the enclosing schema, then re-root it as an
         # outer reference (keeping the resolved struct-field segment).
         resolved = column(field)(outer_ns, registry).referred_expr[0]

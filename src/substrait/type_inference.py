@@ -5,7 +5,7 @@ import substrait.extended_expression_pb2 as stee
 import substrait.plan_pb2 as stp
 import substrait.type_pb2 as stt
 
-from substrait.utils import plan_subtrees
+from substrait.utils import iter_plan_rels, plan_subtrees, rel_anchor_of
 
 
 class _SubtreeScope:
@@ -53,11 +53,62 @@ class _SubtreeScope:
         return schema
 
 
+class _AnchorScope:
+    """Plan-wide map of ``RelCommon.rel_anchor`` -> the relation carrying it, with
+    lazy per-anchor output-schema memoization, for resolving id-based outer
+    references (``OuterReference.rel_reference``).
+
+    A ``rel_reference`` names the anchor of the relation the reference is rooted on;
+    it resolves against that relation's output schema. Resolution is lazy (only
+    anchors actually referenced are inferred) and memoized. Inference of an anchored
+    relation may itself resolve a ``rel_reference``, so an in-progress set turns a
+    malformed cyclic reference into a clear error rather than a ``RecursionError``.
+    Anchored relations are inferred with the plan's ``_SubtreeScope`` in scope so an
+    anchor set on a shared subtree still resolves.
+    """
+
+    __slots__ = ("_rels", "_subtrees", "_schemas", "_resolving")
+
+    def __init__(self, rels: dict, subtrees):
+        self._rels = rels
+        self._subtrees = subtrees
+        self._schemas: dict = {}
+        self._resolving: set = set()
+
+    def schema_of(self, anchor, registry) -> stt.Type.Struct:
+        if anchor in self._schemas:
+            return self._schemas[anchor]
+        if anchor not in self._rels:
+            raise Exception(f"outer reference to unknown rel_anchor {anchor}")
+        if anchor in self._resolving:
+            raise Exception(
+                f"outer reference rel_anchor {anchor} forms a resolution cycle"
+            )
+        self._resolving.add(anchor)
+        try:
+            struct = infer_rel_schema(
+                self._rels[anchor], registry=registry, subtrees=self._subtrees
+            )
+        finally:
+            self._resolving.discard(anchor)
+        self._schemas[anchor] = struct
+        return struct
+
+
 # Stack of enclosing-query schemas (NamedStruct) for correlated subqueries, so a
 # field reference with an OuterReference root resolves against the right level.
-# Pushed by the subquery builders while resolving their inner plan.
+# Pushed by the subquery builders while resolving their inner plan. Used for
+# offset-based (steps_out) outer references; id-based (rel_reference) ones resolve
+# against ``anchor_scope`` instead.
 outer_schemas: contextvars.ContextVar = contextvars.ContextVar(
     "outer_schemas", default=()
+)
+
+# The plan-wide anchor index (an ``_AnchorScope``) for the plan currently being
+# inferred, or None outside ``infer_plan_schema``. Set for the duration of a
+# whole-plan inference so a ``rel_reference`` anywhere in the tree resolves.
+anchor_scope: contextvars.ContextVar = contextvars.ContextVar(
+    "anchor_scope", default=None
 )
 
 
@@ -277,20 +328,34 @@ def infer_expression_type(
         # the correlated-subquery stack); a lambda parameter reference against
         # the lambda's parameter struct; otherwise against the input row.
         if root_type == "outer_reference":
-            stack = outer_schemas.get()
-            # steps_out is 1-based per the Substrait spec (1 = the immediately
-            # enclosing query), so it indexes back from the top of the stack.
-            steps = expression.selection.outer_reference.steps_out
-            if steps < 1:
-                raise Exception(
-                    f"outer reference has steps_out={steps}; Substrait requires "
-                    "steps_out >= 1 (1 = the immediately enclosing query)"
-                )
-            if steps > len(stack):
-                raise Exception(
-                    "outer reference outside an enclosing (correlated) query"
-                )
-            schema = stack[len(stack) - steps].struct
+            outer_ref = expression.selection.outer_reference
+            # An outer reference resolves either by id (rel_reference -> the schema
+            # of the relation carrying that rel_anchor, via the plan-wide anchor
+            # index) or by offset (steps_out -> that many levels up the
+            # correlated-subquery stack). These are a protobuf oneof.
+            if outer_ref.WhichOneof("outer_reference_type") == "rel_reference":
+                anchors = anchor_scope.get()
+                if anchors is None:
+                    raise Exception(
+                        "rel_reference outer reference requires whole-plan context; "
+                        "infer via infer_plan_schema"
+                    )
+                schema = anchors.schema_of(outer_ref.rel_reference, registry)
+            else:
+                stack = outer_schemas.get()
+                # steps_out is 1-based per the Substrait spec (1 = the immediately
+                # enclosing query), so it indexes back from the top of the stack.
+                steps = outer_ref.steps_out
+                if steps < 1:
+                    raise Exception(
+                        f"outer reference has steps_out={steps}; Substrait requires "
+                        "steps_out >= 1 (1 = the immediately enclosing query)"
+                    )
+                if steps > len(stack):
+                    raise Exception(
+                        "outer reference outside an enclosing (correlated) query"
+                    )
+                schema = stack[len(stack) - steps].struct
         else:
             assert root_type in ("root_reference", "lambda_parameter_reference")
             schema = parent_schema
@@ -802,7 +867,15 @@ def infer_plan_schema(plan: stp.Plan, *, registry=None) -> stt.NamedStruct:
     # ReferenceRel anywhere in the tree resolves against them by ordinal. Wrap them
     # in a _SubtreeScope so repeated references are memoized and cycles are caught.
     subtrees = _SubtreeScope(plan_subtrees(plan))
-    root = plan.relations[-1].root
-    schema = infer_rel_schema(root.input, registry=registry, subtrees=subtrees)
+    # Index every RelCommon.rel_anchor in the plan (across subtrees, the root, and
+    # subquery-embedded relations) so an id-based OuterReference (rel_reference)
+    # anywhere resolves against the anchored relation's output schema.
+    anchors = {a: rel for rel in iter_plan_rels(plan) if (a := rel_anchor_of(rel))}
+    token = anchor_scope.set(_AnchorScope(anchors, subtrees))
+    try:
+        root = plan.relations[-1].root
+        schema = infer_rel_schema(root.input, registry=registry, subtrees=subtrees)
+    finally:
+        anchor_scope.reset(token)
 
     return stt.NamedStruct(names=root.names, struct=schema)

@@ -1,10 +1,12 @@
 import pytest
 import substrait.algebra_pb2 as stalg
+import substrait.plan_pb2 as stp
 import substrait.type_pb2 as stt
 
 from substrait.type_inference import (
     infer_expression_type,
     infer_nested_type,
+    infer_plan_schema,
     infer_rel_schema,
 )
 
@@ -626,3 +628,78 @@ def test_inference_reference_out_of_range_raises():
     # No subtrees in scope at all is also out of range.
     with pytest.raises(Exception, match="out of range"):
         infer_rel_schema(ref)
+
+
+def _outer_ref(field, *, rel_reference=None, steps_out=None):
+    outer = stalg.Expression.FieldReference.OuterReference()
+    if rel_reference is not None:
+        outer.rel_reference = rel_reference
+    else:
+        outer.steps_out = steps_out
+    return stalg.Expression(
+        selection=stalg.Expression.FieldReference(
+            outer_reference=outer,
+            direct_reference=stalg.Expression.ReferenceSegment(
+                struct_field=stalg.Expression.ReferenceSegment.StructField(field=field)
+            ),
+        )
+    )
+
+
+def test_infer_rel_reference_resolves_against_anchored_subtree():
+    # A rel_reference resolves against the output schema of whatever relation in the
+    # plan carries the matching rel_anchor -- here a shared subtree -- which the
+    # offset-based steps_out could not address. The project appends order_total
+    # (field 2, fp32 nullable) pulled from the anchored subtree.
+    anchored = stalg.Rel(
+        read=stalg.ReadRel(
+            base_schema=named_struct,
+            common=stalg.RelCommon(rel_anchor=7),
+            named_table=stalg.ReadRel.NamedTable(names=["shared"]),
+        )
+    )
+    root_input = stalg.Rel(
+        project=stalg.ProjectRel(
+            input=right_read_rel,
+            expressions=[_outer_ref(2, rel_reference=7)],
+        )
+    )
+    plan = stp.Plan(
+        relations=[
+            stp.PlanRel(rel=anchored),
+            stp.PlanRel(
+                root=stalg.RelRoot(
+                    input=root_input,
+                    names=["order_id", "is_refundable", "order_total"],
+                )
+            ),
+        ]
+    )
+
+    expected = stt.Type.Struct(
+        types=list(right_struct.types)
+        + [stt.Type(fp32=stt.Type.FP32(nullability=stt.Type.NULLABILITY_NULLABLE))]
+    )
+    assert infer_plan_schema(plan).struct == expected
+
+
+def test_infer_rel_reference_unknown_anchor_raises():
+    root_input = stalg.Rel(
+        project=stalg.ProjectRel(
+            input=right_read_rel, expressions=[_outer_ref(0, rel_reference=99)]
+        )
+    )
+    plan = stp.Plan(
+        relations=[
+            stp.PlanRel(root=stalg.RelRoot(input=root_input, names=["a", "b", "c"]))
+        ]
+    )
+    with pytest.raises(Exception, match="unknown rel_anchor 99"):
+        infer_plan_schema(plan)
+
+
+def test_infer_expression_rel_reference_without_plan_context_raises():
+    # Resolving a rel_reference needs the plan-wide anchor index; a bare
+    # infer_expression_type call (no infer_plan_schema) has no index in scope.
+    with pytest.raises(Exception, match="whole-plan context"):
+        infer_expression_type(_outer_ref(0, rel_reference=1), struct)

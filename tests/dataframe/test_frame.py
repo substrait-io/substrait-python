@@ -1123,13 +1123,18 @@ def test_correlated_exists():
     corr = inner.filter(sub.col("k") == sub.outer("k"))  # inner.k == outer.k
     plan = outer.filter(sub.exists(corr)).to_plan()
 
-    inner_cond = plan.relations[
-        -1
-    ].root.input.filter.condition.subquery.set_predicate.tuples.filter.condition
+    root_input = plan.relations[-1].root.input
+    inner_cond = (
+        root_input.filter.condition.subquery.set_predicate.tuples.filter.condition
+    )
     lhs, rhs = (a.value.selection for a in inner_cond.scalar_function.arguments)
     assert lhs.WhichOneof("root_type") == "root_reference"  # inner.k
     assert rhs.WhichOneof("root_type") == "outer_reference"  # outer.k
-    assert rhs.outer_reference.steps_out == 1  # 1 = the immediately enclosing query
+    # The DataFrame emits id-based correlations: the outer reference names the
+    # rel_anchor stamped on the binding relation (the enclosing filter's input).
+    anchor = root_input.filter.input.read.common.rel_anchor
+    assert rhs.outer_reference.WhichOneof("outer_reference_type") == "rel_reference"
+    assert rhs.outer_reference.rel_reference == anchor
     assert rhs.direct_reference.struct_field.field == 0  # "k" in the outer schema
 
 
@@ -1141,7 +1146,7 @@ def test_correlated_scalar_subquery_chains():
     assert plan.relations[-1].root.input.HasField("filter")
 
 
-def test_nested_correlation_steps_out():
+def test_nested_correlation_id_based():
     outer = sub.read_named_table("o", {"k": sub.i64})
     mid = sub.read_named_table("m", {"k": sub.i64})
     inner = sub.read_named_table("i", {"k": sub.i64})
@@ -1150,11 +1155,14 @@ def test_nested_correlation_steps_out():
     mid_corr = mid.filter(sub.exists(inner_corr))
     plan = outer.filter(sub.exists(mid_corr)).to_plan()
 
-    inner_cond = plan.relations[
-        -1
-    ].root.input.filter.condition.subquery.set_predicate.tuples.filter.condition.subquery.set_predicate.tuples.filter.condition  # mid  # inner
+    root_input = plan.relations[-1].root.input
+    inner_cond = root_input.filter.condition.subquery.set_predicate.tuples.filter.condition.subquery.set_predicate.tuples.filter.condition  # mid  # inner
     rhs = inner_cond.scalar_function.arguments[1].value.selection
-    assert rhs.outer_reference.steps_out == 2  # two levels out -> the outermost
+    # steps_out=2 selects the outermost query; it is emitted id-based as a
+    # rel_reference to the rel_anchor stamped on that outermost relation.
+    outermost_read = root_input.filter.input.read
+    assert rhs.outer_reference.WhichOneof("outer_reference_type") == "rel_reference"
+    assert rhs.outer_reference.rel_reference == outermost_read.common.rel_anchor
 
 
 def test_outer_outside_subquery_raises():

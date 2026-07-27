@@ -116,7 +116,7 @@ def _iter_child_rels(rel: stalg.Rel):
         return
     node = getattr(rel, rel_type)
     for field in _child_rel_fields(node):
-        if field.label == field.LABEL_REPEATED:
+        if field.is_repeated:
             children = getattr(node, field.name)
             for i in range(len(children)):
                 yield children, i
@@ -174,6 +174,196 @@ def _inline_reference_rels_in_place(rel: stalg.Rel, subtrees) -> None:
             )
         else:
             _inline_reference_rels_in_place(child, subtrees)
+
+
+def _iter_direct_subexpressions(msg):
+    """Yield the immediate ``Expression`` messages owned by ``msg``.
+
+    Recurses through sub-messages that are neither ``Expression`` nor ``Rel`` (e.g.
+    ``FunctionArgument``, ``IfClause``, the ``Subquery`` wrappers), yields each
+    ``Expression``-typed field without descending into it, and stops at ``Rel``
+    fields (child relations / subquery inputs, handled separately). Discovered from
+    the protobuf descriptor so it stays correct as the schema evolves -- a shallow
+    scan of top-level ``Expression`` fields would miss e.g. an aggregate measure's
+    arguments (``measures[].measure.arguments[].value``) or a sort key
+    (``sorts[].expr``).
+    """
+    for field in msg.DESCRIPTOR.fields:
+        if field.message_type is None:
+            continue
+        if field.message_type.GetOptions().map_entry:
+            continue
+        full = field.message_type.full_name
+        if field.is_repeated:
+            values = getattr(msg, field.name)
+            if full == "substrait.Expression":
+                yield from values
+            elif full != "substrait.Rel":
+                for value in values:
+                    yield from _iter_direct_subexpressions(value)
+        elif msg.HasField(field.name):
+            if full == "substrait.Expression":
+                yield getattr(msg, field.name)
+            elif full != "substrait.Rel":
+                yield from _iter_direct_subexpressions(getattr(msg, field.name))
+
+
+def _iter_rel_expressions(rel: stalg.Rel):
+    """Yield the root ``Expression`` messages a relation owns (its own scope): the
+    filter condition, project expressions, join condition, aggregate/sort/expand
+    expressions, etc. Expressions inside child relations belong to those relations."""
+    rel_type = rel.WhichOneof("rel_type")
+    if rel_type is None:
+        return
+    yield from _iter_direct_subexpressions(getattr(rel, rel_type))
+
+
+def _iter_subquery_rels(expr: stalg.Expression):
+    """Yield the input ``Rel``(s) of a subquery expression (``scalar.input``,
+    ``set_predicate.tuples``, ``set_comparison.right``, ``in_predicate.haystack``),
+    discovered from the descriptor. Empty for a non-subquery expression."""
+    if expr.WhichOneof("rex_type") != "subquery":
+        return
+    variant = expr.subquery.WhichOneof("subquery_type")
+    if variant is None:
+        return
+    inner = getattr(expr.subquery, variant)
+    for field in _child_rel_fields(inner):
+        if field.is_repeated:
+            yield from getattr(inner, field.name)
+        elif inner.HasField(field.name):
+            yield getattr(inner, field.name)
+
+
+def _iter_subquery_rels_in_expr(expr: stalg.Expression):
+    """Yield every subquery input ``Rel`` reachable from ``expr`` in its own scope
+    (i.e. not descending into those inner relations)."""
+    yield from _iter_subquery_rels(expr)
+    for sub in _iter_direct_subexpressions(expr):
+        yield from _iter_subquery_rels_in_expr(sub)
+
+
+def _walk_rel(rel: stalg.Rel):
+    yield rel
+    for container, key in _iter_child_rels(rel):
+        yield from _walk_rel(_child_rel(container, key))
+    for expr in _iter_rel_expressions(rel):
+        for inner in _iter_subquery_rels_in_expr(expr):
+            yield from _walk_rel(inner)
+
+
+def iter_plan_rels(plan: stplan.Plan):
+    """Yield every ``Rel`` in a Plan: the shared subtrees, the query root, all direct
+    child relations, and relations embedded inside ``Expression`` subqueries."""
+    for pr in plan.relations:
+        kind = pr.WhichOneof("rel_type")
+        if kind == "rel":
+            yield from _walk_rel(pr.rel)
+        elif kind == "root":
+            yield from _walk_rel(pr.root.input)
+
+
+def _rel_node_with_common(rel: stalg.Rel):
+    """The active relation-variant submessage of ``rel`` if it carries a
+    ``RelCommon``, else ``None`` (a ``ReferenceRel`` has no ``common``)."""
+    rel_type = rel.WhichOneof("rel_type")
+    if rel_type is None:
+        return None
+    node = getattr(rel, rel_type)
+    if node.DESCRIPTOR.fields_by_name.get("common") is None:
+        return None
+    return node
+
+
+def rel_anchor_of(rel: stalg.Rel):
+    """The ``RelCommon.rel_anchor`` of ``rel`` if set, else ``None``."""
+    node = _rel_node_with_common(rel)
+    if node is None or not node.common.HasField("rel_anchor"):
+        return None
+    return node.common.rel_anchor
+
+
+def to_id_based_outer_references(plan: stplan.Plan) -> stplan.Plan:
+    """A copy of ``plan`` with every offset-based ``OuterReference`` (``steps_out``)
+    rewritten to the id-based form (``rel_reference`` naming a
+    ``RelCommon.rel_anchor``).
+
+    The binding relation an ``OuterReference`` resolves against -- the input of its
+    enclosing single-input host (``Filter`` / ``Project`` / ...) -- is stamped with a
+    plan-wide-unique ``rel_anchor``; several references to the same scope share one
+    anchor. References already in id-based form are left unchanged, so the pass is
+    idempotent and tolerates a partially-converted input.
+
+    Raises if a correlation binds to a relation that cannot carry an anchor: a
+    ``ReferenceRel`` (no ``RelCommon``) or a multi-input host (ambiguous input row).
+    """
+    out = stplan.Plan()
+    out.CopyFrom(plan)
+
+    existing = [a for a in (rel_anchor_of(r) for r in iter_plan_rels(out)) if a]
+    counter = [max(existing) if existing else 0]
+    anchor_by_id: dict = {}
+
+    def anchor_for(binding: stalg.Rel) -> int:
+        found = rel_anchor_of(binding)
+        if found:
+            return found
+        key = id(binding)
+        if key in anchor_by_id:
+            return anchor_by_id[key]
+        node = _rel_node_with_common(binding)
+        if node is None:
+            raise Exception(
+                "cannot resolve an outer reference into a "
+                f"{binding.WhichOneof('rel_type')!r} relation to an id-based "
+                "rel_reference: it carries no RelCommon to hold a rel_anchor"
+            )
+        counter[0] += 1
+        node.common.rel_anchor = counter[0]
+        anchor_by_id[key] = counter[0]
+        return counter[0]
+
+    def convert_expr(expr, scope, host_input):
+        rex = expr.WhichOneof("rex_type")
+        if rex == "selection":
+            sel = expr.selection
+            if sel.WhichOneof("root_type") == "outer_reference":
+                oref = sel.outer_reference
+                if oref.WhichOneof("outer_reference_type") == "steps_out":
+                    steps = oref.steps_out
+                    if not 1 <= steps <= len(scope):
+                        raise Exception(
+                            f"outer reference steps_out={steps} escapes its "
+                            f"{len(scope)} enclosing query scope(s)"
+                        )
+                    binding = scope[-steps]
+                    if binding is None:
+                        raise Exception(
+                            "cannot resolve an outer reference into a multi-input "
+                            "relation's scope to an id-based rel_reference"
+                        )
+                    oref.rel_reference = anchor_for(binding)
+        elif rex == "subquery":
+            for inner in _iter_subquery_rels(expr):
+                convert_rel(inner, scope + [host_input])
+        for sub in _iter_direct_subexpressions(expr):
+            convert_expr(sub, scope, host_input)
+
+    def convert_rel(rel, scope):
+        children = list(_iter_child_rels(rel))
+        host_input = _child_rel(*children[0]) if len(children) == 1 else None
+        for expr in _iter_rel_expressions(rel):
+            convert_expr(expr, scope, host_input)
+        for container, key in children:
+            convert_rel(_child_rel(container, key), scope)
+
+    for pr in out.relations:
+        kind = pr.WhichOneof("rel_type")
+        if kind == "rel":
+            convert_rel(pr.rel, [])
+        elif kind == "root":
+            convert_rel(pr.root.input, [])
+    return out
 
 
 def merge_extensions_into(target, *sources):

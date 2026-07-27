@@ -406,7 +406,17 @@ class DataFrame:
             )
         )
 
-    def _equi_join(self, builder, rel_cls, other, left_on, right_on, how):
+    def _equi_join(
+        self,
+        builder,
+        rel_cls,
+        other,
+        left_on,
+        right_on,
+        how,
+        post_filter,
+        residual,
+    ):
         if how not in _JOIN_TYPES:
             raise ValueError(
                 f"unknown join type {how!r}; expected one of {sorted(_JOIN_TYPES)}"
@@ -420,7 +430,19 @@ class DataFrame:
                 [right_on] if isinstance(right_on, (str, int)) else list(right_on)
             )
         return self._next(
-            builder(self._plan, other._plan, left_keys, right_keys, join_type)
+            builder(
+                self._plan,
+                other._plan,
+                left_keys,
+                right_keys,
+                join_type,
+                post_join_filter=(
+                    _unbound(post_filter) if post_filter is not None else None
+                ),
+                residual_expression=(
+                    _unbound(residual) if residual is not None else None
+                ),
+            )
         )
 
     def hash_join(
@@ -429,14 +451,27 @@ class DataFrame:
         left_on: Union[str, int, Iterable[Union[str, int]]],
         right_on: Union[str, int, Iterable[Union[str, int]], None] = None,
         how: str = "inner",
+        *,
+        post_filter: Union[Expr, Any, None] = None,
+        residual: Union[Expr, Any, None] = None,
     ) -> "DataFrame":
         """Physical hash equi-join on key columns.
 
         ``left_on``/``right_on`` are column names/indices; ``right_on`` defaults
         to ``left_on``. ``how`` accepts the same values as :meth:`join`.
+        ``post_filter`` is an optional predicate applied to the join output;
+        ``residual`` is an optional non-equi condition evaluated alongside the
+        key equalities. Both bind against the concatenated left+right schema.
         """
         return self._equi_join(
-            _plan.hash_join, stalg.HashJoinRel, other, left_on, right_on, how
+            _plan.hash_join,
+            stalg.HashJoinRel,
+            other,
+            left_on,
+            right_on,
+            how,
+            post_filter,
+            residual,
         )
 
     def merge_join(
@@ -445,10 +480,23 @@ class DataFrame:
         left_on: Union[str, int, Iterable[Union[str, int]]],
         right_on: Union[str, int, Iterable[Union[str, int]], None] = None,
         how: str = "inner",
+        *,
+        post_filter: Union[Expr, Any, None] = None,
+        residual: Union[Expr, Any, None] = None,
     ) -> "DataFrame":
-        """Physical sort-merge equi-join on key columns (inputs assumed sorted)."""
+        """Physical sort-merge equi-join on key columns (inputs assumed sorted).
+
+        ``post_filter`` and ``residual`` behave as in :meth:`hash_join`.
+        """
         return self._equi_join(
-            _plan.merge_join, stalg.MergeJoinRel, other, left_on, right_on, how
+            _plan.merge_join,
+            stalg.MergeJoinRel,
+            other,
+            left_on,
+            right_on,
+            how,
+            post_filter,
+            residual,
         )
 
     def repartition(self, n: int = 0) -> "DataFrame":

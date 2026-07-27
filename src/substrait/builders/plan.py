@@ -19,7 +19,11 @@ from substrait.builders.extended_expression import (
     resolve_expression,
 )
 from substrait.extension_registry import ExtensionRegistry
-from substrait.type_inference import infer_plan_schema, join_output_names
+from substrait.type_inference import (
+    _join_output_struct,
+    infer_plan_schema,
+    join_output_names,
+)
 from substrait.utils import (
     merge_extension_declarations,
     merge_extension_urns,
@@ -487,6 +491,7 @@ def join(
         left_ns = infer_plan_schema(bound_left, registry=registry)
         right_ns = infer_plan_schema(bound_right, registry=registry)
 
+        # The join condition binds against the combined left+right schema.
         ns = stt.NamedStruct(
             struct=stt.Type.Struct(
                 types=list(left_ns.struct.types) + list(right_ns.struct.types),
@@ -497,11 +502,28 @@ def join(
         bound_expression: stee.ExtendedExpression = resolve_expression(
             expression, ns, registry
         )
-        bound_post = (
-            resolve_expression(post_join_filter, ns, registry)
-            if post_join_filter is not None
-            else None
-        )
+
+        # The output names must match the columns the join type actually emits
+        # (semi/anti drop a side, mark appends a boolean).
+        type_name = stalg.JoinRel.JoinType.Name(type)
+        out_names = join_output_names(type_name, left_ns.names, right_ns.names)
+
+        # post_join_filter is applied to each output record after
+        # join-type-specific output formation (semantically a FilterRel above the
+        # join), so it resolves against the output schema -- which for semi/anti
+        # joins is a single side, not the combined schema.
+        bound_post = None
+        if post_join_filter is not None:
+            output_ns = stt.NamedStruct(
+                names=out_names,
+                struct=_join_output_struct(
+                    type_name,
+                    bound_left.relations[-1].root.input,
+                    bound_right.relations[-1].root.input,
+                    registry=registry,
+                ),
+            )
+            bound_post = resolve_expression(post_join_filter, output_ns, registry)
 
         rel = stalg.Rel(
             join=stalg.JoinRel(
@@ -516,12 +538,6 @@ def join(
             )
         )
 
-        # The join condition resolves against the combined left+right schema, but
-        # the output names must match the columns the join type actually emits
-        # (semi/anti drop a side, mark appends a boolean).
-        out_names = join_output_names(
-            stalg.JoinRel.JoinType.Name(type), left_ns.names, right_ns.names
-        )
         return stp.Plan(
             version=default_version,
             relations=[stp.PlanRel(root=stalg.RelRoot(input=rel, names=out_names))],
@@ -1023,6 +1039,9 @@ def _physical_equi_join(rel_name, rel_cls):
         left_keys: Iterable[Union[str, int]],
         right_keys: Iterable[Union[str, int]],
         type,
+        *,
+        post_join_filter: Optional[ExtendedExpressionOrUnbound] = None,
+        residual_expression: Optional[ExtendedExpressionOrUnbound] = None,
         extension: Optional[AdvancedExtension] = None,
     ) -> UnboundPlan:
         def resolve(registry: ExtensionRegistry) -> stp.Plan:
@@ -1033,9 +1052,42 @@ def _physical_equi_join(rel_name, rel_cls):
             keys = _comparison_join_keys(
                 list(left_keys), list(right_keys), left_ns, right_ns, registry
             )
-            names = join_output_names(
-                rel_cls.JoinType.Name(type), left_ns.names, right_ns.names
-            )
+            type_name = rel_cls.JoinType.Name(type)
+            names = join_output_names(type_name, left_ns.names, right_ns.names)
+
+            # post_join_filter is applied to each output record after
+            # join-type-specific output formation (semantically a FilterRel above
+            # the join), so it resolves against the output schema -- which for
+            # semi/anti joins is a single side. residual_expression is evaluated
+            # on each candidate key-match (both rows present), so it resolves
+            # against the combined left+right schema. Each is built only when the
+            # corresponding predicate is supplied.
+            bound_post = None
+            if post_join_filter is not None:
+                output_ns = stt.NamedStruct(
+                    names=names,
+                    struct=_join_output_struct(
+                        type_name,
+                        bound_left.relations[-1].root.input,
+                        bound_right.relations[-1].root.input,
+                        registry=registry,
+                    ),
+                )
+                bound_post = resolve_expression(post_join_filter, output_ns, registry)
+
+            bound_residual = None
+            if residual_expression is not None:
+                combined_ns = stt.NamedStruct(
+                    struct=stt.Type.Struct(
+                        types=list(left_ns.struct.types) + list(right_ns.struct.types),
+                        nullability=stt.Type.Nullability.NULLABILITY_REQUIRED,
+                    ),
+                    names=list(left_ns.names) + list(right_ns.names),
+                )
+                bound_residual = resolve_expression(
+                    residual_expression, combined_ns, registry
+                )
+
             rel = stalg.Rel(
                 **{
                     rel_name: rel_cls(
@@ -1043,6 +1095,12 @@ def _physical_equi_join(rel_name, rel_cls):
                         right=bound_right.relations[-1].root.input,
                         keys=keys,
                         type=type,
+                        post_join_filter=bound_post.referred_expr[0].expression
+                        if bound_post
+                        else None,
+                        residual_expression=bound_residual.referred_expr[0].expression
+                        if bound_residual
+                        else None,
                         advanced_extension=extension,
                     )
                 }
@@ -1050,7 +1108,9 @@ def _physical_equi_join(rel_name, rel_cls):
             return stp.Plan(
                 version=default_version,
                 relations=[stp.PlanRel(root=stalg.RelRoot(input=rel, names=names))],
-                **_merge_plan_metadata(bound_left, bound_right),
+                **_merge_plan_metadata(
+                    bound_left, bound_right, bound_post, bound_residual
+                ),
             )
 
         return resolve

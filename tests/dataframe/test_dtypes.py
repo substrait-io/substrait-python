@@ -77,11 +77,13 @@ def test_datatype_exported():
 # proto Type kinds intentionally NOT surfaced on the ergonomic facade:
 #  - deprecated in favor of the precision_* variants
 #  - not concrete data types / advanced extension machinery
+#  - "unbound" is a placeholder for partially bound plans, not a concrete type
 _EXCLUDED_KINDS = {
     "timestamp",
     "time",
     "timestamp_tz",
     "func",
+    "unbound",
     "user_defined",
     "user_defined_type_reference",
     "alias",

@@ -1165,6 +1165,77 @@ def test_nested_correlation_id_based():
     assert rhs.outer_reference.rel_reference == outermost_read.common.rel_anchor
 
 
+def test_correlated_exists_over_cached_outer_is_id_based():
+    # Regression: the correlation's enclosing scope is a cache()d frame, so its
+    # binding relation is a ReferenceRel (which carries no RelCommon). The anchor
+    # lands on the shared subtree the reference points at, and the whole plan still
+    # infers. Previously to_plan() raised.
+    from substrait.type_inference import infer_plan_schema
+
+    outer = sub.read_named_table("o", {"k": sub.i64}).cache()
+    inner = sub.read_named_table("i", {"k": sub.i64})
+    corr = inner.filter(sub.col("k") == sub.outer("k"))
+    plan = outer.filter(sub.exists(corr)).to_plan()
+
+    root_input = plan.relations[-1].root.input
+    # The binding is a ReferenceRel; the anchor is on the shared subtree.
+    assert root_input.filter.input.WhichOneof("rel_type") == "reference"
+    anchor = plan.relations[0].rel.read.common.rel_anchor
+    rhs = root_input.filter.condition.subquery.set_predicate.tuples.filter.condition.scalar_function.arguments[
+        1
+    ].value.selection.outer_reference
+    assert rhs.WhichOneof("outer_reference_type") == "rel_reference"
+    assert rhs.rel_reference == anchor
+    infer_plan_schema(plan)
+
+
+def test_correlated_exists_in_join_post_filter_is_id_based():
+    # Regression: a correlated subquery in a join's post_join_filter binds against
+    # the join output, i.e. the join itself -- so the join is anchored. Previously
+    # to_plan() raised on the multi-input host.
+    from substrait.type_inference import infer_plan_schema
+
+    left = sub.read_named_table("l", {"a": sub.i64})
+    right = sub.read_named_table("r", {"b": sub.i64})
+    inner = sub.read_named_table("i", {"k": sub.i64})
+    corr = inner.filter(sub.col("k") == sub.outer("a"))
+    plan = left.join(
+        right, sub.col("a") == sub.col("b"), how="inner", post_filter=sub.exists(corr)
+    ).to_plan()
+
+    join = plan.relations[-1].root.input
+    assert join.WhichOneof("rel_type") == "join"
+    anchor = join.join.common.rel_anchor
+    rhs = join.join.post_join_filter.subquery.set_predicate.tuples.filter.condition.scalar_function.arguments[
+        1
+    ].value.selection.outer_reference
+    assert rhs.WhichOneof("outer_reference_type") == "rel_reference"
+    assert rhs.rel_reference == anchor
+    infer_plan_schema(plan)
+
+
+def test_correlated_exists_in_reducing_join_condition_stays_steps_out():
+    # A reducing join (semi) emits one side, so its output row can't carry the
+    # combined condition scope the correlation sees; the reference is left
+    # offset-based (steps_out) -- still spec-valid and read by inference -- rather
+    # than mis-anchored. to_plan() must still succeed.
+    from substrait.type_inference import infer_plan_schema
+
+    left = sub.read_named_table("l", {"a": sub.i64})
+    right = sub.read_named_table("r", {"b": sub.i64})
+    inner = sub.read_named_table("i", {"k": sub.i64})
+    corr = inner.filter(sub.col("k") == sub.outer("b"))  # references the right side
+    plan = left.join(right, sub.exists(corr), how="left_semi").to_plan()
+
+    join = plan.relations[-1].root.input
+    assert not join.join.common.HasField("rel_anchor")
+    rhs = join.join.expression.subquery.set_predicate.tuples.filter.condition.scalar_function.arguments[
+        1
+    ].value.selection.outer_reference
+    assert rhs.WhichOneof("outer_reference_type") == "steps_out"
+    infer_plan_schema(plan)
+
+
 def test_outer_outside_subquery_raises():
     df = sub.read_named_table("t", {"x": sub.i64})
     with pytest.raises(Exception, match="correlated subquery"):

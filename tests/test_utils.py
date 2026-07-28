@@ -328,30 +328,114 @@ def test_convert_preexisting_anchor_reused_and_counter_continues():
     assert rel_anchor_of(out.relations[-1].root.input.filter.input) == 6
 
 
-def test_convert_reference_rel_binding_raises():
-    # A correlation binding to a ReferenceRel (which has no RelCommon) cannot be
-    # expressed id-based.
+def _join(
+    left: stalg.Rel,
+    right: stalg.Rel,
+    *,
+    type=stalg.JoinRel.JOIN_TYPE_INNER,
+    expression: stalg.Expression = None,
+    post_join_filter: stalg.Expression = None,
+) -> stalg.Rel:
+    return stalg.Rel(
+        join=stalg.JoinRel(
+            left=left,
+            right=right,
+            type=type,
+            expression=expression,
+            post_join_filter=post_join_filter,
+        )
+    )
+
+
+def test_convert_reference_rel_binding_anchors_the_shared_subtree():
+    # A correlation whose enclosing host input is a ReferenceRel (a cache()d frame)
+    # has no RelCommon on the reference itself; the anchor lands on the shared
+    # subtree it points at, whose output is exactly the reference's. This is the
+    # DAG case that offset-based steps_out cannot address unambiguously.
     ref_rel = stalg.Rel(reference=stalg.ReferenceRel(subtree_ordinal=0))
     plan = _plan(
         _filter(ref_rel, _exists(_filter(_read("i"), _outer(1)))),
         _read("s"),  # subtree at ordinal 0
     )
-    with pytest.raises(Exception, match="no RelCommon"):
-        to_id_based_outer_references(plan)
+    out = to_id_based_outer_references(plan)
+
+    subtree = out.relations[0].rel
+    assert rel_anchor_of(subtree) == 1
+    # The ReferenceRel binding is left as-is (it carries no RelCommon).
+    assert rel_anchor_of(out.relations[-1].root.input.filter.input) is None
+    ref = out.relations[
+        -1
+    ].root.input.filter.condition.subquery.set_predicate.tuples.filter.condition.selection.outer_reference
+    assert ref.WhichOneof("outer_reference_type") == "rel_reference"
+    assert ref.rel_reference == 1
 
 
-def test_convert_multi_input_host_binding_raises():
-    # A correlation binding to a multi-input host (a join) has no single input row.
-    join = stalg.Rel(
-        join=stalg.JoinRel(
-            left=_read("l"),
-            right=_read("r"),
-            type=stalg.JoinRel.JOIN_TYPE_INNER,
-            expression=_exists(_filter(_read("i"), _outer(1))),
+def test_convert_multi_input_join_condition_anchors_the_join():
+    # A correlation into a (non-reducing) join's condition resolves against the
+    # combined left+right row, which equals the join's own output -- so the join
+    # relation is anchored and the reference names it.
+    join = _join(
+        _read("l"),
+        _read("r"),
+        expression=_exists(_filter(_read("i"), _outer(1))),
+    )
+    out = to_id_based_outer_references(_plan(join))
+
+    out_join = out.relations[-1].root.input
+    assert rel_anchor_of(out_join) == 1
+    ref = out_join.join.expression.subquery.set_predicate.tuples.filter.condition.selection.outer_reference
+    assert ref.WhichOneof("outer_reference_type") == "rel_reference"
+    assert ref.rel_reference == 1
+
+
+def test_convert_post_join_filter_anchors_the_join():
+    # A correlation in a join's post_join_filter resolves against the join output,
+    # i.e. the join itself -- anchored the same way.
+    join = _join(
+        _read("l"),
+        _read("r"),
+        post_join_filter=_exists(_filter(_read("i"), _outer(1))),
+    )
+    out = to_id_based_outer_references(_plan(join))
+
+    out_join = out.relations[-1].root.input
+    assert rel_anchor_of(out_join) == 1
+    ref = out_join.join.post_join_filter.subquery.set_predicate.tuples.filter.condition.selection.outer_reference
+    assert ref.rel_reference == 1
+
+
+def test_convert_reducing_join_condition_left_as_steps_out():
+    # A reducing join (semi/anti) emits only one side, so its output row differs
+    # from the combined condition scope the reference sees. No relation carries
+    # that row, so the reference stays offset-based (still spec-valid) rather than
+    # being mis-anchored to the join's narrower output.
+    join = _join(
+        _read("l"),
+        _read("r"),
+        type=stalg.JoinRel.JOIN_TYPE_LEFT_SEMI,
+        expression=_exists(_filter(_read("i"), _outer(1))),
+    )
+    out = to_id_based_outer_references(_plan(join))
+
+    out_join = out.relations[-1].root.input
+    assert rel_anchor_of(out_join) is None
+    ref = out_join.join.expression.subquery.set_predicate.tuples.filter.condition.selection.outer_reference
+    assert ref.WhichOneof("outer_reference_type") == "steps_out"
+    assert ref.steps_out == 1
+
+
+def test_convert_binding_without_rel_common_raises():
+    # A binding relation that carries no RelCommon at all (an UpdateRel) cannot hold
+    # an anchor. No correlated-subquery shape produces this, but the converter
+    # guards it rather than silently dropping the reference.
+    update = stalg.Rel(
+        update=stalg.UpdateRel(
+            named_table=stalg.NamedTable(names=["t"]),
         )
     )
-    with pytest.raises(Exception, match="multi-input"):
-        to_id_based_outer_references(_plan(join))
+    plan = _plan(_filter(update, _exists(_filter(_read("i"), _outer(1)))))
+    with pytest.raises(Exception, match="no RelCommon"):
+        to_id_based_outer_references(plan)
 
 
 def test_convert_noncorrelated_plan_unchanged():

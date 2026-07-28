@@ -722,12 +722,12 @@ class DataFrame:
         any offset-based ``steps_out`` the builders produced is rewritten here."""
         return to_id_based_outer_references(self._plan(registry))
 
-    def to_plan(self):
+    def to_plan(self) -> stplan.Plan:
         """Materialize to a ``substrait.proto.Plan``."""
         return self._finalize(self._registry)
 
     # Kept for parity with the substrait.narwhals (Narwhals) wrapper's API.
-    def to_substrait(self, registry: Optional[ExtensionRegistry] = None):
+    def to_substrait(self, registry: Optional[ExtensionRegistry] = None) -> stplan.Plan:
         return self._finalize(registry or self._registry)
 
 

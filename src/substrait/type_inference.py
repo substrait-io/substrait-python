@@ -870,7 +870,9 @@ def infer_plan_schema(plan: stp.Plan, *, registry=None) -> stt.NamedStruct:
     # Index every RelCommon.rel_anchor in the plan (across subtrees, the root, and
     # subquery-embedded relations) so an id-based OuterReference (rel_reference)
     # anywhere resolves against the anchored relation's output schema.
-    anchors = {a: rel for rel in iter_plan_rels(plan) if (a := rel_anchor_of(rel))}
+    anchors = {
+        a: rel for rel in iter_plan_rels(plan) if (a := rel_anchor_of(rel)) is not None
+    }
     token = anchor_scope.set(_AnchorScope(anchors, subtrees))
     try:
         root = plan.relations[-1].root

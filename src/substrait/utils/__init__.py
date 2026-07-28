@@ -208,6 +208,31 @@ def _iter_direct_subexpressions(msg):
                 yield from _iter_direct_subexpressions(getattr(msg, field.name))
 
 
+def _iter_named_direct_expressions(node):
+    """Like :func:`_iter_direct_subexpressions` but yields ``(field_name, expr)``,
+    tagging each expression with the name of the top-level field on ``node`` it was
+    reached through. Used to tell a join's ``post_join_filter`` (output-scoped) from
+    its condition / ``residual_expression`` (combined-inputs-scoped)."""
+    for field in node.DESCRIPTOR.fields:
+        if field.message_type is None or field.message_type.GetOptions().map_entry:
+            continue
+        full = field.message_type.full_name
+        if full == "substrait.Rel":
+            continue
+        if field.is_repeated:
+            values = getattr(node, field.name)
+        elif node.HasField(field.name):
+            values = [getattr(node, field.name)]
+        else:
+            continue
+        for value in values:
+            if full == "substrait.Expression":
+                yield field.name, value
+            else:
+                for expr in _iter_direct_subexpressions(value):
+                    yield field.name, expr
+
+
 def _iter_rel_expressions(rel: stalg.Rel):
     """Yield the root ``Expression`` messages a relation owns (its own scope): the
     filter condition, project expressions, join condition, aggregate/sort/expand
@@ -283,30 +308,111 @@ def rel_anchor_of(rel: stalg.Rel):
     return node.common.rel_anchor
 
 
+def _all_subexpressions(expr: stalg.Expression):
+    """Yield every ``Expression`` transitively owned by ``expr`` in its own scope
+    (through operators and subquery-wrapping expressions, but not into subquery
+    input relations)."""
+    for sub in _iter_direct_subexpressions(expr):
+        yield sub
+        yield from _all_subexpressions(sub)
+
+
+def _is_steps_out_ref(expr: stalg.Expression) -> bool:
+    if expr.WhichOneof("rex_type") != "selection":
+        return False
+    sel = expr.selection
+    return (
+        sel.WhichOneof("root_type") == "outer_reference"
+        and sel.outer_reference.WhichOneof("outer_reference_type") == "steps_out"
+    )
+
+
+def _plan_has_steps_out(plan: stplan.Plan) -> bool:
+    """Whether any ``OuterReference`` in ``plan`` is still offset-based (``steps_out``)
+    -- i.e. whether :func:`to_id_based_outer_references` has anything to rewrite. A
+    cheap pre-scan so the common (non-correlated) plan skips the copy-and-walk."""
+    for rel in iter_plan_rels(plan):
+        for expr in _iter_rel_expressions(rel):
+            if _is_steps_out_ref(expr) or any(
+                _is_steps_out_ref(sub) for sub in _all_subexpressions(expr)
+            ):
+                return True
+    return False
+
+
+# A join's expression fields bind against two different rows: ``post_join_filter``
+# against the join *output* (semantically a Filter above the join), the condition
+# and ``residual_expression`` against the *combined* left+right inputs. The join
+# relation's own output equals that combined row for every non-reducing join, but a
+# reducing join (semi/anti) emits a single side -- so a correlation into its
+# condition scope names columns the output drops and has no anchorable relation.
+_JOIN_COMBINED_SCOPED_FIELDS = frozenset({"expression", "residual_expression"})
+
+
+def _is_reducing_join(node) -> bool:
+    """Whether a join relation-variant ``node`` emits only one side (semi/anti), so
+    its output row differs from its combined left+right condition scope."""
+    field = node.DESCRIPTOR.fields_by_name.get("type")
+    if field is None or field.enum_type is None:
+        return False
+    name = field.enum_type.values_by_number.get(node.type)
+    return name is not None and ("SEMI" in name.name or "ANTI" in name.name)
+
+
 def to_id_based_outer_references(plan: stplan.Plan) -> stplan.Plan:
     """A copy of ``plan`` with every offset-based ``OuterReference`` (``steps_out``)
     rewritten to the id-based form (``rel_reference`` naming a
     ``RelCommon.rel_anchor``).
 
-    The binding relation an ``OuterReference`` resolves against -- the input of its
-    enclosing single-input host (``Filter`` / ``Project`` / ...) -- is stamped with a
-    plan-wide-unique ``rel_anchor``; several references to the same scope share one
-    anchor. References already in id-based form are left unchanged, so the pass is
-    idempotent and tolerates a partially-converted input.
+    The binding relation an ``OuterReference`` resolves against is stamped with a
+    plan-wide-unique ``rel_anchor`` (``>= 1``, per the Substrait spec), and the
+    reference is rewritten to name it; several references to the same scope share one
+    anchor, and an anchor already present is reused. References already id-based are
+    left unchanged, so the pass is idempotent and tolerates a partially-converted
+    input. A plan with nothing to rewrite is returned unchanged (no copy).
 
-    Raises if a correlation binds to a relation that cannot carry an anchor: a
-    ``ReferenceRel`` (no ``RelCommon``) or a multi-input host (ambiguous input row).
+    A ``steps_out`` reference resolves against an enclosing query's *row*, which is
+    the output of a specific relation, so the relation whose output is that row is
+    anchored:
+
+    * a single-input host (``Filter`` / ``Project`` / ...) exposes its **input**'s
+      row. If that input is a ``ReferenceRel`` (a ``cache()``-shared subtree, which
+      carries no ``RelCommon``), the shared subtree it points at is anchored instead
+      -- the ``ReferenceRel`` has no ``emit``, so its output is exactly the subtree's.
+      This is the shared-subtree / DAG case that offset-based ``steps_out`` cannot
+      address unambiguously.
+    * a ``post_join_filter``, or a leaf host's own filter, exposes the **host's**
+      output row, so the host is anchored.
+    * a join *condition* / ``residual_expression`` exposes the **combined** left+right
+      row; the join's own output equals that row for a non-reducing join, so the join
+      is anchored. For a *reducing* join (semi/anti) the two differ and no relation
+      carries that row -- such a reference is left offset-based (still spec-valid, and
+      read by inference), rather than mis-anchored.
+
+    Raises only if a resolvable binding carries no ``RelCommon`` at all (e.g. an
+    ``UpdateRel``), which no correlated-subquery shape produces.
     """
+    if not _plan_has_steps_out(plan):
+        return plan
+
     out = stplan.Plan()
     out.CopyFrom(plan)
 
-    existing = [a for a in (rel_anchor_of(r) for r in iter_plan_rels(out)) if a]
-    counter = [max(existing) if existing else 0]
+    subtrees = plan_subtrees(out)
+    existing = [
+        a for a in (rel_anchor_of(r) for r in iter_plan_rels(out)) if a is not None
+    ]
+    counter = max(existing) if existing else 0
     anchor_by_id: dict = {}
 
     def anchor_for(binding: stalg.Rel) -> int:
+        nonlocal counter
+        # A ReferenceRel is a plan-global pointer with no RelCommon of its own; its
+        # output is the shared subtree's, so anchor the subtree instead.
+        while binding.WhichOneof("rel_type") == "reference":
+            binding = subtrees[binding.reference.subtree_ordinal]
         found = rel_anchor_of(binding)
-        if found:
+        if found is not None:
             return found
         key = id(binding)
         if key in anchor_by_id:
@@ -318,12 +424,12 @@ def to_id_based_outer_references(plan: stplan.Plan) -> stplan.Plan:
                 f"{binding.WhichOneof('rel_type')!r} relation to an id-based "
                 "rel_reference: it carries no RelCommon to hold a rel_anchor"
             )
-        counter[0] += 1
-        node.common.rel_anchor = counter[0]
-        anchor_by_id[key] = counter[0]
-        return counter[0]
+        counter += 1
+        node.common.rel_anchor = counter
+        anchor_by_id[key] = counter
+        return counter
 
-    def convert_expr(expr, scope, host_input):
+    def convert_expr(expr, scope, binding):
         rex = expr.WhichOneof("rex_type")
         if rex == "selection":
             sel = expr.selection
@@ -336,24 +442,36 @@ def to_id_based_outer_references(plan: stplan.Plan) -> stplan.Plan:
                             f"outer reference steps_out={steps} escapes its "
                             f"{len(scope)} enclosing query scope(s)"
                         )
-                    binding = scope[-steps]
-                    if binding is None:
-                        raise Exception(
-                            "cannot resolve an outer reference into a multi-input "
-                            "relation's scope to an id-based rel_reference"
-                        )
-                    oref.rel_reference = anchor_for(binding)
+                    target = scope[-steps]
+                    # None marks a combined-inputs scope with no anchorable relation
+                    # (a reducing join's condition); leave such a reference as-is.
+                    if target is not None:
+                        oref.rel_reference = anchor_for(target)
         elif rex == "subquery":
             for inner in _iter_subquery_rels(expr):
-                convert_rel(inner, scope + [host_input])
+                convert_rel(inner, scope + [binding])
         for sub in _iter_direct_subexpressions(expr):
-            convert_expr(sub, scope, host_input)
+            convert_expr(sub, scope, binding)
 
     def convert_rel(rel, scope):
         children = list(_iter_child_rels(rel))
-        host_input = _child_rel(*children[0]) if len(children) == 1 else None
-        for expr in _iter_rel_expressions(rel):
-            convert_expr(expr, scope, host_input)
+        rel_type = rel.WhichOneof("rel_type")
+        node = getattr(rel, rel_type) if rel_type is not None else None
+        if node is not None:
+            # The relation whose output row a subquery here would see one level up:
+            # a single-input host exposes its input; a leaf or multi-input host its
+            # own output -- except a reducing join's combined-inputs-scoped fields,
+            # whose scope no relation's output carries (binding None -> left as-is).
+            single_input = _child_rel(*children[0]) if len(children) == 1 else None
+            reducing = single_input is None and _is_reducing_join(node)
+            for name, expr in _iter_named_direct_expressions(node):
+                if single_input is not None:
+                    binding = single_input
+                elif reducing and name in _JOIN_COMBINED_SCOPED_FIELDS:
+                    binding = None
+                else:
+                    binding = rel
+                convert_expr(expr, scope, binding)
         for container, key in children:
             convert_rel(_child_rel(container, key), scope)
 

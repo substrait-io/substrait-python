@@ -703,3 +703,40 @@ def test_infer_expression_rel_reference_without_plan_context_raises():
     # infer_expression_type call (no infer_plan_schema) has no index in scope.
     with pytest.raises(Exception, match="whole-plan context"):
         infer_expression_type(_outer_ref(0, rel_reference=1), struct)
+
+
+def test_infer_rel_reference_anchor_zero_is_a_distinct_anchor():
+    # rel_anchor has explicit field presence, so 0 is a set, valid anchor distinct
+    # from "absent". The anchor index must key on presence, not truthiness, or a
+    # legitimate anchor 0 would be silently dropped. (The builder-side converter
+    # never emits 0, but an externally-produced or #228 lateral-join plan can.)
+    anchored = stalg.Rel(
+        read=stalg.ReadRel(
+            base_schema=named_struct,
+            common=stalg.RelCommon(rel_anchor=0),
+            named_table=stalg.ReadRel.NamedTable(names=["shared"]),
+        )
+    )
+    root_input = stalg.Rel(
+        project=stalg.ProjectRel(
+            input=right_read_rel,
+            expressions=[_outer_ref(2, rel_reference=0)],
+        )
+    )
+    plan = stp.Plan(
+        relations=[
+            stp.PlanRel(rel=anchored),
+            stp.PlanRel(
+                root=stalg.RelRoot(
+                    input=root_input,
+                    names=["order_id", "is_refundable", "order_total"],
+                )
+            ),
+        ]
+    )
+
+    expected = stt.Type.Struct(
+        types=list(right_struct.types)
+        + [stt.Type(fp32=stt.Type.FP32(nullability=stt.Type.NULLABILITY_NULLABLE))]
+    )
+    assert infer_plan_schema(plan).struct == expected

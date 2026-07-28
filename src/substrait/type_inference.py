@@ -5,6 +5,54 @@ import substrait.extended_expression_pb2 as stee
 import substrait.plan_pb2 as stp
 import substrait.type_pb2 as stt
 
+from substrait.utils import plan_subtrees
+
+
+class _SubtreeScope:
+    """The shared-subtree list a ``ReferenceRel`` resolves against, with per-ordinal
+    schema memoization and cycle detection.
+
+    A ``ReferenceRel``'s schema is that of ``subtrees[subtree_ordinal]``, and a
+    subtree may itself reference an earlier one, so resolution recurses. Memoizing
+    each ordinal's schema avoids re-inferring a subtree referenced from many places
+    (otherwise exponential for chained cached self-joins), and the in-progress set
+    turns a cyclic/self reference in a malformed plan into a clear error rather than
+    a ``RecursionError``. Behaves as a read-only sequence (``len`` / indexing) so
+    callers that pass a plain list of subtrees still work unchanged.
+    """
+
+    __slots__ = ("_rels", "_schemas", "_resolving")
+
+    def __init__(self, rels):
+        self._rels = list(rels)
+        self._schemas: dict = {}
+        self._resolving: set = set()
+
+    def __len__(self):
+        return len(self._rels)
+
+    def __getitem__(self, ordinal):
+        return self._rels[ordinal]
+
+    def schema_of(self, ordinal, registry):
+        if ordinal in self._schemas:
+            return self._schemas[ordinal]
+        if ordinal in self._resolving:
+            raise Exception(
+                f"ReferenceRel subtree_ordinal {ordinal} forms a cycle; a shared "
+                "subtree cannot reference itself directly or transitively"
+            )
+        self._resolving.add(ordinal)
+        try:
+            schema = infer_rel_schema(
+                self._rels[ordinal], registry=registry, subtrees=self
+            )
+        finally:
+            self._resolving.discard(ordinal)
+        self._schemas[ordinal] = schema
+        return schema
+
+
 # Stack of enclosing-query schemas (NamedStruct) for correlated subqueries, so a
 # field reference with an OuterReference root resolves against the right level.
 # Pushed by the subquery builders while resolving their inner plan.
@@ -159,7 +207,7 @@ def infer_literal_type(literal: stalg.Expression.Literal) -> stt.Type:
 
 
 def infer_nested_type(
-    nested: stalg.Expression.Nested, parent_schema, *, registry=None
+    nested: stalg.Expression.Nested, parent_schema, *, registry=None, subtrees=()
 ) -> stt.Type:
     nested_type = nested.WhichOneof("nested_type")
 
@@ -173,7 +221,9 @@ def infer_nested_type(
         return stt.Type(
             struct=stt.Type.Struct(
                 types=[
-                    infer_expression_type(f, parent_schema, registry=registry)
+                    infer_expression_type(
+                        f, parent_schema, registry=registry, subtrees=subtrees
+                    )
                     for f in nested.struct.fields
                 ],
                 nullability=nullability,
@@ -183,7 +233,10 @@ def infer_nested_type(
         return stt.Type(
             list=stt.Type.List(
                 type=infer_expression_type(
-                    nested.list.values[0], parent_schema, registry=registry
+                    nested.list.values[0],
+                    parent_schema,
+                    registry=registry,
+                    subtrees=subtrees,
                 ),
                 nullability=nullability,
             )
@@ -192,10 +245,16 @@ def infer_nested_type(
         return stt.Type(
             map=stt.Type.Map(
                 key=infer_expression_type(
-                    nested.map.key_values[0].key, parent_schema, registry=registry
+                    nested.map.key_values[0].key,
+                    parent_schema,
+                    registry=registry,
+                    subtrees=subtrees,
                 ),
                 value=infer_expression_type(
-                    nested.map.key_values[0].value, parent_schema, registry=registry
+                    nested.map.key_values[0].value,
+                    parent_schema,
+                    registry=registry,
+                    subtrees=subtrees,
                 ),
                 nullability=nullability,
             )
@@ -205,7 +264,11 @@ def infer_nested_type(
 
 
 def infer_expression_type(
-    expression: stalg.Expression, parent_schema: stt.Type.Struct, *, registry=None
+    expression: stalg.Expression,
+    parent_schema: stt.Type.Struct,
+    *,
+    registry=None,
+    subtrees=(),
 ) -> stt.Type:
     rex_type = expression.WhichOneof("rex_type")
     if rex_type == "selection":
@@ -254,11 +317,17 @@ def infer_expression_type(
         return expression.window_function.output_type
     elif rex_type == "if_then":
         return infer_expression_type(
-            expression.if_then.ifs[0].then, parent_schema, registry=registry
+            expression.if_then.ifs[0].then,
+            parent_schema,
+            registry=registry,
+            subtrees=subtrees,
         )
     elif rex_type == "switch_expression":
         return infer_expression_type(
-            expression.switch_expression.ifs[0].then, parent_schema, registry=registry
+            expression.switch_expression.ifs[0].then,
+            parent_schema,
+            registry=registry,
+            subtrees=subtrees,
         )
     elif rex_type == "cast":
         return expression.cast.type
@@ -267,12 +336,16 @@ def infer_expression_type(
             bool=stt.Type.Boolean(nullability=stt.Type.Nullability.NULLABILITY_NULLABLE)
         )
     elif rex_type == "nested":
-        return infer_nested_type(expression.nested, parent_schema, registry=registry)
+        return infer_nested_type(
+            expression.nested, parent_schema, registry=registry, subtrees=subtrees
+        )
     elif rex_type == "lambda":
         # A lambda's type is func<param_types -> body_type>; the body's parameter
         # references resolve against the lambda's own parameter struct.
         lam = getattr(expression, "lambda")
-        body_type = infer_expression_type(lam.body, lam.parameters, registry=registry)
+        body_type = infer_expression_type(
+            lam.body, lam.parameters, registry=registry, subtrees=subtrees
+        )
         return stt.Type(
             func=stt.Type.Func(
                 parameter_types=list(lam.parameters.types),
@@ -294,7 +367,9 @@ def infer_expression_type(
         try:
             if subquery_type == "scalar":
                 scalar_rel = infer_rel_schema(
-                    expression.subquery.scalar.input, registry=registry
+                    expression.subquery.scalar.input,
+                    registry=registry,
+                    subtrees=subtrees,
                 )
                 return scalar_rel.types[0]
             elif (
@@ -378,12 +453,12 @@ def join_output_names(type_name: str, left_names, right_names) -> list:
 
 
 def _join_output_struct(
-    type_name: str, left_rel, right_rel, *, registry=None
+    type_name: str, left_rel, right_rel, *, registry=None, subtrees=()
 ) -> stt.Type.Struct:
     """Join output column types by join-type NAME (shared across all join
     relations, whose enum integer values differ)."""
-    left = infer_rel_schema(left_rel, registry=registry)
-    right = infer_rel_schema(right_rel, registry=registry)
+    left = infer_rel_schema(left_rel, registry=registry, subtrees=subtrees)
+    right = infer_rel_schema(right_rel, registry=registry, subtrees=subtrees)
     required = stt.Type.Nullability.NULLABILITY_REQUIRED
     shape = _join_column_shape(type_name)
     if shape == "left":
@@ -466,7 +541,14 @@ def _set_output_struct(op_name: str, inputs: list) -> stt.Type.Struct:
     return stt.Type.Struct(types=types, nullability=primary.nullability)
 
 
-def infer_rel_schema(rel: stalg.Rel, *, registry=None) -> stt.Type.Struct:
+def infer_rel_schema(rel: stalg.Rel, *, registry=None, subtrees=()) -> stt.Type.Struct:
+    """Infer a relation's output struct.
+
+    ``subtrees`` is the plan's list of shared subtree ``Rel``s (the leading ``rel``
+    entries of a ``Plan``, extracted by :func:`infer_plan_schema`); a
+    ``ReferenceRel`` resolves its schema against ``subtrees[subtree_ordinal]``. It
+    defaults to ``()`` so plans without shared subtrees behave exactly as before.
+    """
     rel_type = rel.WhichOneof("rel_type")
 
     if rel_type == "read":
@@ -474,17 +556,21 @@ def infer_rel_schema(rel: stalg.Rel, *, registry=None) -> stt.Type.Struct:
     elif rel_type == "filter":
         (common, struct) = (
             rel.filter.common,
-            infer_rel_schema(rel.filter.input, registry=registry),
+            infer_rel_schema(rel.filter.input, registry=registry, subtrees=subtrees),
         )
     elif rel_type == "fetch":
         (common, struct) = (
             rel.fetch.common,
-            infer_rel_schema(rel.fetch.input, registry=registry),
+            infer_rel_schema(rel.fetch.input, registry=registry, subtrees=subtrees),
         )
     elif rel_type == "aggregate":
-        parent_schema = infer_rel_schema(rel.aggregate.input, registry=registry)
+        parent_schema = infer_rel_schema(
+            rel.aggregate.input, registry=registry, subtrees=subtrees
+        )
         grouping_types = [
-            infer_expression_type(g, parent_schema, registry=registry)
+            infer_expression_type(
+                g, parent_schema, registry=registry, subtrees=subtrees
+            )
             for g in rel.aggregate.grouping_expressions
         ]
         measure_types = [m.measure.output_type for m in rel.aggregate.measures]
@@ -504,12 +590,16 @@ def infer_rel_schema(rel: stalg.Rel, *, registry=None) -> stt.Type.Struct:
     elif rel_type == "sort":
         (common, struct) = (
             rel.sort.common,
-            infer_rel_schema(rel.sort.input, registry=registry),
+            infer_rel_schema(rel.sort.input, registry=registry, subtrees=subtrees),
         )
     elif rel_type == "project":
-        parent_schema = infer_rel_schema(rel.project.input, registry=registry)
+        parent_schema = infer_rel_schema(
+            rel.project.input, registry=registry, subtrees=subtrees
+        )
         expression_types = [
-            infer_expression_type(e, parent_schema, registry=registry)
+            infer_expression_type(
+                e, parent_schema, registry=registry, subtrees=subtrees
+            )
             for e in rel.project.expressions
         ]
         raw_schema = stt.Type.Struct(
@@ -519,14 +609,21 @@ def infer_rel_schema(rel: stalg.Rel, *, registry=None) -> stt.Type.Struct:
 
         (common, struct) = (rel.project.common, raw_schema)
     elif rel_type == "set":
-        input_structs = [infer_rel_schema(i, registry=registry) for i in rel.set.inputs]
+        input_structs = [
+            infer_rel_schema(i, registry=registry, subtrees=subtrees)
+            for i in rel.set.inputs
+        ]
         (common, struct) = (
             rel.set.common,
             _set_output_struct(stalg.SetRel.SetOp.Name(rel.set.op), input_structs),
         )
     elif rel_type == "cross":
-        left_schema = infer_rel_schema(rel.cross.left, registry=registry)
-        right_schema = infer_rel_schema(rel.cross.right, registry=registry)
+        left_schema = infer_rel_schema(
+            rel.cross.left, registry=registry, subtrees=subtrees
+        )
+        right_schema = infer_rel_schema(
+            rel.cross.right, registry=registry, subtrees=subtrees
+        )
 
         raw_schema = stt.Type.Struct(
             types=list(left_schema.types) + list(right_schema.types),
@@ -540,10 +637,13 @@ def infer_rel_schema(rel: stalg.Rel, *, registry=None) -> stt.Type.Struct:
             rel.join.left,
             rel.join.right,
             registry=registry,
+            subtrees=subtrees,
         )
         (common, struct) = (rel.join.common, raw_schema)
     elif rel_type == "window":
-        parent_schema = infer_rel_schema(rel.window.input, registry=registry)
+        parent_schema = infer_rel_schema(
+            rel.window.input, registry=registry, subtrees=subtrees
+        )
         window_output_types = [wf.output_type for wf in rel.window.window_functions]
         raw_schema = stt.Type.Struct(
             types=list(parent_schema.types) + window_output_types,
@@ -551,13 +651,18 @@ def infer_rel_schema(rel: stalg.Rel, *, registry=None) -> stt.Type.Struct:
         )
         (common, struct) = (rel.window.common, raw_schema)
     elif rel_type == "expand":
-        parent_schema = infer_rel_schema(rel.expand.input, registry=registry)
+        parent_schema = infer_rel_schema(
+            rel.expand.input, registry=registry, subtrees=subtrees
+        )
         field_types = []
         for field in rel.expand.fields:
             if field.HasField("consistent_field"):
                 field_types.append(
                     infer_expression_type(
-                        field.consistent_field, parent_schema, registry=registry
+                        field.consistent_field,
+                        parent_schema,
+                        registry=registry,
+                        subtrees=subtrees,
                     )
                 )
             else:
@@ -571,7 +676,10 @@ def infer_rel_schema(rel: stalg.Rel, *, registry=None) -> stt.Type.Struct:
                 # determines the output column type.
                 field_types.append(
                     infer_expression_type(
-                        duplicates[0], parent_schema, registry=registry
+                        duplicates[0],
+                        parent_schema,
+                        registry=registry,
+                        subtrees=subtrees,
                     )
                 )
         # Expand appends an i32 column with the index of the duplicate the row
@@ -590,32 +698,56 @@ def infer_rel_schema(rel: stalg.Rel, *, registry=None) -> stt.Type.Struct:
             rel.nested_loop_join.left,
             rel.nested_loop_join.right,
             registry=registry,
+            subtrees=subtrees,
         )
         (common, struct) = (rel.nested_loop_join.common, raw_schema)
     elif rel_type == "hash_join":
         name = stalg.HashJoinRel.JoinType.Name(rel.hash_join.type)
         raw_schema = _join_output_struct(
-            name, rel.hash_join.left, rel.hash_join.right, registry=registry
+            name,
+            rel.hash_join.left,
+            rel.hash_join.right,
+            registry=registry,
+            subtrees=subtrees,
         )
         (common, struct) = (rel.hash_join.common, raw_schema)
     elif rel_type == "merge_join":
         name = stalg.MergeJoinRel.JoinType.Name(rel.merge_join.type)
         raw_schema = _join_output_struct(
-            name, rel.merge_join.left, rel.merge_join.right, registry=registry
+            name,
+            rel.merge_join.left,
+            rel.merge_join.right,
+            registry=registry,
+            subtrees=subtrees,
         )
         (common, struct) = (rel.merge_join.common, raw_schema)
     elif rel_type == "exchange":
         # Exchange redistributes rows without changing the schema.
         (common, struct) = (
             rel.exchange.common,
-            infer_rel_schema(rel.exchange.input, registry=registry),
+            infer_rel_schema(rel.exchange.input, registry=registry, subtrees=subtrees),
         )
     elif rel_type == "top_n":
         # TopN is a fused sort+fetch; the schema is unchanged from the input.
         (common, struct) = (
             rel.top_n.common,
-            infer_rel_schema(rel.top_n.input, registry=registry),
+            infer_rel_schema(rel.top_n.input, registry=registry, subtrees=subtrees),
         )
+    elif rel_type == "reference":
+        # A ReferenceRel has no RelCommon/emit; its schema is that of the shared
+        # subtree its subtree_ordinal indexes into. A _SubtreeScope memoizes that
+        # resolution and guards against reference cycles; a plain sequence (direct
+        # callers/tests) is resolved inline against the full subtree list so a
+        # subtree may itself reference an earlier one.
+        ordinal = rel.reference.subtree_ordinal
+        if not 0 <= ordinal < len(subtrees):
+            raise Exception(
+                f"ReferenceRel subtree_ordinal {ordinal} is out of range "
+                f"({len(subtrees)} shared subtree(s) in scope)"
+            )
+        if isinstance(subtrees, _SubtreeScope):
+            return subtrees.schema_of(ordinal, registry)
+        return infer_rel_schema(subtrees[ordinal], registry=registry, subtrees=subtrees)
     elif rel_type == "extension_leaf":
         derived = _derive_extension_schema(rel.extension_leaf.detail, None, registry)
         if derived is None:
@@ -625,7 +757,9 @@ def infer_rel_schema(rel: stalg.Rel, *, registry=None) -> stt.Type.Struct:
             )
         (common, struct) = (rel.extension_leaf.common, derived.struct)
     elif rel_type == "extension_single":
-        input_struct = infer_rel_schema(rel.extension_single.input, registry=registry)
+        input_struct = infer_rel_schema(
+            rel.extension_single.input, registry=registry, subtrees=subtrees
+        )
         derived = _derive_extension_schema(
             rel.extension_single.detail, input_struct, registry
         )
@@ -636,7 +770,8 @@ def infer_rel_schema(rel: stalg.Rel, *, registry=None) -> stt.Type.Struct:
         )
     elif rel_type == "extension_multi":
         input_structs = [
-            infer_rel_schema(i, registry=registry) for i in rel.extension_multi.inputs
+            infer_rel_schema(i, registry=registry, subtrees=subtrees)
+            for i in rel.extension_multi.inputs
         ]
         derived = _derive_extension_schema(
             rel.extension_multi.detail, input_structs, registry
@@ -662,6 +797,12 @@ def infer_rel_schema(rel: stalg.Rel, *, registry=None) -> stt.Type.Struct:
 
 
 def infer_plan_schema(plan: stp.Plan, *, registry=None) -> stt.NamedStruct:
-    schema = infer_rel_schema(plan.relations[-1].root.input, registry=registry)
+    # A Plan carries its shared subtrees in-band as the leading ``rel`` entries of
+    # ``relations`` (the query root is the trailing ``root`` entry), so a
+    # ReferenceRel anywhere in the tree resolves against them by ordinal. Wrap them
+    # in a _SubtreeScope so repeated references are memoized and cycles are caught.
+    subtrees = _SubtreeScope(plan_subtrees(plan))
+    root = plan.relations[-1].root
+    schema = infer_rel_schema(root.input, registry=registry, subtrees=subtrees)
 
-    return stt.NamedStruct(names=plan.relations[-1].root.names, struct=schema)
+    return stt.NamedStruct(names=root.names, struct=schema)

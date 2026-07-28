@@ -548,6 +548,15 @@ class DataFrame:
             bound = inner(registry)
             rel = bound.relations[-1].root.input
             rel_inner = getattr(rel, rel.WhichOneof("rel_type"))
+            # A few relations (a ReferenceRel from .cache(), an UpdateRel) carry no
+            # RelCommon and so cannot hold a hint -- fail with a clear message
+            # rather than an opaque AttributeError on `.common`.
+            if "common" not in rel_inner.DESCRIPTOR.fields_by_name:
+                raise TypeError(
+                    f"cannot attach a hint to a {rel_inner.DESCRIPTOR.name} "
+                    "(e.g. a cached/reference relation); apply .hint(...) before "
+                    ".cache()"
+                )
             common = rel_inner.common
             if row_count is not None:
                 common.hint.stats.row_count = row_count
@@ -561,6 +570,21 @@ class DataFrame:
             return bound
 
         return self._next(resolve)
+
+    def cache(self) -> "DataFrame":
+        """Mark this DataFrame as a reusable common subplan (a CTE).
+
+        The returned frame is emitted as a shared subtree (a leading ``rel`` entry
+        in the plan) and referenced via a ``ReferenceRel`` wherever it is used.
+        When the same cached frame feeds two branches that later meet at a
+        multi-input relation (e.g. ``base.filter(...).union(base.filter(...))``),
+        the shared subtree is emitted **once** and referenced from both branches
+        instead of being inlined twice.
+
+        Because the subtree carries no ``RelCommon``, apply :meth:`hint` (and any
+        node-level annotation) *before* ``cache()``, not after.
+        """
+        return self._next(_plan.reference(self._plan))
 
     def with_execution_behavior(self, variable_eval_mode: str) -> "DataFrame":
         """Set how often execution context variables are evaluated (plan-level).

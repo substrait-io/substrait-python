@@ -26,7 +26,38 @@ This project is not an execution engine for Substrait Plans.
 ## Status
 This is an experimental package that is still under development.
 
-# Example
+# Building plans with the DataFrame API
+
+The `substrait.dataframe` module is an ergonomic, fluent API for authoring
+Substrait plans — a Polars/PySpark-style DataFrame with operator-overloaded
+expressions, on top of the lower-level builders. It is the recommended way to
+build plans by hand:
+
+```python
+import substrait.dataframe as sub
+
+plan = (
+    sub.read_named_table("people", {"id": sub.i64, "age": sub.i64, "name": sub.string})
+    .filter(sub.col("age") > 25)
+    .with_columns(adult=sub.col("age") >= 18)
+    .select("id", "name", "adult")
+    .to_plan()
+)
+```
+
+`plan` is a `substrait.proto.Plan` ready to hand to a consumer such as DuckDB or
+DataFusion. Install the `extensions` extra so function overloads resolve against
+the standard Substrait extensions:
+
+```sh
+pip install "substrait[extensions]"
+```
+
+# Example (low-level API)
+
+The examples below construct plans with the raw `substrait.proto` and
+`substrait.builders` layers. For most hand-authored plans, prefer the
+[DataFrame API](#building-plans-with-the-dataframe-api) above.
 
 ## Produce a Substrait Plan
 The ``substrait.proto`` module provides access to the classes

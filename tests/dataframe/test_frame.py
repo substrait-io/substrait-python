@@ -1123,13 +1123,18 @@ def test_correlated_exists():
     corr = inner.filter(sub.col("k") == sub.outer("k"))  # inner.k == outer.k
     plan = outer.filter(sub.exists(corr)).to_plan()
 
-    inner_cond = plan.relations[
-        -1
-    ].root.input.filter.condition.subquery.set_predicate.tuples.filter.condition
+    root_input = plan.relations[-1].root.input
+    inner_cond = (
+        root_input.filter.condition.subquery.set_predicate.tuples.filter.condition
+    )
     lhs, rhs = (a.value.selection for a in inner_cond.scalar_function.arguments)
     assert lhs.WhichOneof("root_type") == "root_reference"  # inner.k
     assert rhs.WhichOneof("root_type") == "outer_reference"  # outer.k
-    assert rhs.outer_reference.steps_out == 1  # 1 = the immediately enclosing query
+    # The DataFrame emits id-based correlations: the outer reference names the
+    # rel_anchor stamped on the binding relation (the enclosing filter's input).
+    anchor = root_input.filter.input.read.common.rel_anchor
+    assert rhs.outer_reference.WhichOneof("outer_reference_type") == "rel_reference"
+    assert rhs.outer_reference.rel_reference == anchor
     assert rhs.direct_reference.struct_field.field == 0  # "k" in the outer schema
 
 
@@ -1141,7 +1146,7 @@ def test_correlated_scalar_subquery_chains():
     assert plan.relations[-1].root.input.HasField("filter")
 
 
-def test_nested_correlation_steps_out():
+def test_nested_correlation_id_based():
     outer = sub.read_named_table("o", {"k": sub.i64})
     mid = sub.read_named_table("m", {"k": sub.i64})
     inner = sub.read_named_table("i", {"k": sub.i64})
@@ -1150,11 +1155,85 @@ def test_nested_correlation_steps_out():
     mid_corr = mid.filter(sub.exists(inner_corr))
     plan = outer.filter(sub.exists(mid_corr)).to_plan()
 
-    inner_cond = plan.relations[
-        -1
-    ].root.input.filter.condition.subquery.set_predicate.tuples.filter.condition.subquery.set_predicate.tuples.filter.condition  # mid  # inner
+    root_input = plan.relations[-1].root.input
+    inner_cond = root_input.filter.condition.subquery.set_predicate.tuples.filter.condition.subquery.set_predicate.tuples.filter.condition  # mid  # inner
     rhs = inner_cond.scalar_function.arguments[1].value.selection
-    assert rhs.outer_reference.steps_out == 2  # two levels out -> the outermost
+    # steps_out=2 selects the outermost query; it is emitted id-based as a
+    # rel_reference to the rel_anchor stamped on that outermost relation.
+    outermost_read = root_input.filter.input.read
+    assert rhs.outer_reference.WhichOneof("outer_reference_type") == "rel_reference"
+    assert rhs.outer_reference.rel_reference == outermost_read.common.rel_anchor
+
+
+def test_correlated_exists_over_cached_outer_is_id_based():
+    # Regression: the correlation's enclosing scope is a cache()d frame, so its
+    # binding relation is a ReferenceRel (which carries no RelCommon). The anchor
+    # lands on the shared subtree the reference points at, and the whole plan still
+    # infers. Previously to_plan() raised.
+    from substrait.type_inference import infer_plan_schema
+
+    outer = sub.read_named_table("o", {"k": sub.i64}).cache()
+    inner = sub.read_named_table("i", {"k": sub.i64})
+    corr = inner.filter(sub.col("k") == sub.outer("k"))
+    plan = outer.filter(sub.exists(corr)).to_plan()
+
+    root_input = plan.relations[-1].root.input
+    # The binding is a ReferenceRel; the anchor is on the shared subtree.
+    assert root_input.filter.input.WhichOneof("rel_type") == "reference"
+    anchor = plan.relations[0].rel.read.common.rel_anchor
+    rhs = root_input.filter.condition.subquery.set_predicate.tuples.filter.condition.scalar_function.arguments[
+        1
+    ].value.selection.outer_reference
+    assert rhs.WhichOneof("outer_reference_type") == "rel_reference"
+    assert rhs.rel_reference == anchor
+    infer_plan_schema(plan)
+
+
+def test_correlated_exists_in_join_post_filter_is_id_based():
+    # Regression: a correlated subquery in a join's post_join_filter binds against
+    # the join output, i.e. the join itself -- so the join is anchored. Previously
+    # to_plan() raised on the multi-input host.
+    from substrait.type_inference import infer_plan_schema
+
+    left = sub.read_named_table("l", {"a": sub.i64})
+    right = sub.read_named_table("r", {"b": sub.i64})
+    inner = sub.read_named_table("i", {"k": sub.i64})
+    corr = inner.filter(sub.col("k") == sub.outer("a"))
+    plan = left.join(
+        right, sub.col("a") == sub.col("b"), how="inner", post_filter=sub.exists(corr)
+    ).to_plan()
+
+    join = plan.relations[-1].root.input
+    assert join.WhichOneof("rel_type") == "join"
+    anchor = join.join.common.rel_anchor
+    rhs = join.join.post_join_filter.subquery.set_predicate.tuples.filter.condition.scalar_function.arguments[
+        1
+    ].value.selection.outer_reference
+    assert rhs.WhichOneof("outer_reference_type") == "rel_reference"
+    assert rhs.rel_reference == anchor
+    infer_plan_schema(plan)
+
+
+def test_correlated_exists_in_reducing_join_condition_stays_steps_out():
+    # A reducing join (semi) emits one side, so its output row can't carry the
+    # combined condition scope the correlation sees; the reference is left
+    # offset-based (steps_out) -- still spec-valid and read by inference -- rather
+    # than mis-anchored. to_plan() must still succeed.
+    from substrait.type_inference import infer_plan_schema
+
+    left = sub.read_named_table("l", {"a": sub.i64})
+    right = sub.read_named_table("r", {"b": sub.i64})
+    inner = sub.read_named_table("i", {"k": sub.i64})
+    corr = inner.filter(sub.col("k") == sub.outer("b"))  # references the right side
+    plan = left.join(right, sub.exists(corr), how="left_semi").to_plan()
+
+    join = plan.relations[-1].root.input
+    assert not join.join.common.HasField("rel_anchor")
+    rhs = join.join.expression.subquery.set_predicate.tuples.filter.condition.scalar_function.arguments[
+        1
+    ].value.selection.outer_reference
+    assert rhs.WhichOneof("outer_reference_type") == "steps_out"
+    infer_plan_schema(plan)
 
 
 def test_outer_outside_subquery_raises():

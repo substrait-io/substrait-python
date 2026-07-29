@@ -1,12 +1,17 @@
 import pytest
+import substrait.algebra_pb2 as stalg
 import substrait.extended_expression_pb2 as stee
 import substrait.extensions.extensions_pb2 as ste
+import substrait.plan_pb2 as stplan
 import substrait.type_pb2 as stt
 
 from substrait.utils import (
+    iter_plan_rels,
     merge_extension_declarations,
     merge_extension_urns,
     merge_extensions_into,
+    rel_anchor_of,
+    to_id_based_outer_references,
     type_num_names,
 )
 
@@ -177,3 +182,271 @@ def test_merge_extension_declarations_rejects_non_function_mapping():
 
     with pytest.raises(NotImplementedError, match="extension_type"):
         merge_extension_declarations([declaration])
+
+
+# --- to_id_based_outer_references ----------------------------------------------
+#
+# Compact hand-built plans exercising the steps_out -> rel_reference conversion.
+# A filter condition here is a bare (outer) reference rather than a realistic
+# boolean predicate -- the converter only walks expressions to find and rewrite
+# OuterReferences, so the surrounding operator shape is what matters.
+
+
+def _read(name: str, ncols: int = 1) -> stalg.Rel:
+    return stalg.Rel(
+        read=stalg.ReadRel(
+            base_schema=stt.NamedStruct(
+                names=[f"c{i}" for i in range(ncols)],
+                struct=stt.Type.Struct(
+                    types=[stt.Type(i64=stt.Type.I64()) for _ in range(ncols)]
+                ),
+            ),
+            named_table=stalg.ReadRel.NamedTable(names=[name]),
+        )
+    )
+
+
+def _outer(steps_out: int, field: int = 0) -> stalg.Expression:
+    return stalg.Expression(
+        selection=stalg.Expression.FieldReference(
+            outer_reference=stalg.Expression.FieldReference.OuterReference(
+                steps_out=steps_out
+            ),
+            direct_reference=stalg.Expression.ReferenceSegment(
+                struct_field=stalg.Expression.ReferenceSegment.StructField(field=field)
+            ),
+        )
+    )
+
+
+def _exists(inner: stalg.Rel) -> stalg.Expression:
+    return stalg.Expression(
+        subquery=stalg.Expression.Subquery(
+            set_predicate=stalg.Expression.Subquery.SetPredicate(
+                predicate_op=stalg.Expression.Subquery.SetPredicate.PREDICATE_OP_EXISTS,
+                tuples=inner,
+            )
+        )
+    )
+
+
+def _filter(input: stalg.Rel, condition: stalg.Expression) -> stalg.Rel:
+    return stalg.Rel(filter=stalg.FilterRel(input=input, condition=condition))
+
+
+def _plan(root_input: stalg.Rel, *subtrees: stalg.Rel) -> stplan.Plan:
+    relations = [stplan.PlanRel(rel=s) for s in subtrees]
+    relations.append(stplan.PlanRel(root=stalg.RelRoot(input=root_input, names=["c0"])))
+    return stplan.Plan(relations=relations)
+
+
+def _outer_refs(plan: stplan.Plan):
+    """Every OuterReference in a plan (across subquery-embedded relations)."""
+    return [
+        rel.filter.condition
+        for rel in iter_plan_rels(plan)
+        if rel.WhichOneof("rel_type") == "filter"
+        and rel.filter.condition.WhichOneof("rex_type") == "selection"
+        and rel.filter.condition.selection.WhichOneof("root_type") == "outer_reference"
+    ]
+
+
+def test_convert_correlated_exists_stamps_anchor_and_rewrites():
+    plan = _plan(_filter(_read("o"), _exists(_filter(_read("i"), _outer(1)))))
+    out = to_id_based_outer_references(plan)
+
+    binding = out.relations[-1].root.input.filter.input  # the outer read
+    assert rel_anchor_of(binding) == 1
+
+    ref = out.relations[
+        -1
+    ].root.input.filter.condition.subquery.set_predicate.tuples.filter.condition.selection.outer_reference
+    assert ref.WhichOneof("outer_reference_type") == "rel_reference"
+    assert ref.rel_reference == 1
+    # The input plan is untouched (conversion works on a copy).
+    assert rel_anchor_of(plan.relations[-1].root.input.filter.input) is None
+
+
+def test_convert_dedup_same_scope_shares_one_anchor():
+    # Two correlated columns from the same enclosing scope share a single anchor.
+    inner = _filter(
+        _read("i"),
+        stalg.Expression(
+            nested=stalg.Expression.Nested(
+                struct=stalg.Expression.Nested.Struct(
+                    fields=[_outer(1, 0), _outer(1, 1)]
+                )
+            )
+        ),
+    )
+    plan = _plan(_filter(_read("o", ncols=2), _exists(inner)))
+    out = to_id_based_outer_references(plan)
+
+    anchors = {a for r in iter_plan_rels(out) if (a := rel_anchor_of(r))}
+    assert anchors == {1}
+    refs = out.relations[
+        -1
+    ].root.input.filter.condition.subquery.set_predicate.tuples.filter.condition.nested.struct.fields
+    assert [f.selection.outer_reference.rel_reference for f in refs] == [1, 1]
+
+
+def test_convert_distinct_scopes_get_distinct_anchors():
+    # An inner subquery referencing two different enclosing scopes (steps_out 1 and
+    # 2) anchors each binding relation separately.
+    inner = _filter(
+        _read("i"),
+        stalg.Expression(
+            nested=stalg.Expression.Nested(
+                struct=stalg.Expression.Nested.Struct(fields=[_outer(1), _outer(2)])
+            )
+        ),
+    )
+    mid = _filter(_read("m"), _exists(inner))
+    plan = _plan(_filter(_read("o"), _exists(mid)))
+    out = to_id_based_outer_references(plan)
+
+    root = out.relations[-1].root.input
+    outer_read = root.filter.input
+    mid_read = root.filter.condition.subquery.set_predicate.tuples.filter.input
+    assert rel_anchor_of(mid_read) != rel_anchor_of(outer_read)
+
+    fields = root.filter.condition.subquery.set_predicate.tuples.filter.condition.subquery.set_predicate.tuples.filter.condition.nested.struct.fields
+    assert fields[0].selection.outer_reference.rel_reference == rel_anchor_of(mid_read)
+    assert fields[1].selection.outer_reference.rel_reference == rel_anchor_of(
+        outer_read
+    )
+
+
+def test_convert_preexisting_anchor_reused_and_counter_continues():
+    # An anchor already present in the plan is left alone; freshly allocated
+    # anchors continue past the maximum existing one.
+    marked = _read("i")
+    marked.read.common.rel_anchor = 5
+    plan = _plan(_filter(_read("o"), _exists(_filter(marked, _outer(1)))))
+    out = to_id_based_outer_references(plan)
+
+    assert rel_anchor_of(out.relations[-1].root.input.filter.input) == 6
+
+
+def _join(
+    left: stalg.Rel,
+    right: stalg.Rel,
+    *,
+    type=stalg.JoinRel.JOIN_TYPE_INNER,
+    expression: stalg.Expression = None,
+    post_join_filter: stalg.Expression = None,
+) -> stalg.Rel:
+    return stalg.Rel(
+        join=stalg.JoinRel(
+            left=left,
+            right=right,
+            type=type,
+            expression=expression,
+            post_join_filter=post_join_filter,
+        )
+    )
+
+
+def test_convert_reference_rel_binding_anchors_the_shared_subtree():
+    # A correlation whose enclosing host input is a ReferenceRel (a cache()d frame)
+    # has no RelCommon on the reference itself; the anchor lands on the shared
+    # subtree it points at, whose output is exactly the reference's. This is the
+    # DAG case that offset-based steps_out cannot address unambiguously.
+    ref_rel = stalg.Rel(reference=stalg.ReferenceRel(subtree_ordinal=0))
+    plan = _plan(
+        _filter(ref_rel, _exists(_filter(_read("i"), _outer(1)))),
+        _read("s"),  # subtree at ordinal 0
+    )
+    out = to_id_based_outer_references(plan)
+
+    subtree = out.relations[0].rel
+    assert rel_anchor_of(subtree) == 1
+    # The ReferenceRel binding is left as-is (it carries no RelCommon).
+    assert rel_anchor_of(out.relations[-1].root.input.filter.input) is None
+    ref = out.relations[
+        -1
+    ].root.input.filter.condition.subquery.set_predicate.tuples.filter.condition.selection.outer_reference
+    assert ref.WhichOneof("outer_reference_type") == "rel_reference"
+    assert ref.rel_reference == 1
+
+
+def test_convert_multi_input_join_condition_anchors_the_join():
+    # A correlation into a (non-reducing) join's condition resolves against the
+    # combined left+right row, which equals the join's own output -- so the join
+    # relation is anchored and the reference names it.
+    join = _join(
+        _read("l"),
+        _read("r"),
+        expression=_exists(_filter(_read("i"), _outer(1))),
+    )
+    out = to_id_based_outer_references(_plan(join))
+
+    out_join = out.relations[-1].root.input
+    assert rel_anchor_of(out_join) == 1
+    ref = out_join.join.expression.subquery.set_predicate.tuples.filter.condition.selection.outer_reference
+    assert ref.WhichOneof("outer_reference_type") == "rel_reference"
+    assert ref.rel_reference == 1
+
+
+def test_convert_post_join_filter_anchors_the_join():
+    # A correlation in a join's post_join_filter resolves against the join output,
+    # i.e. the join itself -- anchored the same way.
+    join = _join(
+        _read("l"),
+        _read("r"),
+        post_join_filter=_exists(_filter(_read("i"), _outer(1))),
+    )
+    out = to_id_based_outer_references(_plan(join))
+
+    out_join = out.relations[-1].root.input
+    assert rel_anchor_of(out_join) == 1
+    ref = out_join.join.post_join_filter.subquery.set_predicate.tuples.filter.condition.selection.outer_reference
+    assert ref.rel_reference == 1
+
+
+def test_convert_reducing_join_condition_left_as_steps_out():
+    # A reducing join (semi/anti) emits only one side, so its output row differs
+    # from the combined condition scope the reference sees. No relation carries
+    # that row, so the reference stays offset-based (still spec-valid) rather than
+    # being mis-anchored to the join's narrower output.
+    join = _join(
+        _read("l"),
+        _read("r"),
+        type=stalg.JoinRel.JOIN_TYPE_LEFT_SEMI,
+        expression=_exists(_filter(_read("i"), _outer(1))),
+    )
+    out = to_id_based_outer_references(_plan(join))
+
+    out_join = out.relations[-1].root.input
+    assert rel_anchor_of(out_join) is None
+    ref = out_join.join.expression.subquery.set_predicate.tuples.filter.condition.selection.outer_reference
+    assert ref.WhichOneof("outer_reference_type") == "steps_out"
+    assert ref.steps_out == 1
+
+
+def test_convert_binding_without_rel_common_raises():
+    # A binding relation that carries no RelCommon at all (an UpdateRel) cannot hold
+    # an anchor. No correlated-subquery shape produces this, but the converter
+    # guards it rather than silently dropping the reference.
+    update = stalg.Rel(
+        update=stalg.UpdateRel(
+            named_table=stalg.NamedTable(names=["t"]),
+        )
+    )
+    plan = _plan(_filter(update, _exists(_filter(_read("i"), _outer(1)))))
+    with pytest.raises(Exception, match="no RelCommon"):
+        to_id_based_outer_references(plan)
+
+
+def test_convert_noncorrelated_plan_unchanged():
+    plan = _plan(
+        _filter(_read("o"), stalg.Expression(literal=stalg.Expression.Literal(i64=1)))
+    )
+    assert to_id_based_outer_references(plan) == plan
+
+
+def test_convert_is_idempotent():
+    plan = _plan(_filter(_read("o"), _exists(_filter(_read("i"), _outer(1)))))
+    once = to_id_based_outer_references(plan)
+    twice = to_id_based_outer_references(once)
+    assert twice == once

@@ -40,6 +40,7 @@ from substrait.builders import type as _type
 from substrait.dataframe.expr import Expr, Measure, col, lit, sort_direction
 from substrait.extension_registry import ExtensionRegistry
 from substrait.type_inference import infer_plan_schema
+from substrait.utils import to_id_based_outer_references
 
 # All 13 JoinRel.JoinType variants (SET_OP_UNSPECIFIED excluded). "single"
 # returns at most one right match per left row (runtime error on multiple);
@@ -715,13 +716,19 @@ class DataFrame:
             )
         )
 
-    def to_plan(self):
+    def _finalize(self, registry: Optional[ExtensionRegistry]) -> stplan.Plan:
+        """Build the plan and normalize it for output. The DataFrame layer emits
+        correlated (outer) references in the id-based form (``rel_reference``), so
+        any offset-based ``steps_out`` the builders produced is rewritten here."""
+        return to_id_based_outer_references(self._plan(registry))
+
+    def to_plan(self) -> stplan.Plan:
         """Materialize to a ``substrait.proto.Plan``."""
-        return self._plan(self._registry)
+        return self._finalize(self._registry)
 
     # Kept for parity with the substrait.narwhals (Narwhals) wrapper's API.
-    def to_substrait(self, registry: Optional[ExtensionRegistry] = None):
-        return self._plan(registry or self._registry)
+    def to_substrait(self, registry: Optional[ExtensionRegistry] = None) -> stplan.Plan:
+        return self._finalize(registry or self._registry)
 
 
 class GroupBy:

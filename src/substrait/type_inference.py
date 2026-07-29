@@ -1,3 +1,4 @@
+import contextlib
 import contextvars
 
 import substrait.algebra_pb2 as stalg
@@ -54,31 +55,43 @@ class _SubtreeScope:
 
 
 class _AnchorScope:
-    """Plan-wide map of ``RelCommon.rel_anchor`` -> the relation carrying it, with
-    lazy per-anchor output-schema memoization, for resolving id-based outer
-    references (``OuterReference.rel_reference``).
+    """Map of ``RelCommon.rel_anchor`` -> the relation carrying it, with lazy
+    per-anchor schema memoization, for resolving id-based outer references
+    (``OuterReference.rel_reference``).
 
-    A ``rel_reference`` names the anchor of the relation the reference is rooted on;
-    it resolves against that relation's output schema. Resolution is lazy (only
-    anchors actually referenced are inferred) and memoized. Inference of an anchored
-    relation may itself resolve a ``rel_reference``, so an in-progress set turns a
-    malformed cyclic reference into a clear error rather than a ``RecursionError``.
-    Anchored relations are inferred with the plan's ``_SubtreeScope`` in scope so an
-    anchor set on a shared subtree still resolves.
+    A ``rel_reference`` names the anchor of the relation the reference is rooted on
+    and resolves against that relation's schema: a ``LateralJoinRel`` anchor denotes
+    the *current left row* (its left input's schema), any other anchor its output
+    schema. Resolution is lazy (only referenced anchors are inferred) and memoized;
+    an in-progress set turns a malformed cyclic reference into a clear error rather
+    than a ``RecursionError``. Anchored relations are inferred with the plan's
+    ``_SubtreeScope`` in scope so an anchor on a shared subtree still resolves.
+
+    ``register`` pre-binds an anchor to an already-known schema, for a correlated
+    sub-tree whose anchoring relation is not yet assembled (a lateral join's right
+    input, at build or inference time). ``parent`` chains to an enclosing scope so
+    nested correlations still resolve outer anchors.
     """
 
-    __slots__ = ("_rels", "_subtrees", "_schemas", "_resolving")
+    __slots__ = ("_rels", "_subtrees", "_schemas", "_resolving", "_parent")
 
-    def __init__(self, rels: dict, subtrees):
+    def __init__(self, rels: dict, subtrees, *, parent=None):
         self._rels = rels
         self._subtrees = subtrees
         self._schemas: dict = {}
         self._resolving: set = set()
+        self._parent = parent
+
+    def register(self, anchor, struct: stt.Type.Struct) -> None:
+        """Pre-bind ``anchor`` to an already-known schema."""
+        self._schemas[anchor] = struct
 
     def schema_of(self, anchor, registry) -> stt.Type.Struct:
         if anchor in self._schemas:
             return self._schemas[anchor]
         if anchor not in self._rels:
+            if self._parent is not None:
+                return self._parent.schema_of(anchor, registry)
             raise Exception(f"outer reference to unknown rel_anchor {anchor}")
         if anchor in self._resolving:
             raise Exception(
@@ -86,8 +99,16 @@ class _AnchorScope:
             )
         self._resolving.add(anchor)
         try:
+            rel = self._rels[anchor]
+            # A lateral-join anchor denotes the current left row, not the join's
+            # own output; every other anchor resolves against its output schema.
+            target = (
+                rel.lateral_join.left
+                if rel.WhichOneof("rel_type") == "lateral_join"
+                else rel
+            )
             struct = infer_rel_schema(
-                self._rels[anchor], registry=registry, subtrees=self._subtrees
+                target, registry=registry, subtrees=self._subtrees
             )
         finally:
             self._resolving.discard(anchor)
@@ -96,20 +117,41 @@ class _AnchorScope:
 
 
 # Stack of enclosing-query schemas (NamedStruct) for correlated subqueries, so a
-# field reference with an OuterReference root resolves against the right level.
-# Pushed by the subquery builders while resolving their inner plan. Used for
-# offset-based (steps_out) outer references; id-based (rel_reference) ones resolve
-# against ``anchor_scope`` instead.
+# field reference with an OuterReference.steps_out root resolves against the right
+# level (offset-based, for tree-shaped plans). Pushed by the subquery builders
+# while resolving their inner plan. Id-based (rel_reference) outer references
+# resolve against ``anchor_scope`` instead.
 outer_schemas: contextvars.ContextVar = contextvars.ContextVar(
     "outer_schemas", default=()
 )
 
-# The plan-wide anchor index (an ``_AnchorScope``) for the plan currently being
-# inferred, or None outside ``infer_plan_schema``. Set for the duration of a
-# whole-plan inference so a ``rel_reference`` anywhere in the tree resolves.
+# The anchor scope (an ``_AnchorScope``) for the plan / correlated sub-tree
+# currently being inferred, or None outside inference. Set for the duration of a
+# whole-plan inference (``infer_plan_schema``) so a ``rel_reference`` anywhere in
+# the tree resolves, and temporarily narrowed by ``_outer_anchor_binding`` while a
+# lateral join's right input is inferred.
 anchor_scope: contextvars.ContextVar = contextvars.ContextVar(
     "anchor_scope", default=None
 )
+
+
+@contextlib.contextmanager
+def _outer_anchor_binding(anchor, struct):
+    """Bind ``anchor`` -> ``struct`` for id-based outer references resolved within
+    the block, chaining to any enclosing anchor scope.
+
+    Used while a ``LateralJoinRel``'s right (dependent) input is built or inferred:
+    references to the join's ``rel_anchor`` resolve to the current left row even
+    though the join relation is not yet in an anchor index. Nested lateral joins
+    compose via the parent chain.
+    """
+    scope = _AnchorScope({}, (), parent=anchor_scope.get())
+    scope.register(anchor, struct)
+    token = anchor_scope.set(scope)
+    try:
+        yield
+    finally:
+        anchor_scope.reset(token)
 
 
 def _derive_extension_schema(detail, inputs, registry):
@@ -324,15 +366,16 @@ def infer_expression_type(
     rex_type = expression.WhichOneof("rex_type")
     if rex_type == "selection":
         root_type = expression.selection.WhichOneof("root_type")
-        # An OuterReference resolves against an enclosing query's schema (from
-        # the correlated-subquery stack); a lambda parameter reference against
-        # the lambda's parameter struct; otherwise against the input row.
+        # An OuterReference resolves against an enclosing query's schema; a lambda
+        # parameter reference against the lambda's parameter struct; otherwise
+        # against the input row.
         if root_type == "outer_reference":
             outer_ref = expression.selection.outer_reference
             # An outer reference resolves either by id (rel_reference -> the schema
-            # of the relation carrying that rel_anchor, via the plan-wide anchor
-            # index) or by offset (steps_out -> that many levels up the
-            # correlated-subquery stack). These are a protobuf oneof.
+            # of the relation carrying that rel_anchor, via the anchor scope -- a
+            # LateralJoinRel anchor gives the current left row) or by offset
+            # (steps_out -> that many levels up the correlated-subquery stack).
+            # These are a protobuf oneof.
             if outer_ref.WhichOneof("outer_reference_type") == "rel_reference":
                 anchors = anchor_scope.get()
                 if anchors is None:
@@ -517,13 +560,12 @@ def join_output_names(type_name: str, left_names, right_names) -> list:
     return list(left_names) + list(right_names)
 
 
-def _join_output_struct(
-    type_name: str, left_rel, right_rel, *, registry=None, subtrees=()
+def _join_struct_from_schemas(
+    type_name: str, left: stt.Type.Struct, right: stt.Type.Struct
 ) -> stt.Type.Struct:
-    """Join output column types by join-type NAME (shared across all join
-    relations, whose enum integer values differ)."""
-    left = infer_rel_schema(left_rel, registry=registry, subtrees=subtrees)
-    right = infer_rel_schema(right_rel, registry=registry, subtrees=subtrees)
+    """Combine already-inferred left/right schemas into a join's output struct
+    by join-type NAME (shared across all join relations, whose enum integer
+    values differ)."""
     required = stt.Type.Nullability.NULLABILITY_REQUIRED
     shape = _join_column_shape(type_name)
     if shape == "left":
@@ -543,6 +585,42 @@ def _join_output_struct(
     else:
         types = list(left.types) + list(right.types)
     return stt.Type.Struct(types=types, nullability=required)
+
+
+def _join_output_struct(
+    type_name: str, left_rel, right_rel, *, registry=None, subtrees=()
+) -> stt.Type.Struct:
+    """Join output column types by join-type NAME (shared across all join
+    relations, whose enum integer values differ)."""
+    left = infer_rel_schema(left_rel, registry=registry, subtrees=subtrees)
+    right = infer_rel_schema(right_rel, registry=registry, subtrees=subtrees)
+    return _join_struct_from_schemas(type_name, left, right)
+
+
+def _lateral_join_output_struct(
+    type_name: str, lateral_join: stalg.LateralJoinRel, *, registry=None, subtrees=()
+) -> stt.Type.Struct:
+    """Lateral-join output column types.
+
+    A lateral join forms output like a regular join (same per-join-type column
+    shapes), except its right (dependent) input is evaluated once per left row and
+    may reference the current left row via ``OuterReference.rel_reference`` pointing
+    to this relation's ``RelCommon.rel_anchor``. The left schema is bound to that
+    anchor (via the anchor scope) while the right schema is inferred, so those
+    id-based references resolve.
+    """
+    left = infer_rel_schema(lateral_join.left, registry=registry, subtrees=subtrees)
+    common = lateral_join.common
+    if common.HasField("rel_anchor"):
+        with _outer_anchor_binding(common.rel_anchor, left):
+            right = infer_rel_schema(
+                lateral_join.right, registry=registry, subtrees=subtrees
+            )
+    else:
+        right = infer_rel_schema(
+            lateral_join.right, registry=registry, subtrees=subtrees
+        )
+    return _join_struct_from_schemas(type_name, left, right)
 
 
 def _field_nullability(t: stt.Type):
@@ -705,6 +783,14 @@ def infer_rel_schema(rel: stalg.Rel, *, registry=None, subtrees=()) -> stt.Type.
             subtrees=subtrees,
         )
         (common, struct) = (rel.join.common, raw_schema)
+    elif rel_type == "lateral_join":
+        raw_schema = _lateral_join_output_struct(
+            stalg.JoinRel.JoinType.Name(rel.lateral_join.type),
+            rel.lateral_join,
+            registry=registry,
+            subtrees=subtrees,
+        )
+        (common, struct) = (rel.lateral_join.common, raw_schema)
     elif rel_type == "window":
         parent_schema = infer_rel_schema(
             rel.window.input, registry=registry, subtrees=subtrees
@@ -873,7 +959,10 @@ def infer_plan_schema(plan: stp.Plan, *, registry=None) -> stt.NamedStruct:
     anchors = {
         a: rel for rel in iter_plan_rels(plan) if (a := rel_anchor_of(rel)) is not None
     }
-    token = anchor_scope.set(_AnchorScope(anchors, subtrees))
+    # Chain to any enclosing anchor scope (e.g. a lateral join binding its left
+    # schema while its right input -- a separate plan being inferred here -- is
+    # built) so references to an outer anchor still resolve.
+    token = anchor_scope.set(_AnchorScope(anchors, subtrees, parent=anchor_scope.get()))
     try:
         root = plan.relations[-1].root
         schema = infer_rel_schema(root.input, registry=registry, subtrees=subtrees)

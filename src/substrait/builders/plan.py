@@ -16,11 +16,15 @@ from substrait.extensions.extensions_pb2 import AdvancedExtension
 
 from substrait.builders.extended_expression import (
     ExtendedExpressionOrUnbound,
+    LateralInput,
+    next_rel_anchor,
     resolve_expression,
 )
 from substrait.extension_registry import ExtensionRegistry
 from substrait.type_inference import (
     _join_output_struct,
+    _join_struct_from_schemas,
+    _outer_anchor_binding,
     infer_plan_schema,
     join_output_names,
 )
@@ -625,6 +629,107 @@ def join(
                     post_join_filter=bound_post.referred_expr[0].expression
                     if bound_post
                     else None,
+                    type=type,
+                    advanced_extension=extension,
+                )
+            ),
+            out_names,
+            (bound_left, bound_right, bound_expression, bound_post),
+        )
+
+    return resolve
+
+
+def lateral_join(
+    left: PlanOrUnbound,
+    right: Callable[[LateralInput], PlanOrUnbound],
+    type: stalg.JoinRel.JoinType,
+    *,
+    expression: Optional[ExtendedExpressionOrUnbound] = None,
+    post_join_filter: Optional[ExtendedExpressionOrUnbound] = None,
+    extension: Optional[AdvancedExtension] = None,
+) -> UnboundPlan:
+    """A LateralJoinRel: the right (dependent) input is evaluated once per left
+    row and may reference the current left row.
+
+    ``right`` is a function of a :class:`~substrait.builders.extended_expression.LateralInput`
+    handle to the left; use ``handle.column(...)`` inside it to correlate on the
+    current left row (an id-based ``OuterReference`` to this relation's
+    ``rel_anchor``). Capturing the handle avoids counting nesting levels: an
+    inner lateral join can reference an outer one by using its handle directly.
+
+    Only INNER and left-oriented join types are valid for lateral joins: INNER,
+    LEFT, LEFT_SEMI, LEFT_ANTI, LEFT_SINGLE, LEFT_MARK. ``expression`` is an
+    optional match condition over the combined left+right schema.
+    """
+
+    def resolve(registry: ExtensionRegistry) -> stp.Plan:
+        bound_left = left if isinstance(left, stp.Plan) else left(registry)
+        left_ns = infer_plan_schema(bound_left, registry=registry)
+
+        anchor = next_rel_anchor()
+        handle = LateralInput(anchor, left_ns)
+        # Bind the left schema to `anchor` while the right input is built and its
+        # schema inferred, so id-based references (handle.column(...)) resolve to
+        # the current left row during that inference.
+        with _outer_anchor_binding(anchor, left_ns.struct):
+            unbound_right = right(handle)
+            bound_right = (
+                unbound_right
+                if isinstance(unbound_right, stp.Plan)
+                else unbound_right(registry)
+            )
+            right_ns = infer_plan_schema(bound_right, registry=registry)
+
+            # The join condition binds against the combined left+right input row.
+            ns = stt.NamedStruct(
+                struct=stt.Type.Struct(
+                    types=list(left_ns.struct.types) + list(right_ns.struct.types),
+                    nullability=stt.Type.Nullability.NULLABILITY_REQUIRED,
+                ),
+                names=list(left_ns.names) + list(right_ns.names),
+            )
+            bound_expression = (
+                resolve_expression(expression, ns, registry)
+                if expression is not None
+                else None
+            )
+
+            # Output names/columns follow the same per-join-type shape as a
+            # regular join (semi/anti drop the right side, mark appends a boolean).
+            type_name = stalg.JoinRel.JoinType.Name(type)
+            out_names = join_output_names(type_name, left_ns.names, right_ns.names)
+
+            # post_join_filter is applied to each output record after
+            # join-type-specific output formation (semantically a FilterRel above
+            # the join), so it resolves against the *output* schema -- which for
+            # semi/anti joins is a single side and for a mark join carries the
+            # appended marker column -- not the combined input row.
+            bound_post = None
+            if post_join_filter is not None:
+                output_ns = stt.NamedStruct(
+                    names=out_names,
+                    struct=_join_struct_from_schemas(
+                        type_name, left_ns.struct, right_ns.struct
+                    ),
+                )
+                bound_post = resolve_expression(post_join_filter, output_ns, registry)
+
+        return _plan_from(
+            [bound_left, bound_right],
+            lambda inp: stalg.Rel(
+                lateral_join=stalg.LateralJoinRel(
+                    common=stalg.RelCommon(rel_anchor=anchor),
+                    left=inp[0],
+                    right=inp[1],
+                    expression=(
+                        bound_expression.referred_expr[0].expression
+                        if bound_expression
+                        else None
+                    ),
+                    post_join_filter=(
+                        bound_post.referred_expr[0].expression if bound_post else None
+                    ),
                     type=type,
                     advanced_extension=extension,
                 )

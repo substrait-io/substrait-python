@@ -1251,6 +1251,154 @@ def test_outer_steps_out_below_one_raises():
         outer.filter(sub.exists(corr)).to_plan()
 
 
+# -- Lateral joins (handle-based id correlation) --------------------------
+
+
+def test_lateral_join_correlated_filter():
+    from substrait.type_inference import infer_plan_schema
+
+    left = sub.read_named_table("l", {"k": sub.i64, "v": sub.i64})
+    inner = sub.read_named_table("r", {"k": sub.i64, "w": sub.i64})
+    # The right filters on the current left row via the left handle l.col("k").
+    plan = left.lateral_join(
+        lambda lat: inner.filter(sub.col("k") == lat.col("k")), how="inner"
+    ).to_plan()
+
+    lj = plan.relations[-1].root.input.lateral_join
+    assert lj.common.HasField("rel_anchor")
+    rhs = lj.right.filter.condition.scalar_function.arguments[1].value.selection
+    assert rhs.WhichOneof("root_type") == "outer_reference"
+    assert rhs.outer_reference.rel_reference == lj.common.rel_anchor
+    # Inner + full right schema.
+    assert list(infer_plan_schema(plan).names) == ["k", "v", "k", "w"]
+
+
+def test_lateral_join_nested_handles_no_depth():
+    # An inner lateral join references the outer left via its captured handle;
+    # the innermost predicate correlates on both levels with no depth argument.
+    from substrait.type_inference import infer_plan_schema
+
+    outer = sub.read_named_table("o", {"j": sub.i64})
+    mid = sub.read_named_table("m", {"k": sub.i64})
+    inner = sub.read_named_table("i", {"k": sub.i64, "j": sub.i64})
+    plan = outer.lateral_join(
+        lambda o: mid.lateral_join(
+            lambda m: inner.filter(
+                (sub.col("k") == m.col("k")) & (sub.col("j") == o.col("j"))
+            ),
+            how="inner",
+        ),
+        how="inner",
+    ).to_plan()
+
+    outer_lj = plan.relations[-1].root.input.lateral_join
+    inner_lj = outer_lj.right.lateral_join
+    assert outer_lj.common.rel_anchor != inner_lj.common.rel_anchor
+    infer_plan_schema(plan)  # both id references resolve
+
+
+def test_lateral_join_is_deterministic():
+    left = sub.read_named_table("l", {"k": sub.i64})
+    inner = sub.read_named_table("r", {"k": sub.i64})
+
+    def build():
+        return left.lateral_join(
+            lambda lat: inner.filter(sub.col("k") == lat.col("k")), how="inner"
+        )
+
+    # Building the same frame twice assigns identical anchors -> equal plans,
+    # and both materialization entry points reset anchor numbering alike.
+    assert build().to_plan() == build().to_plan()
+    assert build().to_plan() == build().to_substrait()
+
+
+def test_lateral_join_left_semi_drops_right():
+    from substrait.type_inference import infer_plan_schema
+
+    left = sub.read_named_table("l", {"k": sub.i64, "v": sub.i64})
+    inner = sub.read_named_table("r", {"k": sub.i64})
+    plan = left.lateral_join(
+        lambda lat: inner.filter(sub.col("k") == lat.col("k")), how="left_semi"
+    ).to_plan()
+    assert list(infer_plan_schema(plan).names) == ["k", "v"]
+
+
+def test_lateral_join_unknown_how_raises():
+    left = sub.read_named_table("l", {"k": sub.i64})
+    inner = sub.read_named_table("r", {"k": sub.i64})
+    with pytest.raises(ValueError, match="unknown lateral join type 'right'"):
+        left.lateral_join(lambda lat: inner, how="right")
+
+
+def test_lateral_join_on_condition():
+    from substrait.type_inference import infer_plan_schema
+
+    left = sub.read_named_table("l", {"k": sub.i64, "v": sub.i64})
+    inner = sub.read_named_table("r", {"w": sub.i64})
+    # `on` is a match condition over the combined left+right schema.
+    plan = left.lateral_join(
+        lambda lat: inner, how="inner", on=sub.col("v") == sub.col("w")
+    ).to_plan()
+
+    lj = plan.relations[-1].root.input.lateral_join
+    assert lj.HasField("expression")
+    assert lj.expression.WhichOneof("rex_type") == "scalar_function"
+    assert list(infer_plan_schema(plan).names) == ["k", "v", "w"]
+
+
+def test_lateral_join_post_filter_binds_output_schema():
+    from substrait.type_inference import infer_plan_schema
+
+    left = sub.read_named_table("l", {"k": sub.i64, "v": sub.i64})
+    inner = sub.read_named_table("r", {"w": sub.i64})
+    # A left-mark join appends a `mark` column to the output; post_filter resolves
+    # against that output schema, so it can reference `mark` -- which the combined
+    # left+right inputs do not carry.
+    plan = left.lateral_join(
+        lambda lat: inner, how="left_mark", post_filter=sub.col("mark")
+    ).to_plan()
+
+    lj = plan.relations[-1].root.input.lateral_join
+    assert lj.HasField("post_join_filter")
+    field = lj.post_join_filter.selection.direct_reference.struct_field.field
+    assert field == 3  # output is [k, v, w, mark]
+    assert list(infer_plan_schema(plan).names) == ["k", "v", "w", "mark"]
+
+
+def test_correlated_exists_above_lateral_join_stays_steps_out():
+    # Regression: a correlated subquery stacked ABOVE a lateral join references the
+    # join's OUTPUT row. A lateral join's rel_anchor is reserved (per the Substrait
+    # spec) for its right input's reference to the current LEFT row, so it must NOT
+    # be reused to anchor this correlation -- doing so aliases the left-row anchor
+    # and corrupts any reference beyond the left columns (here the right-side `w`).
+    # The reference is left offset-based (steps_out) instead.
+    from substrait.type_inference import infer_plan_schema
+
+    outer = sub.read_named_table("outer", {"k": sub.i64, "v": sub.i64})
+    inner = sub.read_named_table("inner", {"k": sub.i64, "w": sub.i64})
+    subq = sub.read_named_table("subq", {"k": sub.i64})
+
+    lj = outer.lateral_join(
+        lambda lat: inner.filter(sub.col("k") == lat.col("k")), how="inner"
+    )
+    # The EXISTS correlates on the lateral join's OUTPUT column `w` (right-side,
+    # index 3 in the output [k, v, k, w]).
+    plan = lj.filter(
+        sub.exists(subq.filter(sub.col("k") == sub.outer("w", steps_out=1)))
+    ).to_plan()
+
+    top = plan.relations[-1].root.input
+    lat_anchor = top.filter.input.lateral_join.common.rel_anchor
+    oref = top.filter.condition.subquery.set_predicate.tuples.filter.condition.scalar_function.arguments[
+        1
+    ].value.selection.outer_reference
+    # Offset-based, NOT aliasing the lateral join's (left-row) anchor.
+    assert oref.WhichOneof("outer_reference_type") == "steps_out"
+    assert oref.steps_out == 1
+    assert lat_anchor >= 1  # the lateral join still carries its own left-row anchor
+    infer_plan_schema(plan)  # resolves without corruption
+
+
 def test_correlated_subquery_projecting_outer_column_then_chaining():
     # Regression: a correlated subquery whose *output* is the outer column forces
     # the enclosing plan's schema inference to resolve the OuterReference. This

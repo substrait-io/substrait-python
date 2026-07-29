@@ -388,6 +388,11 @@ def to_id_based_outer_references(plan: stplan.Plan) -> stplan.Plan:
       is anchored. For a *reducing* join (semi/anti) the two differ and no relation
       carries that row -- such a reference is left offset-based (still spec-valid, and
       read by inference), rather than mis-anchored.
+    * a ``LateralJoinRel``'s ``rel_anchor`` is reserved (per the Substrait spec) for
+      its right input's reference to the current *left* row, so it does **not** name
+      the join's output row. A ``steps_out`` correlation into a lateral join's output
+      therefore cannot be anchored on it and is left offset-based, rather than
+      aliasing (and corrupting) the left-row anchor.
 
     Raises only if a resolvable binding carries no ``RelCommon`` at all (e.g. an
     ``UpdateRel``), which no correlated-subquery shape produces.
@@ -429,6 +434,15 @@ def to_id_based_outer_references(plan: stplan.Plan) -> stplan.Plan:
         anchor_by_id[key] = counter
         return counter
 
+    def _binding_is_lateral_join(binding: stalg.Rel) -> bool:
+        # A LateralJoinRel's rel_anchor is reserved (per the Substrait spec) for its
+        # right input's reference to the current *left* row, so it does not denote
+        # the join's output row and must not be reused to anchor a correlation into
+        # that output. Unwrap a ReferenceRel to the subtree it points at first.
+        while binding.WhichOneof("rel_type") == "reference":
+            binding = subtrees[binding.reference.subtree_ordinal]
+        return binding.WhichOneof("rel_type") == "lateral_join"
+
     def convert_expr(expr, scope, binding):
         rex = expr.WhichOneof("rex_type")
         if rex == "selection":
@@ -444,8 +458,11 @@ def to_id_based_outer_references(plan: stplan.Plan) -> stplan.Plan:
                         )
                     target = scope[-steps]
                     # None marks a combined-inputs scope with no anchorable relation
-                    # (a reducing join's condition); leave such a reference as-is.
-                    if target is not None:
+                    # (a reducing join's condition). A lateral join's rel_anchor is
+                    # reserved for its right input's left-row reference, so it cannot
+                    # double as the output-row anchor a correlation here would need.
+                    # Both are left offset-based (spec-valid, read by inference).
+                    if target is not None and not _binding_is_lateral_join(target):
                         oref.rel_reference = anchor_for(target)
         elif rex == "subquery":
             for inner in _iter_subquery_rels(expr):

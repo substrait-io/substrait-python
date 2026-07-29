@@ -21,6 +21,7 @@ sql = ["sqloxide", "deepdiff"]
 
 [dependency-groups]
 dev = ["pytest >= 7.0.0", "substrait-antlr==0.99.0", "pyyaml", "sqloxide", "deepdiff", "duckdb<=1.2.2; python_version < '3.14'", "datafusion"]
+docs = ["zensical", "mkdocstrings-python"]
 
 [tool.pytest.ini_options]
 pythonpath = "src"
@@ -36,6 +37,13 @@ respect-gitignore = true
 target-version = "py310"
 lint.extend-select = ["I"]
 
+[tool.ruff.lint.per-file-ignores]
+# Guide snippet sources (examples/guide/) mirror the documentation: imports are
+# shown inside their code sections (and re-shown per page), so import placement
+# (E402), re-definition (F811), and import ordering (I001) intentionally follow
+# the docs rather than module conventions.
+"examples/guide/*.py" = ["E402", "F811", "I001"]
+
 
 [tool.pixi.workspace]
 channels = ["conda-forge"]
@@ -45,11 +53,16 @@ platforms = ["win-64", "linux-64", "osx-64", "osx-arm64", "linux-aarch64"]
 dev = { features = ["dev"], solve-group = "default" }
 extensions = { features = ["extensions"], solve-group = "default" }
 sql = { features = ["sql"], solve-group = "default" }
+docs = { features = ["docs"], solve-group = "default" }
 
 [tool.pixi.tasks]
 format = "ruff format"
 lint = "ruff check"
 lint_fix = "ruff check --fix"
+
+[tool.pixi.feature.docs.tasks]
+docs-build = "zensical build"
+docs-serve = "zensical serve"
 
 [tool.pixi.dependencies]
 ruff = ">=0.14.10,<0.15"

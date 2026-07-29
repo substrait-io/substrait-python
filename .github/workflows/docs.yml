@@ -1,0 +1,29 @@
+name: Build documentation
+
+on:
+  pull_request:
+  push:
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+# Build-check only: this verifies the docs compile on every PR so broken pages
+# or a broken mkdocstrings reference are caught early. It does NOT publish.
+# Versioned publishing to GitHub Pages is handled separately by
+# .github/workflows/docs-deploy.yml (mike -> gh-pages branch).
+
+jobs:
+  build:
+    name: Build docs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+      - name: Install uv with python
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.12"
+      - name: Build the documentation site
+        run: |
+          uv run --frozen --group docs zensical build

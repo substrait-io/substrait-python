@@ -3,11 +3,13 @@
 ``Expr`` wraps the existing "unbound" expression callables produced by
 ``substrait.builders.extended_expression`` and adds Python operator overloading
 so that expressions can be written the way users of pandas / Polars / PySpark /
-Ibis expect::
+Ibis expect:
 
-    col("age") > 25
-    (col("x") + col("y")) * 2
-    col("a").is_null() & col("b")
+```python
+col("age") > 25
+(col("x") + col("y")) * 2
+col("a").is_null() & col("b")
+```
 
 Each operator maps to a fixed standard function-extension URN + signature name
 and defers to the existing ``scalar_function`` builder, which already resolves
@@ -241,7 +243,7 @@ def _resolve_over_urns(
 
     Builds with the first URN whose overload matches the operands' signature and
     raises a uniform error if none do. Shared by the operator path
-    (:func:`_numeric_binary`) and the ``f.*`` namespace's multi-URN helper
+    (`_numeric_binary`) and the ``f.*`` namespace's multi-URN helper
     (``substrait.dataframe.functions._multi_urn_helper``) so both resolve
     identically and their error text cannot drift apart. The registry finds the
     winning extension across every candidate URN in one call; ``entry.urn``
@@ -284,7 +286,7 @@ def _numeric_binary(
     ``[functions_arithmetic, functions_arithmetic_decimal]`` so decimal operands
     fall through to the decimal extension when the base one has no overload,
     mirroring the ``f.*`` namespace's multi-URN resolution. ``decimal_literal``
-    (``"natural"`` / ``"peer"``) is forwarded to :func:`_match_numeric_type` to
+    (``"natural"`` / ``"peer"``) is forwarded to `_match_numeric_type` to
     pick how a decimal literal is coerced against a decimal peer.
     """
     urns = [urns] if isinstance(urns, str) else list(urns)
@@ -346,7 +348,7 @@ _COMPARISON_OPS = {
 
 
 class _SubqueryReduction:
-    """A subquery wrapped by :func:`any_` / :func:`all_`, consumed by a
+    """A subquery wrapped by `any_` / `all_`, consumed by a
     comparison operator to build a ``left <op> ANY/ALL (subquery)`` expression."""
 
     __slots__ = ("reduction_op", "plan")
@@ -633,7 +635,7 @@ class Expr:
     # -- higher-order list functions --------------------------------------
     def _higher_order(self, function: str, callback) -> "Expr":
         """Apply a list higher-order function whose lambda ``callback`` receives
-        an :class:`Expr` bound to the current list element."""
+        an `Expr` bound to the current list element."""
         list_unbound = self._unbound
 
         def resolve(base_schema, registry):
@@ -709,9 +711,11 @@ class Expr:
         return self._higher_order("filter", fn)
 
     def switch(self, cases: dict, default: Any) -> "Expr":
-        """Value-match CASE against literal keys::
+        """Value-match CASE against literal keys:
 
-            col("code").switch({1: "one", 2: "two"}, default="other")
+        ```python
+        col("code").switch({1: "one", 2: "two"}, default="other")
+        ```
 
         Keys must be Python scalars (they become literals); each value may be an
         ``Expr`` or a scalar.
@@ -838,9 +842,11 @@ class Expr:
         """Restrict this aggregate to rows where ``predicate`` holds
         (SQL ``agg(x) FILTER (WHERE predicate)``).
 
-        Returns a :class:`Measure`, only meaningful inside ``group_by().agg(...)``::
+        Returns a `Measure`, only meaningful inside ``group_by().agg(...)``:
 
-            f.sum(col("amount")).filter(col("status") == "paid")
+        ```python
+        f.sum(col("amount")).filter(col("status") == "paid")
+        ```
         """
         return Measure(self, Expr._coerce(predicate))
 
@@ -848,9 +854,11 @@ class Expr:
         """Cast this expression to ``type`` (a proto.Type or a type builder).
 
         The explicit escape hatch when automatic literal coercion is not enough,
-        e.g. between two columns of different numeric types::
+        e.g. between two columns of different numeric types:
 
-            col("small_i32").cast(sub.i64) + col("big_i64")
+        ```python
+        col("small_i32").cast(sub.i64) + col("big_i64")
+        ```
         """
         if callable(type):  # allow a bare builder / DataType, e.g. sub.i64
             type = type()
@@ -867,7 +875,7 @@ class Expr:
 class Measure:
     """An aggregate expression paired with a ``FILTER (WHERE ...)`` predicate.
 
-    Produced by :meth:`Expr.filter` and consumed by
+    Produced by `Expr.filter` and consumed by
     ``DataFrame.group_by(...).agg(...)``; not a standalone expression.
     """
 
@@ -888,7 +896,7 @@ class Measure:
 
 
 class When:
-    """Intermediate for building a CASE expression; see :func:`when`."""
+    """Intermediate for building a CASE expression; see `when`."""
 
     __slots__ = ("_clauses", "_pending")
 
@@ -916,12 +924,14 @@ class When:
 
 
 def when(condition: Any) -> When:
-    """Begin a CASE expression, PySpark/Polars-style::
+    """Begin a CASE expression, PySpark/Polars-style:
 
-        when(col("x") > 0).then("pos").when(col("x") < 0).then("neg").otherwise("zero")
+    ```python
+    when(col("x") > 0).then("pos").when(col("x") < 0).then("neg").otherwise("zero")
+    ```
 
     Chain ``.then(value)`` after each ``.when(condition)`` and finish with
-    ``.otherwise(default)``, which returns the :class:`Expr`.
+    ``.otherwise(default)``, which returns the `Expr`.
     """
     return When([], Expr._coerce(condition))
 
@@ -1017,9 +1027,11 @@ def col(name: Union[str, int]) -> Expr:
 def outer(name: Union[str, int], steps_out: int = 1) -> Expr:
     """Reference a column from an enclosing query (a correlated reference).
 
-    Only valid inside a subquery, e.g. a correlated ``exists``::
+    Only valid inside a subquery, e.g. a correlated ``exists``:
 
-        outer_df.filter(sub.exists(inner_df.filter(sub.col("k") == sub.outer("k"))))
+    ```python
+    outer_df.filter(sub.exists(inner_df.filter(sub.col("k") == sub.outer("k"))))
+    ```
 
     ``steps_out`` counts query-nesting levels outward (1 = the immediately
     enclosing query), matching Substrait's requirement that ``steps_out`` be

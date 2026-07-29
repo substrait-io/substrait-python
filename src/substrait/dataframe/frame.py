@@ -5,22 +5,24 @@ to build a Substrait plan in Python (analogous to how ``daft.DataFrame`` is
 Daft's own native frame). It is a thin, chainable wrapper over the
 ``substrait.builders.plan`` functions: it carries an ``ExtensionRegistry`` so it
 does not have to be threaded through every call, and it takes
-:class:`~substrait.dataframe.expr.Expr` objects (or bare column names / Python
-scalars) rather than raw ``scalar_function`` invocations::
+`Expr` objects (or bare column names / Python
+scalars) rather than raw ``scalar_function`` invocations:
 
-    import substrait.dataframe as sub
+```python
+import substrait.dataframe as sub
 
-    plan = (
-        sub.read_named_table("people", {"id": sub.i64, "age": sub.i64})
-        .filter(sub.col("age") > 25)
-        .select("id")
-        .to_plan()
-    )
+plan = (
+    sub.read_named_table("people", {"id": sub.i64, "age": sub.i64})
+    .filter(sub.col("age") > 25)
+    .select("id")
+    .to_plan()
+)
+```
 
 Verb naming follows Polars: ``select`` replaces the projection, ``with_columns``
 appends.
 
-Relationship to :mod:`substrait.narwhals`: that module is the **Narwhals
+Relationship to `substrait.narwhals`: that module is the **Narwhals
 integration layer** -- a compliant wrapper that lets ``narwhals`` drive plan
 construction (``nw.from_native(...)``). It adapts Narwhals calls down onto this
 native frame; the two layers compose rather than compete.
@@ -176,7 +178,7 @@ def _unbound(value: Any):
 
 class LateralLeft:
     """Handle to a lateral join's left input, passed to the ``right`` builder of
-    :meth:`DataFrame.lateral_join`.
+    `DataFrame.lateral_join`.
 
     Its columns are correlated references to the current left row (an id-based
     ``OuterReference``), so the right frame can be built as a function of the
@@ -198,7 +200,7 @@ class DataFrame:
     """The Substrait-native fluent DataFrame.
 
     Build plans directly (``df.filter(...).select(...).to_plan()``). For the
-    Narwhals-driven equivalent, see :class:`substrait.narwhals.DataFrame`, which
+    Narwhals-driven equivalent, see `substrait.narwhals.DataFrame`, which
     wraps this frame to satisfy the Narwhals backend protocol.
     """
 
@@ -360,7 +362,7 @@ class DataFrame:
     ) -> "DataFrame":
         """The top ``n`` rows ordered by ``by`` (a fused sort + fetch, TopNRel).
 
-        ``descending``/``nulls_last`` follow :meth:`sort`; ``with_ties`` keeps
+        ``descending``/``nulls_last`` follow `sort`; ``with_ties`` keeps
         rows tied with the n-th.
         """
         keys = [by] if isinstance(by, (str, Expr)) else list(by)
@@ -434,10 +436,12 @@ class DataFrame:
     ) -> "DataFrame":
         """Lateral join: evaluate the right frame once per row of this frame.
 
-        ``right`` is a function of a :class:`LateralLeft` handle to this frame;
-        use ``left.col(...)`` inside it to correlate on the current left row::
+        ``right`` is a function of a `LateralLeft` handle to this frame;
+        use ``left.col(...)`` inside it to correlate on the current left row:
 
-            left.lateral_join(lambda lat: inner.filter(sub.col("k") == lat.col("k")))
+        ```python
+        left.lateral_join(lambda lat: inner.filter(sub.col("k") == lat.col("k")))
+        ```
 
         Capturing the handle avoids counting nesting levels -- an inner lateral
         join can reference an outer one via its own handle.
@@ -476,7 +480,7 @@ class DataFrame:
     ) -> "DataFrame":
         """Physical nested-loop join: evaluate ``on`` over the Cartesian product.
 
-        ``how`` accepts the same values as :meth:`join`.
+        ``how`` accepts the same values as `join`.
         """
         if how not in _JOIN_TYPES:
             raise ValueError(
@@ -541,7 +545,7 @@ class DataFrame:
         """Physical hash equi-join on key columns.
 
         ``left_on``/``right_on`` are column names/indices; ``right_on`` defaults
-        to ``left_on``. ``how`` accepts the same values as :meth:`join`.
+        to ``left_on``. ``how`` accepts the same values as `join`.
         ``post_filter`` is an optional predicate applied to the join output;
         ``residual`` is an optional non-equi condition evaluated alongside the
         key equalities. Both bind against the concatenated left+right schema.
@@ -569,7 +573,7 @@ class DataFrame:
     ) -> "DataFrame":
         """Physical sort-merge equi-join on key columns (inputs assumed sorted).
 
-        ``post_filter`` and ``residual`` behave as in :meth:`hash_join`.
+        ``post_filter`` and ``residual`` behave as in `hash_join`.
         """
         return self._equi_join(
             _plan.merge_join,
@@ -594,7 +598,7 @@ class DataFrame:
         """Apply a custom single-input relation (ExtensionSingleRel).
 
         ``detail`` is an
-        :class:`~substrait.dataframe.extension_relations.ExtensionSingleDetail` (its
+        `ExtensionSingleDetail` (its
         ``derive_schema`` defines the output) or a raw ``google.protobuf.Any``
         (the input schema is then assumed to pass through). Register the detail
         class via ``ExtensionRegistry.register_extension_relation`` for schema
@@ -607,7 +611,7 @@ class DataFrame:
     ) -> "DataFrame":
         """A custom multi-input relation (ExtensionMultiRel) over this frame and
         ``others``; ``detail`` is an
-        :class:`~substrait.dataframe.extension_relations.ExtensionMultiDetail`."""
+        `ExtensionMultiDetail`."""
         inputs = [self._plan, *(o._plan for o in others)]
         return self._next(_plan.extension_multi(inputs, detail))
 
@@ -664,7 +668,7 @@ class DataFrame:
         the shared subtree is emitted **once** and referenced from both branches
         instead of being inlined twice.
 
-        Because the subtree carries no ``RelCommon``, apply :meth:`hint` (and any
+        Because the subtree carries no ``RelCommon``, apply `hint` (and any
         node-level annotation) *before* ``cache()``, not after.
         """
         return self._next(_plan.reference(self._plan))
@@ -674,7 +678,7 @@ class DataFrame:
 
         ``variable_eval_mode`` is ``"per_plan"`` (evaluate once for the whole
         plan) or ``"per_record"`` (evaluate once per record), controlling
-        variables such as :func:`substrait.dataframe.current_timestamp`. The
+        variables such as `substrait.dataframe.current_timestamp`. The
         setting is carried across subsequent operations, so it may be applied at
         any point in the chain.
         """
@@ -852,7 +856,7 @@ def extension_leaf(
     """Start a DataFrame from a custom leaf relation (ExtensionLeafRel).
 
     ``detail`` is an
-    :class:`~substrait.dataframe.extension_relations.ExtensionLeafDetail`; its
+    `ExtensionLeafDetail`; its
     ``derive_schema`` defines the source's output columns.
     """
     return DataFrame(_plan.extension_leaf(detail), registry)

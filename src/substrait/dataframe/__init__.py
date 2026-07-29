@@ -1,16 +1,18 @@
 """Ergonomic front door for substrait-python.
 
-A single, shallow import that gets you productive::
+A single, shallow import that gets you productive:
 
-    import substrait.dataframe as sub
+```python
+import substrait.dataframe as sub
 
-    plan = (
-        sub.read_named_table("people", {"id": sub.i64, "age": sub.i64, "name": sub.string})
-        .filter(sub.col("age") > 25)
-        .with_columns(adult=sub.col("age") >= 18)
-        .select("id", "name")
-        .to_plan()
-    )
+plan = (
+    sub.read_named_table("people", {"id": sub.i64, "age": sub.i64, "name": sub.string})
+    .filter(sub.col("age") > 25)
+    .with_columns(adult=sub.col("age") >= 18)
+    .select("id", "name")
+    .to_plan()
+)
+```
 
 This is the Substrait-*native* fluent DataFrame/Expr API -- the higher-level
 counterpart to the lower-level ``substrait.builders`` layer, and a sibling to

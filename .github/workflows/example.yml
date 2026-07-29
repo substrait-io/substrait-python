@@ -16,6 +16,7 @@ jobs:
       matrix:
         example:
           - builder_example.py
+          - dataframe_example.py
           - duckdb_example.py
           - adbc_example.py
           - pyarrow_example.py

@@ -1,0 +1,74 @@
+name: Deploy documentation
+
+# Publishes versioned docs to the `gh-pages` branch using the Zensical-compatible
+# fork of `mike` (https://github.com/squidfunk/mike): each version is committed
+# as a subdirectory of `site_url` (see zensical.toml), with a `latest` alias and
+# root redirect pointing at the newest release. Runs on release tags (v*.*.*),
+# and can be triggered manually.
+
+on:
+  push:
+    tags: [ 'v[0-9]+.[0-9]+.[0-9]+' ]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version label to publish (e.g. 0.29 or dev)"
+        required: true
+        default: "dev"
+      alias:
+        description: "Alias to update"
+        required: false
+        default: "latest"
+      set_default:
+        description: "Point the site root at this alias"
+        type: boolean
+        default: true
+
+permissions:
+  contents: write   # mike pushes the built docs to the gh-pages branch
+
+jobs:
+  deploy:
+    name: Deploy docs with mike
+    runs-on: ubuntu-latest
+    # Auto-deploy only on the canonical repo; manual runs are allowed anywhere
+    # (e.g. to bootstrap gh-pages on a fork while testing).
+    if: ${{ github.event_name == 'workflow_dispatch' || github.repository == 'substrait-io/substrait-python' }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0   # mike reads/writes the full gh-pages history
+      - name: Install uv with python
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.12"
+      - name: Install docs deps + mike
+        run: |
+          uv sync --frozen --group docs
+          uv pip install "git+https://github.com/squidfunk/mike.git"
+      - name: Configure git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+      - name: Resolve version and alias
+        id: v
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            full="${GITHUB_REF_NAME#v}"      # 0.29.0
+            echo "version=${full%.*}" >> "$GITHUB_OUTPUT"   # 0.29 (minor series)
+            echo "alias=latest" >> "$GITHUB_OUTPUT"
+            echo "set_default=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
+            echo "alias=${{ inputs.alias }}" >> "$GITHUB_OUTPUT"
+            echo "set_default=${{ inputs.set_default }}" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Deploy version
+        run: |
+          uv run mike deploy --push --update-aliases \
+            "${{ steps.v.outputs.version }}" "${{ steps.v.outputs.alias }}"
+      - name: Set default version
+        if: ${{ steps.v.outputs.set_default == 'true' }}
+        run: |
+          uv run mike set-default --push "${{ steps.v.outputs.alias }}"

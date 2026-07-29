@@ -1,0 +1,13 @@
+%YAML 1.2
+---
+# Fixture extension used by the custom-extension snippets in docs/functions.md
+# and docs/custom-extensions.md (registered via `register_extension_yaml`).
+urn: extension:example:my_functions
+scalar_functions:
+  - name: "my_double"
+    description: "Double an integer."
+    impls:
+      - args:
+          - name: x
+            value: i64
+        return: i64

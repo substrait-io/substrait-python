@@ -178,7 +178,7 @@ def _unbound(value: Any):
 
 class LateralLeft:
     """Handle to a lateral join's left input, passed to the ``right`` builder of
-    :meth:`DataFrame.lateral_join`.
+    `DataFrame.lateral_join`.
 
     Its columns are correlated references to the current left row (an id-based
     ``OuterReference``), so the right frame can be built as a function of the
@@ -436,10 +436,12 @@ class DataFrame:
     ) -> "DataFrame":
         """Lateral join: evaluate the right frame once per row of this frame.
 
-        ``right`` is a function of a :class:`LateralLeft` handle to this frame;
-        use ``left.col(...)`` inside it to correlate on the current left row::
+        ``right`` is a function of a `LateralLeft` handle to this frame;
+        use ``left.col(...)`` inside it to correlate on the current left row:
 
-            left.lateral_join(lambda lat: inner.filter(sub.col("k") == lat.col("k")))
+        ```python
+        left.lateral_join(lambda lat: inner.filter(sub.col("k") == lat.col("k")))
+        ```
 
         Capturing the handle avoids counting nesting levels -- an inner lateral
         join can reference an outer one via its own handle.
@@ -571,7 +573,7 @@ class DataFrame:
     ) -> "DataFrame":
         """Physical sort-merge equi-join on key columns (inputs assumed sorted).
 
-        ``post_filter`` and ``residual`` behave as in :meth:`hash_join`.
+        ``post_filter`` and ``residual`` behave as in `hash_join`.
         """
         return self._equi_join(
             _plan.merge_join,
@@ -666,7 +668,7 @@ class DataFrame:
         the shared subtree is emitted **once** and referenced from both branches
         instead of being inlined twice.
 
-        Because the subtree carries no ``RelCommon``, apply :meth:`hint` (and any
+        Because the subtree carries no ``RelCommon``, apply `hint` (and any
         node-level annotation) *before* ``cache()``, not after.
         """
         return self._next(_plan.reference(self._plan))
@@ -676,7 +678,7 @@ class DataFrame:
 
         ``variable_eval_mode`` is ``"per_plan"`` (evaluate once for the whole
         plan) or ``"per_record"`` (evaluate once per record), controlling
-        variables such as :func:`substrait.dataframe.current_timestamp`. The
+        variables such as `substrait.dataframe.current_timestamp`. The
         setting is carried across subsequent operations, so it may be applied at
         any point in the chain.
         """

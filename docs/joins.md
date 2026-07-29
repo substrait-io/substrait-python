@@ -42,6 +42,41 @@ The Cartesian product — every left row paired with every right row:
 --8<-- "examples/guide/joins.py:cross_join"
 ```
 
+## Lateral join
+
+A lateral join evaluates the **right** frame once per row of the left, so the
+right side may depend on the current left row. Instead of passing a frame, pass a
+function of a `LateralLeft` handle to the left input; `handle.col(...)` (or the
+`handle[...]` shorthand) is a correlated reference to the current left row:
+
+```python
+--8<-- "examples/guide/joins.py:lateral_join"
+```
+
+`how` is restricted to `inner` and the left-oriented types (`left`, `left_semi`,
+`left_anti`, `left_single`, `left_mark`) — the right side does not exist
+independently of a left row, so right-oriented and `outer` joins are not
+meaningful. `on` (an extra match condition over the combined schema) and
+`post_filter` work as they do for `join`:
+
+```python
+--8<-- "examples/guide/joins.py:lateral_join_on"
+```
+
+Because each handle names its own left input, nested lateral joins need no
+counting of nesting levels — an inner right frame can correlate on any enclosing
+handle it has captured:
+
+```python
+--8<-- "examples/guide/joins.py:lateral_join_nested"
+```
+
+!!! note "Handles vs. `outer()`"
+    A handle resolves to an **id-based** `OuterReference` (it points at the join's
+    `rel_anchor`), which is why no depth argument is needed. The
+    [`outer()`](subqueries.md#correlated-subqueries) form used in correlated
+    subqueries counts levels outward instead.
+
 ## Column disambiguation
 
 Substrait references columns positionally, so overlapping column names across
@@ -74,8 +109,23 @@ join assumes its inputs are already sorted on the keys:
 --8<-- "examples/guide/joins.py:physical_equi_joins"
 ```
 
+Both accept two optional predicates beyond the keys. `residual` is a non-equi
+condition evaluated *alongside* the key equalities (part of deciding a match);
+`post_filter` is applied to the join *output*. They bind against the concatenated
+left+right schema:
+
+```python
+--8<-- "examples/guide/joins.py:equi_join_predicates"
+```
+
+The distinction matters for outer joins: a `residual` that fails means the rows
+did not match (so an unmatched left row is still padded with nulls), whereas
+`post_filter` drops the produced row outright.
+
 ## Next
 
 - [Aggregations](aggregations.md) — summarize the joined rows.
 - [Set operations](set-operations.md) — union / intersect / except.
 - [Subqueries](subqueries.md) — correlated and uncorrelated subquery expressions.
+- [Shared subplans](shared-subplans.md) — join the same frame twice without
+  duplicating it.

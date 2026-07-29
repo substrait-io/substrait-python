@@ -78,6 +78,9 @@ and do not change results:
 --8<-- "examples/guide/transformations.py:hints"
 ```
 
+Not every relation can carry one: a `ReferenceRel` (from
+[`cache()`](shared-subplans.md)) has no `RelCommon`, so hint *before* caching.
+
 ## Physical distribution
 
 For engines that model partitioning, `ExchangeRel` verbs redistribute rows:

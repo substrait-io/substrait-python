@@ -42,3 +42,5 @@ Defaults to deduplicated; pass `distinct=False` for `EXCEPT ALL`. The method is
 - [Joins](joins.md) — combine columns rather than rows.
 - [Subqueries](subqueries.md) — set membership as an expression (`is_in`,
   `in_subquery`, `exists`).
+- [Shared subplans](shared-subplans.md) — feed several branches of a union from one
+  source without duplicating it.

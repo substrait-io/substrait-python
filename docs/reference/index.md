@@ -22,6 +22,7 @@ task-oriented introduction, start with the [guide](../getting-started.md).
       members:
         - DataFrame
         - GroupBy
+        - LateralLeft
         - read_named_table
         - from_records
         - read_parquet

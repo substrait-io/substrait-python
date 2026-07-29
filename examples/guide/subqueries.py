@@ -50,3 +50,25 @@ outer_df.filter(
     sub.exists(inner_df.filter(sub.col("cust_id") == sub.outer("id")))
 ).to_plan()
 # --8<-- [end:correlated]
+
+# Illustrative tables for the two-level correlation below.
+orders_df = sub.read_named_table("orders", {"cust_id": sub.i64, "order_id": sub.i64})
+items_df = sub.read_named_table("items", {"order_ref": sub.i64, "cust_ref": sub.i64})
+
+# --8<-- [start:nested_correlated]
+outer_df.filter(
+    sub.exists(
+        orders_df.filter(
+            (sub.col("cust_id") == sub.outer("id"))
+            & sub.exists(
+                items_df.filter(
+                    # one level out: the enclosing `orders_df` subquery
+                    (sub.col("order_ref") == sub.outer("order_id"))
+                    # two levels out: `outer_df`
+                    & (sub.col("cust_ref") == sub.outer("id", steps_out=2))
+                )
+            )
+        )
+    )
+).to_plan()
+# --8<-- [end:nested_correlated]

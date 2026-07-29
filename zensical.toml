@@ -30,6 +30,7 @@ nav = [
     { "Set operations" = "set-operations.md" },
     { "Window functions" = "window-functions.md" },
     { "Subqueries" = "subqueries.md" },
+    { "Shared subplans (CTEs)" = "shared-subplans.md" },
     { "Parameters & context" = "parameters-and-context.md" },
     { "DDL & writes" = "ddl-and-writes.md" },
     { "Custom extensions" = "custom-extensions.md" },

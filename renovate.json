@@ -1,0 +1,32 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    ":semanticCommitTypeAll(chore)",
+    ":maintainLockFilesWeekly"
+  ],
+  "semanticCommits": "enabled",
+  "semanticCommitType": "chore",
+  "semanticCommitScope": "deps",
+  "packageRules": [
+    {
+      "description": "Port of the dependabot substrait group. check_substrait_package_versions.sh requires all three packages to carry the same version, so they have to move together",
+      "matchPackageNames": [
+        "substrait-protobuf",
+        "substrait-antlr",
+        "substrait-extensions"
+      ],
+      "groupName": "substrait packages"
+    },
+    {
+      "description": "Match the deps-dev scope dependabot used for development dependencies",
+      "matchDepTypes": ["dependency-groups", "project.optional-dependencies"],
+      "semanticCommitScope": "deps-dev"
+    },
+    {
+      "description": "Changing the supported Python version is a project decision, not a routine bump",
+      "matchPackageNames": ["python"],
+      "enabled": false
+    }
+  ]
+}

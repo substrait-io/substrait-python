@@ -8,6 +8,7 @@ import substrait.algebra_pb2 as stalg
 import substrait.extensions.extensions_pb2 as ste
 import substrait.plan_pb2 as stplan
 import substrait.type_pb2 as stp
+from google.protobuf.message import Message
 
 
 def type_num_names(typ: stp.Type):
@@ -27,6 +28,12 @@ def merge_extension_urns(*extension_urns: Iterable[ste.SimpleExtensionURN]):
     """Merges multiple sets of SimpleExtensionURN objects into a single set.
     The order of extensions is kept intact, while duplicates are discarded.
     Assumes that there are no collisions (different extensions having identical anchors).
+
+    Note that anchor collisions between independently numbered inputs are real, so
+    that assumption does not hold in general. The builders no longer rely on it:
+    they route inputs through ``ExtensionCollector.adopt``, which re-derives anchors
+    from ``(urn, name)`` identities instead of merging pre-numbered sets. Retained
+    for external callers doing their own merging.
     """
     seen_urns = set()
     ret = []
@@ -46,6 +53,9 @@ def merge_extension_declarations(
     """Merges multiple sets of SimpleExtensionDeclaration objects into a single set.
     The order of extension declarations is kept intact, while duplicates are discarded.
     Assumes that there are no collisions (different extension declarations having identical anchors).
+
+    See :func:`merge_extension_urns` on why the builders no longer depend on that
+    assumption; this is retained for external callers.
     """
 
     seen_extension_functions = set()
@@ -174,6 +184,123 @@ def _inline_reference_rels_in_place(rel: stalg.Rel, subtrees) -> None:
             )
         else:
             _inline_reference_rels_in_place(child, subtrees)
+
+
+# Every field that holds a function reference, i.e. an index into a plan's
+# extension declarations. Matched by name during a descriptor walk rather than
+# enumerated per message type, so a reference field added to the protos upstream is
+# picked up automatically instead of being silently skipped. Note that this library
+# only ever emits the first of these; the others can appear in a plan built
+# elsewhere.
+_FUNCTION_REFERENCE_FIELDS = frozenset(
+    {
+        # ScalarFunction / WindowFunction / AggregateFunction / WindowRelFunction
+        "function_reference",
+        "comparison_function_reference",  # SortField
+        "custom_function_reference",  # ComparisonJoinKey.ComparisonType
+    }
+)
+
+
+def remap_function_references(msg, remap: dict):
+    """A copy of ``msg`` with every function reference remapped (old -> new).
+
+    Used when a plan built elsewhere is folded into the build in progress: the
+    incoming plan numbered its functions independently, so
+    :meth:`~substrait.extension_registry.ExtensionCollector.adopt` re-derives the
+    numbering and this applies the result to the relations and expressions that
+    refer to it. Joins ``rebase_reference_ordinals`` and
+    ``to_id_based_outer_references`` as a whole-tree rewrite.
+
+    ``msg`` may be any message (a ``Rel``, ``Plan``, or ``Expression``); it is
+    returned unchanged when ``remap`` is empty, which is the common case, so callers
+    need not special-case the no-op.
+
+    A reference of ``0`` is remapped like any other: the spec marks 0 a valid
+    anchor/reference (spelled out in the protos since Substrait v0.83.0), and
+    proto3 leaves such a field out of ``ListFields()``, so the fields to rewrite are
+    read off the descriptor instead -- see :func:`_remap_own_function_references` for
+    how presence decides which of them may be written without inventing a reference
+    that was never there.
+
+    A reference packed inside a ``google.protobuf.Any`` is out of reach: the walk
+    descends into the wrapper, whose only fields are ``type_url`` and the opaque
+    ``value`` bytes, and finds no reference field there. So an
+    ``Extension{Single,Multi,Leaf}Rel.detail``, an ``AdvancedExtension.optimization``
+    / ``.enhancement``, or a ``ReadRel.ExtensionTable.detail`` that embeds a function
+    reference keeps the incoming plan's numbering. That is inherent, not an
+    oversight: rewriting the payload means parsing it, which needs the very schema
+    ``Any`` withholds -- so whoever produces a packed detail owns the remapping of
+    the references inside it.
+    """
+    if not remap:
+        return msg
+    out = type(msg)()
+    out.CopyFrom(msg)
+    _remap_function_references_in_place(out, remap)
+    return out
+
+
+def _remap_own_function_references(msg, remap: dict) -> None:
+    """Remap the function-reference fields ``msg`` itself carries (not its children).
+
+    Driven by the descriptor rather than by ``ListFields()``: proto3 omits a
+    default-valued scalar from ``ListFields()``, so a set-fields walk cannot see --
+    let alone rewrite -- a ``function_reference: 0``, which is a reference the spec
+    permits (since Substrait v0.83.0).
+
+    Field presence decides whether a reference may be written blind:
+
+    * the four ``function_reference`` fields (``Expression.ScalarFunction``,
+      ``Expression.WindowFunction``, ``AggregateFunction``,
+      ``ConsistentPartitionWindowRel.WindowRelFunction``) have no presence, and a
+      containing message that is set always denotes a real function -- there is no
+      valid ``ScalarFunction`` with no function -- so they are remapped
+      unconditionally, 0 included.
+    * ``SortField.comparison_function_reference`` (oneof ``sort_kind``) and
+      ``ComparisonJoinKey.ComparisonType.custom_function_reference`` (oneof
+      ``inner_type``) do have presence, so they are remapped only when their oneof
+      selects them. Writing one blind would *invent* it: a ``SortField`` sorting by
+      ``direction`` would come out sorting by comparison function instead.
+
+    ``HasField`` cannot serve as the single gate, since it raises on a no-presence
+    proto3 scalar; the oneof members are gated on ``WhichOneof`` instead.
+    """
+    for name in _FUNCTION_REFERENCE_FIELDS:
+        field = msg.DESCRIPTOR.fields_by_name.get(name)
+        if field is None:
+            continue
+        oneof = field.containing_oneof
+        if oneof is not None and msg.WhichOneof(oneof.name) != name:
+            continue
+        current = getattr(msg, name)
+        # A reference field is singular today; a repeated one added upstream would
+        # arrive as a container, which is skipped rather than mis-assigned. See
+        # _remap_function_references_in_place for why cardinality is read off the
+        # value rather than the descriptor.
+        if isinstance(current, int):
+            setattr(msg, name, remap.get(current, current))
+
+
+def _remap_function_references_in_place(msg, remap: dict) -> None:
+    _remap_own_function_references(msg, remap)
+    # Cardinality is read off the value rather than the descriptor: `label` is
+    # deprecated in protobuf 6 while `is_repeated` is absent from older 5.x, and
+    # this package supports both.
+    #
+    # Only *set* submessages are descended into -- an unset one holds nothing to
+    # rewrite, and touching it would materialize it. ListFields() snapshots the set
+    # fields, so the assignments above are safe to make during iteration.
+    for field, value in msg.ListFields():
+        if isinstance(value, Message):
+            _remap_function_references_in_place(value, remap)
+        elif field.message_type is not None:
+            # A repeated message field, or a map whose values are messages
+            # (ScalarMap/MessageMap expose .values(), repeated fields do not).
+            items = value.values() if hasattr(value, "values") else value
+            for item in items:
+                if isinstance(item, Message):
+                    _remap_function_references_in_place(item, remap)
 
 
 def _iter_direct_subexpressions(msg):
@@ -507,9 +634,11 @@ def merge_extensions_into(target, *sources):
     Appends any extension URNs / declarations carried by ``sources`` whose identity
     is not already present on ``target``, deduplicating with the same keys as
     :func:`merge_extension_urns` / :func:`merge_extension_declarations` (URN string,
-    resp. ``(extension URN reference, name)``). This is the identity used by
-    ``builders.plan._merge_extensions``, so the DataFrame/Expr layer and the plan
-    builders agree on when extensions collapse.
+    resp. ``(extension URN reference, name)``).
+
+    No longer used by the builders or the DataFrame layer, which let the build's
+    ``ExtensionCollector`` accumulate declarations once instead; retained for
+    external callers assembling plans by hand.
 
     ``target`` and each ``source`` are messages carrying repeated ``extension_urns``
     and ``extensions`` fields (a ``Plan`` or an ``ExtendedExpression``). Unlike the

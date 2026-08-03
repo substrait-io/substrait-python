@@ -23,14 +23,12 @@ class FunctionEntry:
         urn: str,
         name: str,
         impl: Union[se.Impl, se.Impl1, se.Impl2],
-        anchor: int,
         function_type: FunctionType = FunctionType.SCALAR,
     ) -> None:
         self.name = name
         self.impl = impl
         self.normalized_inputs: list = []
         self.urn: str = urn
-        self.anchor = anchor
         self.function_type = function_type
         self.arguments = []
         self.nullability = (

@@ -25,6 +25,24 @@ dev = ["pytest >= 7.0.0", "substrait-antlr==0.99.0", "pyyaml", "sqloxide", "deep
 [tool.pytest.ini_options]
 pythonpath = "src"
 testpaths = "tests"
+markers = [
+    "integration: exercises a third-party Substrait producer or consumer",
+    "pyarrow: integration test against pyarrow's Substrait output; runs by default",
+    "duckdb: integration test against duckdb's Substrait consumer; deselected by default",
+    "datafusion: integration test against datafusion's Substrait consumer; deselected by default",
+]
+# The default turns off the two integrations that cannot report their own failure, not
+# integration testing as a category. DuckDB and DataFusion consume plans this library
+# builds, and handing a lagging consumer a plan built at a newer spec version can crash
+# the interpreter natively -- so they must not gate a plain `pytest`, which is what CI
+# runs. pyarrow goes the other way (it produces, this library consumes), so it cannot
+# take the process down and it currently passes: it runs by default, where it can catch
+# a pyarrow release drifting away from the output shape the anchor handling assumes.
+# Turn it off by adding `and not pyarrow` here if that day comes.
+#
+# A `-m` on the command line replaces this one rather than being ANDed with it, so
+# `-m integration` runs every integration test and `-m duckdb` runs just that one.
+addopts = ["-m", "not duckdb and not datafusion"]
 
 [build-system]
 requires = ["setuptools>=61.0.0", "setuptools_scm[toml]>=6.2.0"]

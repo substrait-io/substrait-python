@@ -65,7 +65,6 @@ from substrait.builders.extended_expression import (
     set_predicate as _set_predicate,
 )
 from substrait.type_inference import infer_extended_expression_schema
-from substrait.utils import merge_extensions_into
 
 # Standard Substrait function-extension URNs used by the operators below.
 FUNCTIONS_COMPARISON = "extension:io.substrait:functions_comparison"
@@ -687,8 +686,6 @@ class Expr:
                     )
                 ],
                 base_schema=base_schema,
-                extension_urns=body.extension_urns,
-                extensions=body.extensions,
             )
             return scalar_function(
                 FUNCTIONS_LIST, function, expressions=[bound_list, lambda_ee]
@@ -765,8 +762,6 @@ class Expr:
                         expr=bound_key.referred_expr[0].expression, direction=direction
                     )
                 )
-                # Carry over any extensions a (function-valued) sort key introduced.
-                merge_extensions_into(bound, bound_key)
             return bound
 
         return Expr(resolve)
@@ -810,7 +805,6 @@ class Expr:
                 key = p.unbound if isinstance(p, Expr) else column(p)
                 bound_p = resolve_expression(key, base_schema, registry)
                 wf.partitions.append(bound_p.referred_expr[0].expression)
-                merge_extensions_into(bound, bound_p)
             for k in order_keys:
                 key = k.unbound if isinstance(k, Expr) else column(k)
                 bound_k = resolve_expression(key, base_schema, registry)
@@ -819,7 +813,6 @@ class Expr:
                         expr=bound_k.referred_expr[0].expression, direction=direction
                     )
                 )
-                merge_extensions_into(bound, bound_k)
             frame = rows if rows is not None else range
             if frame is not None:
                 wf.bounds_type = (

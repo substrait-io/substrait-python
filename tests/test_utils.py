@@ -11,6 +11,7 @@ from substrait.utils import (
     merge_extension_urns,
     merge_extensions_into,
     rel_anchor_of,
+    remap_function_references,
     to_id_based_outer_references,
     type_num_names,
 )
@@ -182,6 +183,279 @@ def test_merge_extension_declarations_rejects_non_function_mapping():
 
     with pytest.raises(NotImplementedError, match="extension_type"):
         merge_extension_declarations([declaration])
+
+
+# --- remap_function_references -------------------------------------------------
+#
+# Every proto field that holds a function reference must be rewritten, including
+# the two this library never emits itself but a plan built elsewhere may carry.
+
+
+def test_remap_function_references_rewrites_every_reference_field():
+    rel = stalg.Rel(
+        project=stalg.ProjectRel(
+            expressions=[
+                stalg.Expression(
+                    scalar_function=stalg.Expression.ScalarFunction(
+                        function_reference=7
+                    )
+                ),
+                stalg.Expression(
+                    window_function=stalg.Expression.WindowFunction(
+                        function_reference=7,
+                        sorts=[stalg.SortField(comparison_function_reference=8)],
+                    )
+                ),
+            ]
+        )
+    )
+    out = remap_function_references(rel, {7: 1, 8: 2})
+
+    expressions = out.project.expressions
+    assert expressions[0].scalar_function.function_reference == 1
+    assert expressions[1].window_function.function_reference == 1
+    assert expressions[1].window_function.sorts[0].comparison_function_reference == 2
+
+
+def test_remap_function_references_rewrites_aggregate_and_window_rels():
+    aggregate = stalg.Rel(
+        aggregate=stalg.AggregateRel(
+            measures=[
+                stalg.AggregateRel.Measure(
+                    measure=stalg.AggregateFunction(function_reference=8)
+                )
+            ]
+        )
+    )
+    window = stalg.Rel(
+        window=stalg.ConsistentPartitionWindowRel(
+            window_functions=[
+                stalg.ConsistentPartitionWindowRel.WindowRelFunction(
+                    function_reference=7
+                )
+            ]
+        )
+    )
+    remap = {7: 1, 8: 2}
+
+    assert (
+        remap_function_references(aggregate, remap)
+        .aggregate.measures[0]
+        .measure.function_reference
+        == 2
+    )
+    assert (
+        remap_function_references(window, remap)
+        .window.window_functions[0]
+        .function_reference
+        == 1
+    )
+
+
+def test_remap_function_references_rewrites_join_key_comparison():
+    """``custom_function_reference`` is never emitted by this library, but a plan
+    built elsewhere may use it, so the walk must still cover it."""
+    key = stalg.ComparisonJoinKey(
+        comparison=stalg.ComparisonJoinKey.ComparisonType(custom_function_reference=8)
+    )
+    assert (
+        remap_function_references(key, {8: 2}).comparison.custom_function_reference == 2
+    )
+
+
+def test_remap_function_references_rewrites_a_reference_of_zero():
+    """0 is a valid anchor/reference -- the protos have said so on ``function_anchor``
+    since Substrait v0.83.0 ("0 is a valid anchor/reference, but prefer non-zero
+    values for ergonomics") -- so an incoming plan may name its
+    first function with ``function_reference: 0``.
+
+    proto3 leaves such a field out of ``ListFields()``, so a set-fields walk cannot
+    see it, let alone rewrite it: the reference would silently survive into a plan
+    whose numbering puts something else at 0. All four fields that hold a reference
+    without presence must be rewritten.
+    """
+    remap = {0: 5}
+    rel = stalg.Rel(
+        project=stalg.ProjectRel(
+            expressions=[
+                stalg.Expression(
+                    scalar_function=stalg.Expression.ScalarFunction(
+                        function_reference=0
+                    )
+                ),
+                stalg.Expression(
+                    window_function=stalg.Expression.WindowFunction(
+                        function_reference=0
+                    )
+                ),
+            ]
+        )
+    )
+    aggregate = stalg.Rel(
+        aggregate=stalg.AggregateRel(
+            measures=[
+                stalg.AggregateRel.Measure(
+                    measure=stalg.AggregateFunction(function_reference=0)
+                )
+            ]
+        )
+    )
+    window = stalg.Rel(
+        window=stalg.ConsistentPartitionWindowRel(
+            window_functions=[
+                stalg.ConsistentPartitionWindowRel.WindowRelFunction(
+                    function_reference=0
+                )
+            ]
+        )
+    )
+
+    out = remap_function_references(rel, remap)
+    assert out.project.expressions[0].scalar_function.function_reference == 5
+    assert out.project.expressions[1].window_function.function_reference == 5
+    assert (
+        remap_function_references(aggregate, remap)
+        .aggregate.measures[0]
+        .measure.function_reference
+        == 5
+    )
+    assert (
+        remap_function_references(window, remap)
+        .window.window_functions[0]
+        .function_reference
+        == 5
+    )
+
+
+def test_remap_function_references_rewrites_zero_in_the_presence_bearing_fields():
+    """The two reference fields that *do* have presence still carry 0 when set to
+    it, so selecting one must be enough to have it rewritten."""
+    remap = {0: 5}
+    sort = stalg.SortField(comparison_function_reference=0)
+    key = stalg.ComparisonJoinKey(
+        comparison=stalg.ComparisonJoinKey.ComparisonType(custom_function_reference=0)
+    )
+
+    assert remap_function_references(sort, remap).comparison_function_reference == 5
+    assert (
+        remap_function_references(key, remap).comparison.custom_function_reference == 5
+    )
+
+
+@pytest.mark.parametrize(
+    "direction",
+    [
+        stalg.SortField.SORT_DIRECTION_ASC_NULLS_FIRST,
+        # The trap: a zero-valued oneof member is as invisible to ListFields() as a
+        # reference of 0, so a walk that gates on "is this field set" the wrong way
+        # cannot tell the two apart.
+        stalg.SortField.SORT_DIRECTION_UNSPECIFIED,
+    ],
+    ids=["asc", "unspecified"],
+)
+def test_remap_function_references_does_not_invent_a_sort_comparison(direction):
+    """``comparison_function_reference`` shares oneof ``sort_kind`` with
+    ``direction``, so a remap that knows the key 0 must not write it blind: a field
+    sorted by direction would come out sorted by a comparison function instead.
+    """
+    sort = stalg.SortField(
+        expr=stalg.Expression(literal=stalg.Expression.Literal(i64=1)),
+        direction=direction,
+    )
+    before = sort.SerializeToString(deterministic=True)
+
+    out = remap_function_references(sort, {0: 5})
+
+    assert out.WhichOneof("sort_kind") == "direction"
+    assert out.SerializeToString(deterministic=True) == before
+
+
+def test_remap_function_references_does_not_invent_a_sort_kind():
+    """A SortField with no ``sort_kind`` at all keeps none: the oneof gate reads
+    which member is selected, not whether the field could hold a reference."""
+    sort = stalg.SortField(
+        expr=stalg.Expression(literal=stalg.Expression.Literal(i64=1))
+    )
+    out = remap_function_references(sort, {0: 5})
+    assert out.WhichOneof("sort_kind") is None
+
+
+@pytest.mark.parametrize(
+    "simple",
+    [
+        stalg.ComparisonJoinKey.SIMPLE_COMPARISON_TYPE_EQ,
+        stalg.ComparisonJoinKey.SIMPLE_COMPARISON_TYPE_UNSPECIFIED,
+    ],
+    ids=["eq", "unspecified"],
+)
+def test_remap_function_references_does_not_invent_a_join_key_comparison(simple):
+    """``custom_function_reference`` shares oneof ``inner_type`` with ``simple``, so
+    the same gate applies: an equi-join key must not come out comparing by function.
+    """
+    key = stalg.ComparisonJoinKey(
+        comparison=stalg.ComparisonJoinKey.ComparisonType(simple=simple)
+    )
+    before = key.SerializeToString(deterministic=True)
+
+    out = remap_function_references(key, {0: 5})
+
+    assert out.comparison.WhichOneof("inner_type") == "simple"
+    assert out.SerializeToString(deterministic=True) == before
+
+
+def test_remap_function_references_does_not_materialize_an_unset_function():
+    """Only *set* submessages are descended into. An ``AggregateRel.Measure`` with no
+    ``measure`` holds no reference to rewrite, and descending anyway would bring the
+    ``AggregateFunction`` into existence -- inventing a measure calling function 5 --
+    because its ``function_reference`` reads back as the 0 the remap knows.
+    """
+    rel = stalg.Rel(
+        aggregate=stalg.AggregateRel(
+            measures=[
+                stalg.AggregateRel.Measure(
+                    filter=stalg.Expression(
+                        literal=stalg.Expression.Literal(boolean=True)
+                    )
+                )
+            ]
+        )
+    )
+    before = rel.SerializeToString(deterministic=True)
+
+    out = remap_function_references(rel, {0: 5})
+
+    assert not out.aggregate.measures[0].HasField("measure")
+    assert out.SerializeToString(deterministic=True) == before
+
+
+def test_remap_function_references_leaves_input_alone():
+    rel = stalg.Rel(
+        project=stalg.ProjectRel(
+            expressions=[
+                stalg.Expression(
+                    scalar_function=stalg.Expression.ScalarFunction(
+                        function_reference=7
+                    )
+                )
+            ]
+        )
+    )
+    remap_function_references(rel, {7: 1})
+    assert rel.project.expressions[0].scalar_function.function_reference == 7
+
+
+def test_remap_function_references_empty_remap_is_the_same_object():
+    """The no-op case is the common one -- callers rely on it not copying."""
+    rel = stalg.Rel(read=stalg.ReadRel())
+    assert remap_function_references(rel, {}) is rel
+
+
+def test_remap_function_references_passes_through_unmapped():
+    expression = stalg.Expression(
+        scalar_function=stalg.Expression.ScalarFunction(function_reference=99)
+    )
+    out = remap_function_references(expression, {7: 1})
+    assert out.scalar_function.function_reference == 99
 
 
 # --- to_id_based_outer_references ----------------------------------------------

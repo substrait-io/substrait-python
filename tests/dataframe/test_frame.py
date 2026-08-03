@@ -549,6 +549,32 @@ def test_subquery_merges_inner_extensions():
     assert "extension:io.substrait:functions_comparison" in urns
 
 
+def test_subquery_over_a_prebuilt_plan_merges_its_extensions():
+    """``sub.DataFrame(other.to_plan())`` as the subquery: a plan that arrives already
+    numbered, against a table this build is about to replace.
+
+    A Subquery embeds a bare Rel, so the inner plan's declarations do not travel with
+    it. Where the two numberings happen to overlap -- as they do here, the outer
+    ``gt`` taking the anchor the inner plan gave ``add`` -- the reference loads fine
+    and names the wrong function, so this checks by name rather than by anchor.
+    """
+    inner = _inner().filter(sub.col("v") + 1 > 5)
+    prebuilt = sub.DataFrame(inner.to_plan())
+    plan = _outer().filter(sub.col("x") > 0).filter(sub.exists(prebuilt)).to_plan()
+
+    declarations = {
+        d.extension_function.function_anchor: d.extension_function.name
+        for d in plan.extensions
+    }
+    assert set(declarations.values()) == {"gt:any_any", "add:i64_i64"}
+    condition = plan.relations[-1].root.input.filter.condition
+    tuples = condition.subquery.set_predicate.tuples
+    lifted = tuples.filter.condition.scalar_function
+    assert declarations[lifted.function_reference] == "gt:any_any"
+    add = lifted.arguments[0].value.scalar_function
+    assert declarations[add.function_reference] == "add:i64_i64"
+
+
 def test_subquery_requires_dataframe():
     with pytest.raises(TypeError, match="expects a DataFrame"):
         sub.scalar_subquery(sub.col("x"))

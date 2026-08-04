@@ -5,6 +5,7 @@ All builders return UnboundPlan objects that can be materialized to a Plan using
 See `examples/builder_example.py` for usage.
 """
 
+from contextvars import ContextVar
 import re
 from typing import Callable, Iterable, Optional, Union
 
@@ -39,6 +40,10 @@ from substrait.version import substrait_version
 UnboundPlan = Callable[[ExtensionRegistry], stp.Plan]
 
 PlanOrUnbound = Union[stp.Plan, UnboundPlan]
+
+_include_relation_output_names = ContextVar(
+    "include_relation_output_names", default=False
+)
 
 
 def _create_default_version():
@@ -75,6 +80,45 @@ def _merge_plan_metadata(*objs):
             metadata["execution_behavior"] = b.execution_behavior
             break
     return metadata
+
+
+def materialize(
+    plan: PlanOrUnbound,
+    registry: ExtensionRegistry,
+    *,
+    include_relation_output_names: bool = False,
+) -> stp.Plan:
+    """Resolve a plan with optional standard output-name hints on every relation.
+
+    ``RelCommon.Hint.output_names`` is the protocol-defined equivalent of
+    ``RelRoot.names`` for intermediate relations.  Builders already infer these
+    names while composing a plan; this option preserves that information in the
+    serialized Plan without changing relation semantics or forcing shared
+    subtrees.  The option is scoped to this materialization and is safe for
+    concurrent callers.
+    """
+
+    if isinstance(plan, stp.Plan):
+        return plan
+    token = _include_relation_output_names.set(include_relation_output_names)
+    try:
+        return plan(registry)
+    finally:
+        _include_relation_output_names.reset(token)
+
+
+def _with_output_names(rel: stalg.Rel, names: Iterable[str]) -> stalg.Rel:
+    if not _include_relation_output_names.get():
+        return rel
+    relation_type = rel.WhichOneof("rel_type")
+    if relation_type is None:
+        return rel
+    relation = getattr(rel, relation_type)
+    if "common" not in relation.DESCRIPTOR.fields_by_name:
+        return rel
+    del relation.common.hint.output_names[:]
+    relation.common.hint.output_names.extend(names)
+    return rel
 
 
 def _is_identity(remap: dict) -> bool:
@@ -139,8 +183,12 @@ def _plan_from(
     propagation and Plan assembly live, so every relational builder is one call.
     """
     subtree_planrels, input_rels = _merge_input_subtrees(bound_inputs)
+    output_names = list(names)
     root = stp.PlanRel(
-        root=stalg.RelRoot(input=make_rel(input_rels), names=list(names))
+        root=stalg.RelRoot(
+            input=_with_output_names(make_rel(input_rels), output_names),
+            names=output_names,
+        )
     )
     kwargs = {
         "relations": [*subtree_planrels, root],
@@ -189,14 +237,14 @@ def read_named_table(
     def resolve(registry: ExtensionRegistry) -> stp.Plan:
         _names = [names] if isinstance(names, str) else names
 
-        rel = stalg.Rel(
+        rel = _with_output_names(stalg.Rel(
             read=stalg.ReadRel(
                 common=stalg.RelCommon(direct=stalg.RelCommon.Direct()),
                 base_schema=named_struct,
                 named_table=stalg.ReadRel.NamedTable(names=_names),
                 advanced_extension=extension,
             )
-        )
+        ), named_struct.names)
 
         return stp.Plan(
             version=default_version,
@@ -223,7 +271,10 @@ def _read_plan(named_struct: stt.NamedStruct, read_rel: stalg.ReadRel) -> stp.Pl
         relations=[
             stp.PlanRel(
                 root=stalg.RelRoot(
-                    input=stalg.Rel(read=read_rel), names=named_struct.names
+                    input=_with_output_names(
+                        stalg.Rel(read=read_rel), named_struct.names
+                    ),
+                    names=named_struct.names,
                 )
             )
         ],

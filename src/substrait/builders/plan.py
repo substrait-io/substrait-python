@@ -107,6 +107,36 @@ def materialize(
         _include_relation_output_names.reset(token)
 
 
+def with_relation_alias(plan: PlanOrUnbound, alias: str) -> UnboundPlan:
+    """Attach the standard ``RelCommon.Hint.alias`` to a plan's root relation.
+
+    The alias is carried with the relation when a later builder nests it. This
+    makes logical relation identities available for qualification and debugging
+    without promoting ordinary single-consumer relations to shared subtrees.
+    """
+
+    if not alias:
+        raise ValueError("relation alias must not be empty")
+
+    def resolve(registry: ExtensionRegistry) -> stp.Plan:
+        bound = plan if isinstance(plan, stp.Plan) else plan(registry)
+        result = stp.Plan()
+        result.CopyFrom(bound)
+        root_input = result.relations[-1].root.input
+        relation_type = root_input.WhichOneof("rel_type")
+        if relation_type is None:
+            raise ValueError("plan root does not contain a relation")
+        relation = getattr(root_input, relation_type)
+        if "common" not in relation.DESCRIPTOR.fields_by_name:
+            raise ValueError(
+                f"relation {relation_type} does not support RelCommon.Hint.alias"
+            )
+        relation.common.hint.alias = alias
+        return result
+
+    return resolve
+
+
 def _with_output_names(rel: stalg.Rel, names: Iterable[str]) -> stalg.Rel:
     if not _include_relation_output_names.get():
         return rel

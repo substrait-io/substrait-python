@@ -3,6 +3,7 @@ import contextlib
 import contextvars
 import itertools
 import uuid as uuid_module
+from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal
 from typing import Any, Callable, Iterable, Union
@@ -55,6 +56,24 @@ UnboundExtendedExpression = Callable[
 ExtendedExpressionOrUnbound = Union[stee.ExtendedExpression, UnboundExtendedExpression]
 
 
+@dataclass(frozen=True)
+class EnumerationArgument:
+    """A simple-extension function enumeration argument.
+
+    Enumeration arguments participate in overload resolution but are encoded as
+    ``FunctionArgument.enum`` rather than record expressions.
+    """
+
+    value: str
+
+    def __post_init__(self):
+        if not self.value:
+            raise ValueError("enumeration argument must be non-empty")
+
+
+FunctionArgumentOrExpression = Union[ExtendedExpressionOrUnbound, EnumerationArgument]
+
+
 def _alias_or_inferred(
     alias: Union[Iterable[str], str, None],
     op: str,
@@ -78,6 +97,42 @@ def _function_options(options):
         prefs = [preference] if isinstance(preference, str) else list(preference)
         result.append(stalg.FunctionOption(name=name, preference=prefs))
     return result
+
+
+def _resolve_function_arguments(
+    arguments: Iterable[FunctionArgumentOrExpression],
+    base_schema: stp.NamedStruct,
+    registry: ExtensionRegistry,
+):
+    bound = [
+        argument
+        if isinstance(argument, EnumerationArgument)
+        else resolve_expression(argument, base_schema, registry)
+        for argument in arguments
+    ]
+    expression_arguments = [
+        argument for argument in bound if isinstance(argument, stee.ExtendedExpression)
+    ]
+    expression_schemas = [
+        infer_extended_expression_schema(argument, registry=registry)
+        for argument in expression_arguments
+    ]
+    schema_iterator = iter(expression_schemas)
+    signature = []
+    protobuf_arguments = []
+    output_names = []
+    for argument in bound:
+        if isinstance(argument, EnumerationArgument):
+            signature.append(argument.value)
+            protobuf_arguments.append(stalg.FunctionArgument(enum=argument.value))
+            output_names.append(argument.value)
+        else:
+            signature.extend(next(schema_iterator).types)
+            protobuf_arguments.append(
+                stalg.FunctionArgument(value=argument.referred_expr[0].expression)
+            )
+            output_names.append(argument.referred_expr[0].output_names[0])
+    return expression_arguments, signature, protobuf_arguments, output_names
 
 
 def resolve_expression(
@@ -389,6 +444,49 @@ def literal(
     return resolve
 
 
+def nested_struct(
+    expressions: Iterable[ExtendedExpressionOrUnbound],
+    nullable: bool = False,
+    alias: Union[Iterable[str], str, None] = None,
+) -> UnboundExtendedExpression:
+    """Build a struct-valued nested expression from scalar expressions."""
+
+    def resolve(
+        base_schema: stp.NamedStruct, registry: ExtensionRegistry
+    ) -> stee.ExtendedExpression:
+        bound = [resolve_expression(item, base_schema, registry) for item in expressions]
+        return stee.ExtendedExpression(
+            referred_expr=[
+                stee.ExpressionReference(
+                    expression=stalg.Expression(
+                        nested=stalg.Expression.Nested(
+                            nullable=nullable,
+                            struct=stalg.Expression.Nested.Struct(
+                                fields=[
+                                    item.referred_expr[0].expression for item in bound
+                                ]
+                            ),
+                        )
+                    ),
+                    output_names=_alias_or_inferred(
+                        alias,
+                        "struct",
+                        [item.referred_expr[0].output_names[0] for item in bound],
+                    ),
+                )
+            ],
+            base_schema=base_schema,
+            extension_urns=merge_extension_urns(
+                *[item.extension_urns for item in bound]
+            ),
+            extensions=merge_extension_declarations(
+                *[item.extensions for item in bound]
+            ),
+        )
+
+    return resolve
+
+
 def outer_reference(field: Union[str, int], steps_out: int = 1):
     """A field reference to an enclosing query's column (a correlated reference).
 
@@ -532,7 +630,7 @@ def column(field: Union[str, int], alias: Union[Iterable[str], str, None] = None
 def scalar_function(
     urn: str,
     function: str,
-    expressions: Iterable[ExtendedExpressionOrUnbound],
+    expressions: Iterable[FunctionArgumentOrExpression],
     alias: Union[Iterable[str], str, None] = None,
     options: Union[dict, None] = None,
 ):
@@ -545,16 +643,12 @@ def scalar_function(
     def resolve(
         base_schema: stp.NamedStruct, registry: ExtensionRegistry
     ) -> stee.ExtendedExpression:
-        bound_expressions = [
-            resolve_expression(e, base_schema, registry) for e in expressions
-        ]
-
-        expression_schemas = [
-            infer_extended_expression_schema(b, registry=registry)
-            for b in bound_expressions
-        ]
-
-        signature = [typ for es in expression_schemas for typ in es.types]
+        (
+            bound_expressions,
+            signature,
+            function_arguments,
+            argument_names,
+        ) = _resolve_function_arguments(expressions, base_schema, registry)
 
         func = registry.lookup_function(urn, function, signature)
 
@@ -591,12 +685,7 @@ def scalar_function(
                     expression=stalg.Expression(
                         scalar_function=stalg.Expression.ScalarFunction(
                             function_reference=func[0].anchor,
-                            arguments=[
-                                stalg.FunctionArgument(
-                                    value=e.referred_expr[0].expression
-                                )
-                                for e in bound_expressions
-                            ],
+                            arguments=function_arguments,
                             options=_function_options(options),
                             output_type=func[1],
                         )
@@ -604,7 +693,7 @@ def scalar_function(
                     output_names=_alias_or_inferred(
                         alias,
                         function,
-                        [e.referred_expr[0].output_names[0] for e in bound_expressions],
+                        argument_names,
                     ),
                 )
             ],
@@ -619,7 +708,7 @@ def scalar_function(
 def aggregate_function(
     urn: str,
     function: str,
-    expressions: Iterable[ExtendedExpressionOrUnbound],
+    expressions: Iterable[FunctionArgumentOrExpression],
     alias: Union[Iterable[str], str, None] = None,
     invocation: Union[
         "stalg.AggregateFunction.AggregationInvocation.ValueType", None
@@ -638,20 +727,16 @@ def aggregate_function(
     def resolve(
         base_schema: stp.NamedStruct, registry: ExtensionRegistry
     ) -> stee.ExtendedExpression:
-        bound_expressions: Iterable[stee.ExtendedExpression] = [
-            resolve_expression(e, base_schema, registry) for e in expressions
-        ]
+        (
+            bound_expressions,
+            signature,
+            function_arguments,
+            argument_names,
+        ) = _resolve_function_arguments(expressions, base_schema, registry)
         bound_sorts = [
             (resolve_expression(e, base_schema, registry), direction)
             for e, direction in sorts
         ]
-
-        expression_schemas = [
-            infer_extended_expression_schema(b, registry=registry)
-            for b in bound_expressions
-        ]
-
-        signature = [typ for es in expression_schemas for typ in es.types]
 
         func = registry.lookup_function(urn, function, signature)
 
@@ -691,10 +776,7 @@ def aggregate_function(
                 stee.ExpressionReference(
                     measure=stalg.AggregateFunction(
                         function_reference=func[0].anchor,
-                        arguments=[
-                            stalg.FunctionArgument(value=e.referred_expr[0].expression)
-                            for e in bound_expressions
-                        ],
+                        arguments=function_arguments,
                         options=_function_options(options),
                         output_type=func[1],
                         invocation=invocation
@@ -710,7 +792,7 @@ def aggregate_function(
                     output_names=_alias_or_inferred(
                         alias,
                         "IfThen",
-                        [e.referred_expr[0].output_names[0] for e in bound_expressions],
+                        argument_names,
                     ),
                 )
             ],
@@ -726,7 +808,7 @@ def aggregate_function(
 def window_function(
     urn: str,
     function: str,
-    expressions: Iterable[ExtendedExpressionOrUnbound],
+    expressions: Iterable[FunctionArgumentOrExpression],
     partitions: Iterable[ExtendedExpressionOrUnbound] = [],
     alias: Union[Iterable[str], str, None] = None,
     options: Union[dict, None] = None,
@@ -736,20 +818,16 @@ def window_function(
     def resolve(
         base_schema: stp.NamedStruct, registry: ExtensionRegistry
     ) -> stee.ExtendedExpression:
-        bound_expressions: Iterable[stee.ExtendedExpression] = [
-            resolve_expression(e, base_schema, registry) for e in expressions
-        ]
+        (
+            bound_expressions,
+            signature,
+            function_arguments,
+            argument_names,
+        ) = _resolve_function_arguments(expressions, base_schema, registry)
 
         bound_partitions = [
             resolve_expression(e, base_schema, registry) for e in partitions
         ]
-
-        expression_schemas = [
-            infer_extended_expression_schema(b, registry=registry)
-            for b in bound_expressions
-        ]
-
-        signature = [typ for es in expression_schemas for typ in es.types]
 
         func = registry.lookup_function(urn, function, signature)
 
@@ -790,12 +868,7 @@ def window_function(
                     expression=stalg.Expression(
                         window_function=stalg.Expression.WindowFunction(
                             function_reference=func[0].anchor,
-                            arguments=[
-                                stalg.FunctionArgument(
-                                    value=e.referred_expr[0].expression
-                                )
-                                for e in bound_expressions
-                            ],
+                            arguments=function_arguments,
                             options=_function_options(options),
                             output_type=func[1],
                             partitions=[
@@ -806,7 +879,7 @@ def window_function(
                     output_names=_alias_or_inferred(
                         alias,
                         function,
-                        [e.referred_expr[0].output_names[0] for e in bound_expressions],
+                        argument_names,
                     ),
                 )
             ],

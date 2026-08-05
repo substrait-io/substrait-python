@@ -1,4 +1,17 @@
-import os
+"""SQL -> Substrait -> engine round-trips, checked against the engine's own SQL.
+
+Behavioral tests through external Substrait consumers (DuckDB / DataFusion, both
+reading plans this library builds). Those consumers lag the spec, and feeding one a
+plan built at a newer spec version can crash the interpreter natively -- not a
+catchable failure, so a red run here is not even reliably a report. They are
+best-effort and never a gate, which is why the ``duckdb`` and ``datafusion`` markers
+are deselected by the ``addopts`` in pyproject.toml -- the two integrations that cannot
+report their own failure, rather than integration testing as a category (the pyarrow
+tests next door run by default). Run these deliberately, once the engines catch up,
+with ``pytest -m integration`` (or one engine at a time via ``-m duckdb`` / ``-m
+datafusion``).
+"""
+
 import sys
 import tempfile
 
@@ -9,16 +22,7 @@ import pytest
 from substrait.extension_registry import ExtensionRegistry
 from substrait.sql.sql_to_substrait import convert
 
-# These are behavioral round-trips through external Substrait consumers
-# (pyarrow / DuckDB / DataFusion). Those consumers lag the spec, and feeding
-# them a plan built at a newer spec version can crash the interpreter natively
-# (not a catchable failure). They are best-effort and never a gate: skipped by
-# default, opt in with SUBSTRAIT_ENGINE_TESTS=1 once the engines catch up.
-pytestmark = pytest.mark.skipif(
-    not os.environ.get("SUBSTRAIT_ENGINE_TESTS"),
-    reason="engine Substrait consumers lag the pinned spec; "
-    "set SUBSTRAIT_ENGINE_TESTS=1 to run",
-)
+pytestmark = pytest.mark.integration
 
 data: pyarrow.Table = pyarrow.Table.from_batches(
     [
@@ -128,15 +132,30 @@ def assert_query(query: str, engine: str, ignore_order=True):
         assert_query_datafusion(query, ignore_order)
 
 
+# Not a marker: the duckdb substrait extension is unavailable on windows at all, so
+# even an explicit ``-m duckdb`` has nothing to run there.
+NO_DUCKDB_SUBSTRAIT_ON_WINDOWS = pytest.mark.skipif(
+    sys.platform.startswith("win"),
+    reason="duckdb substrait extension not found on windows",
+)
+
+# One marker per engine so each can be selected or excluded on its own -- the engines
+# catch up to the spec independently, so "run everything but duckdb" has to be sayable
+# (``-m "integration and not duckdb"``).
 engines = [
+    pytest.param("duckdb", marks=[pytest.mark.duckdb, NO_DUCKDB_SUBSTRAIT_ON_WINDOWS]),
+    pytest.param("datafusion", marks=pytest.mark.datafusion),
+]
+
+# The same two engines where duckdb does not yet consume what we emit. Kept a separate
+# list rather than an inline parametrize per test so the per-engine markers cannot
+# drift out of sync with ``engines``.
+engines_duckdb_xfail = [
     pytest.param(
         "duckdb",
-        marks=pytest.mark.skipif(
-            sys.platform.startswith("win"),
-            reason="duckdb substrait extension not found on windows",
-        ),
+        marks=[pytest.mark.duckdb, NO_DUCKDB_SUBSTRAIT_ON_WINDOWS, pytest.mark.xfail],
     ),
-    "datafusion",
+    pytest.param("datafusion", marks=pytest.mark.datafusion),
 ]
 
 
@@ -264,64 +283,19 @@ def test_order_by(engine: str):
     )
 
 
-@pytest.mark.parametrize(
-    "engine",
-    [
-        pytest.param(
-            "duckdb",
-            marks=[
-                pytest.mark.skipif(
-                    sys.platform.startswith("win"),
-                    reason="duckdb substrait extension not found on windows",
-                ),
-                pytest.mark.xfail,
-            ],
-        ),
-        "datafusion",
-    ],
-)
+@pytest.mark.parametrize("engine", engines_duckdb_xfail)
 def test_select_limit(engine: str):
     assert_query("""SELECT store_id FROM stores ORDER BY store_id LIMIT 2""", engine)
 
 
-@pytest.mark.parametrize(
-    "engine",
-    [
-        pytest.param(
-            "duckdb",
-            marks=[
-                pytest.mark.skipif(
-                    sys.platform.startswith("win"),
-                    reason="duckdb substrait extension not found on windows",
-                ),
-                pytest.mark.xfail,
-            ],
-        ),
-        "datafusion",
-    ],
-)
+@pytest.mark.parametrize("engine", engines_duckdb_xfail)
 def test_select_limit_offset(engine: str):
     assert_query(
         """SELECT store_id FROM stores ORDER BY store_id LIMIT 2 OFFSET 2""", engine
     )
 
 
-@pytest.mark.parametrize(
-    "engine",
-    [
-        pytest.param(
-            "duckdb",
-            marks=[
-                pytest.mark.skipif(
-                    sys.platform.startswith("win"),
-                    reason="duckdb substrait extension not found on windows",
-                ),
-                pytest.mark.xfail,
-            ],
-        ),
-        "datafusion",
-    ],
-)
+@pytest.mark.parametrize("engine", engines_duckdb_xfail)
 def test_row_number(engine: str):
     assert_query(
         """SELECT sale_id, fk_store_id, row_number() over (partition by fk_store_id order by sale_id) as rn

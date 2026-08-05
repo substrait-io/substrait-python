@@ -20,7 +20,11 @@ from substrait.builders.extended_expression import (
     next_rel_anchor,
     resolve_expression,
 )
-from substrait.extension_registry import ExtensionRegistry
+from substrait.extension_registry import (
+    ExtensionRegistry,
+    build_scoped,
+    current_collector,
+)
 from substrait.type_inference import (
     _join_output_struct,
     _join_struct_from_schemas,
@@ -29,10 +33,9 @@ from substrait.type_inference import (
     join_output_names,
 )
 from substrait.utils import (
-    merge_extension_declarations,
-    merge_extension_urns,
     plan_subtrees,
     rebase_reference_ordinals,
+    remap_function_references,
 )
 from substrait.version import substrait_version
 
@@ -55,21 +58,42 @@ def _create_default_version():
 _create_default_version()
 
 
+def _bind(plan: PlanOrUnbound, registry: ExtensionRegistry) -> stp.Plan:
+    """Resolve ``plan`` and fold its extensions into the build in progress.
+
+    A plan built elsewhere -- or by an earlier, separate build -- numbered its
+    function references independently, so the collector re-derives them from the
+    durable ``(urn, name)`` identities and the plan's relations are rewritten to
+    match. Returns the plan untouched when the numbering already agrees, which is
+    always the case for one resolved by the current build (it allocated through the
+    same collector, and carries no declarations of its own until the outermost
+    resolver writes them).
+
+    Every builder binds its inputs through here, so this is the single point at
+    which a foreign plan's anchor space is reconciled with ours.
+    """
+    bound = plan if isinstance(plan, stp.Plan) else plan(registry)
+    collector = current_collector()
+    if collector is None:
+        return bound
+    return remap_function_references(bound, collector.adopt(bound))
+
+
 def _merge_plan_metadata(*objs):
     """Collect the plan-level metadata a builder carries over from its inputs.
 
-    ``objs`` is a mix of input Plans and bound ExtendedExpressions. Extension
-    URNs and declarations are merged from all of them; the plan-level execution
-    behavior is carried over from the first input Plan that declares one
+    ``objs`` is a mix of input Plans and bound ExtendedExpressions. The plan-level
+    execution behavior is carried over from the first input Plan that declares one
     (expressions have no such field). Because every relational builder routes
     its inputs through here, an execution behavior set anywhere upstream is
     preserved on the freshly-constructed output Plan -- so it is order
     independent across a pipeline rather than only surviving as the last step.
+
+    Extension URNs and declarations are *not* merged here: they belong to the
+    build's ``ExtensionCollector``, which writes them onto the outermost plan once
+    (see ``build_scoped``), rather than being re-merged at every level.
     """
-    metadata = {
-        "extension_urns": merge_extension_urns(*[b.extension_urns for b in objs if b]),
-        "extensions": merge_extension_declarations(*[b.extensions for b in objs if b]),
-    }
+    metadata = {}
     for b in objs:
         if isinstance(b, stp.Plan) and b.HasField("execution_behavior"):
             metadata["execution_behavior"] = b.execution_behavior
@@ -86,8 +110,7 @@ def _merge_input_subtrees(bound_inputs):
 
     Returns ``(subtree_planrels, rebased_root_inputs)``: the deduplicated combined
     subtrees as leading ``PlanRel(rel=...)`` entries, and, per input, its root's
-    input Rel with ReferenceRel ordinals rebased into the combined list. Mirrors how
-    ``_merge_plan_metadata`` carries extension declarations upward.
+    input Rel with ReferenceRel ordinals rebased into the combined list.
 
     Structurally-identical subtrees (byte-equal serialized ``Rel``) collapse to a
     single ordinal, so a cached frame reused across branches that later meet at a
@@ -133,10 +156,11 @@ def _plan_from(
     Merges the shared subtrees carried by ``bound_inputs`` (deduping and rebasing
     ordinals), builds the output ``Rel`` by calling ``make_rel`` with the list of
     rebased input rels (one per bound input, in order), and prepends the combined
-    subtrees as leading ``rel`` entries ahead of the query root. Metadata (extension
-    declarations / execution behavior) is merged from ``metadata_sources`` (input
-    plans and bound expressions). This is the single place the CTE subtree
-    propagation and Plan assembly live, so every relational builder is one call.
+    subtrees as leading ``rel`` entries ahead of the query root. Plan-level metadata
+    is carried over from ``metadata_sources`` (input plans and bound expressions);
+    extension declarations are not, as the build's ``ExtensionCollector`` owns those.
+    This is the single place the CTE subtree propagation and Plan assembly live, so
+    every relational builder is one call.
     """
     subtree_planrels, input_rels = _merge_input_subtrees(bound_inputs)
     root = stp.PlanRel(
@@ -166,14 +190,29 @@ def with_execution_behavior(
     """
 
     def resolve(registry: ExtensionRegistry) -> stp.Plan:
-        bound_plan = plan if isinstance(plan, stp.Plan) else plan(registry)
+        bound_plan = _bind(plan, registry)
 
         result = stp.Plan()
         result.CopyFrom(bound_plan)
+        # This is the one builder that copies its input wholesale rather than
+        # assembling a fresh Plan, so it is the one that has to drop the copied
+        # declarations: `_bind` has already renumbered the relations, and the
+        # collector -- not this plan -- owns the anchor space until the outermost
+        # resolver writes it (see `_bind`). Left in place, an enclosing builder
+        # would adopt the stale numbering a second time and re-apply a remap the
+        # relations already carry, silently pointing them at other declarations.
+        # Dropping `extensions` wholesale is only sound because everything it can
+        # hold is recoverable from the collector, which today means function
+        # declarations alone: `ExtensionCollector.adopt` raises NotImplementedError
+        # on any other kind, so whoever teaches it to collect type / type-variation
+        # declarations must extend `write_into` in the same change or they will be
+        # silently dropped here.
+        result.ClearField("extension_urns")
+        result.ClearField("extensions")
         result.execution_behavior.variable_eval_mode = variable_eval_mode
         return result
 
-    return resolve
+    return build_scoped(resolve)
 
 
 def read_named_table(
@@ -205,7 +244,7 @@ def read_named_table(
             ],
         )
 
-    return resolve
+    return build_scoped(resolve)
 
 
 def _require_schema(named_struct: stt.NamedStruct) -> stt.NamedStruct:
@@ -262,7 +301,7 @@ def virtual_table(
         )
         return _read_plan(named_struct, read_rel)
 
-    return resolve
+    return build_scoped(resolve)
 
 
 def local_files(
@@ -282,7 +321,7 @@ def local_files(
         )
         return _read_plan(named_struct, read_rel)
 
-    return resolve
+    return build_scoped(resolve)
 
 
 def extension_table(
@@ -302,7 +341,7 @@ def extension_table(
         )
         return _read_plan(named_struct, read_rel)
 
-    return resolve
+    return build_scoped(resolve)
 
 
 def project(
@@ -325,7 +364,7 @@ def project(
     """
 
     def resolve(registry: ExtensionRegistry) -> stp.Plan:
-        _plan = plan if isinstance(plan, stp.Plan) else plan(registry)
+        _plan = _bind(plan, registry)
         ns = infer_plan_schema(_plan, registry=registry)
         bound_expressions: Iterable[stee.ExtendedExpression] = [
             resolve_expression(e, ns, registry) for e in expressions
@@ -352,7 +391,7 @@ def project(
             (_plan, *bound_expressions),
         )
 
-    return resolve
+    return build_scoped(resolve)
 
 
 def select(
@@ -375,7 +414,7 @@ def select(
     """
 
     def resolve(registry: ExtensionRegistry) -> stp.Plan:
-        _plan = plan if isinstance(plan, stp.Plan) else plan(registry)
+        _plan = _bind(plan, registry)
         ns = infer_plan_schema(_plan, registry=registry)
         bound_expressions: Iterable[stee.ExtendedExpression] = [
             resolve_expression(e, ns, registry) for e in expressions
@@ -409,7 +448,7 @@ def select(
             (_plan, *bound_expressions),
         )
 
-    return resolve
+    return build_scoped(resolve)
 
 
 def filter(
@@ -418,7 +457,7 @@ def filter(
     extension: Optional[AdvancedExtension] = None,
 ) -> UnboundPlan:
     def resolve(registry: ExtensionRegistry) -> stp.Plan:
-        bound_plan = plan if isinstance(plan, stp.Plan) else plan(registry)
+        bound_plan = _bind(plan, registry)
         ns = infer_plan_schema(bound_plan, registry=registry)
         bound_expression: stee.ExtendedExpression = resolve_expression(
             expression, ns, registry
@@ -437,7 +476,7 @@ def filter(
             (bound_plan, bound_expression),
         )
 
-    return resolve
+    return build_scoped(resolve)
 
 
 def sort(
@@ -451,7 +490,7 @@ def sort(
     extension: Optional[AdvancedExtension] = None,
 ) -> UnboundPlan:
     def resolve(registry: ExtensionRegistry) -> stp.Plan:
-        bound_plan = plan if isinstance(plan, stp.Plan) else plan(registry)
+        bound_plan = _bind(plan, registry)
         ns = infer_plan_schema(bound_plan, registry=registry)
 
         bound_expressions = [
@@ -483,12 +522,12 @@ def sort(
             (bound_plan, *[e[0] for e in bound_expressions]),
         )
 
-    return resolve
+    return build_scoped(resolve)
 
 
 def set(inputs: Iterable[PlanOrUnbound], op: stalg.SetRel.SetOp) -> UnboundPlan:
     def resolve(registry: ExtensionRegistry) -> stp.Plan:
-        bound_inputs = [i if isinstance(i, stp.Plan) else i(registry) for i in inputs]
+        bound_inputs = [_bind(i, registry) for i in inputs]
         return _plan_from(
             bound_inputs,
             lambda inp: stalg.Rel(set=stalg.SetRel(inputs=inp, op=op)),
@@ -496,7 +535,7 @@ def set(inputs: Iterable[PlanOrUnbound], op: stalg.SetRel.SetOp) -> UnboundPlan:
             tuple(bound_inputs),
         )
 
-    return resolve
+    return build_scoped(resolve)
 
 
 def reference(plan: PlanOrUnbound) -> UnboundPlan:
@@ -514,7 +553,7 @@ def reference(plan: PlanOrUnbound) -> UnboundPlan:
     """
 
     def resolve(registry: ExtensionRegistry) -> stp.Plan:
-        bound = plan if isinstance(plan, stp.Plan) else plan(registry)
+        bound = _bind(plan, registry)
         nested = [stp.PlanRel(rel=s) for s in plan_subtrees(bound)]
         ordinal = len(nested)  # the promoted root sits after the plan's own subtrees
         promoted = stp.PlanRel(rel=bound.relations[-1].root.input)
@@ -530,7 +569,7 @@ def reference(plan: PlanOrUnbound) -> UnboundPlan:
             **_merge_plan_metadata(bound),
         )
 
-    return resolve
+    return build_scoped(resolve)
 
 
 def fetch(
@@ -540,7 +579,7 @@ def fetch(
     extension: Optional[AdvancedExtension] = None,
 ) -> UnboundPlan:
     def resolve(registry: ExtensionRegistry) -> stp.Plan:
-        bound_plan = plan if isinstance(plan, stp.Plan) else plan(registry)
+        bound_plan = _bind(plan, registry)
         ns = infer_plan_schema(bound_plan, registry=registry)
 
         bound_offset = resolve_expression(offset, ns, registry) if offset else None
@@ -567,7 +606,7 @@ def fetch(
             (bound_plan, bound_offset, bound_count),
         )
 
-    return resolve
+    return build_scoped(resolve)
 
 
 def join(
@@ -580,8 +619,8 @@ def join(
     extension: Optional[AdvancedExtension] = None,
 ) -> UnboundPlan:
     def resolve(registry: ExtensionRegistry) -> stp.Plan:
-        bound_left = left if isinstance(left, stp.Plan) else left(registry)
-        bound_right = right if isinstance(right, stp.Plan) else right(registry)
+        bound_left = _bind(left, registry)
+        bound_right = _bind(right, registry)
         left_ns = infer_plan_schema(bound_left, registry=registry)
         right_ns = infer_plan_schema(bound_right, registry=registry)
 
@@ -637,7 +676,7 @@ def join(
             (bound_left, bound_right, bound_expression, bound_post),
         )
 
-    return resolve
+    return build_scoped(resolve)
 
 
 def lateral_join(
@@ -664,7 +703,7 @@ def lateral_join(
     """
 
     def resolve(registry: ExtensionRegistry) -> stp.Plan:
-        bound_left = left if isinstance(left, stp.Plan) else left(registry)
+        bound_left = _bind(left, registry)
         left_ns = infer_plan_schema(bound_left, registry=registry)
 
         anchor = next_rel_anchor()
@@ -674,11 +713,7 @@ def lateral_join(
         # the current left row during that inference.
         with _outer_anchor_binding(anchor, left_ns.struct):
             unbound_right = right(handle)
-            bound_right = (
-                unbound_right
-                if isinstance(unbound_right, stp.Plan)
-                else unbound_right(registry)
-            )
+            bound_right = _bind(unbound_right, registry)
             right_ns = infer_plan_schema(bound_right, registry=registry)
 
             # The join condition binds against the combined left+right input row.
@@ -738,7 +773,7 @@ def lateral_join(
             (bound_left, bound_right, bound_expression, bound_post),
         )
 
-    return resolve
+    return build_scoped(resolve)
 
 
 def cross(
@@ -747,8 +782,8 @@ def cross(
     extension: Optional[AdvancedExtension] = None,
 ) -> UnboundPlan:
     def resolve(registry: ExtensionRegistry) -> stp.Plan:
-        bound_left = left if isinstance(left, stp.Plan) else left(registry)
-        bound_right = right if isinstance(right, stp.Plan) else right(registry)
+        bound_left = _bind(left, registry)
+        bound_right = _bind(right, registry)
         left_ns = infer_plan_schema(bound_left, registry=registry)
         right_ns = infer_plan_schema(bound_right, registry=registry)
 
@@ -773,7 +808,7 @@ def cross(
             (bound_left, bound_right),
         )
 
-    return resolve
+    return build_scoped(resolve)
 
 
 def aggregate(
@@ -795,13 +830,30 @@ def aggregate(
     """
 
     def resolve(registry: ExtensionRegistry) -> stp.Plan:
-        bound_input = input if isinstance(input, stp.Plan) else input(registry)
+        bound_input = _bind(input, registry)
         ns = infer_plan_schema(bound_input, registry=registry)
 
         bound_grouping_expressions = [
             resolve_expression(e, ns, registry) for e in grouping_expressions
         ]
         bound_measures = [resolve_expression(e, ns, registry) for e in measures]
+        for m in bound_measures:
+            # A measure must be an aggregate_function. Reading `.measure` off a
+            # reference holding an `expression` instead yields a default-constructed
+            # AggregateFunction, and *assigning* that below would emit a measure that
+            # is set but empty -- no function reference, no output type. Such a plan
+            # is already malformed, but it is also the one shape that breaks the
+            # premise `remap_function_references` relies on (a present message implies
+            # a real reference), so its unset reference would be renumbered along with
+            # the genuine ones. Refuse it here rather than emit it.
+            if m.referred_expr[0].WhichOneof("expr_type") != "measure":
+                raise ValueError(
+                    "aggregate() measures must be aggregate functions; got a "
+                    f"{m.referred_expr[0].WhichOneof('expr_type')!r} for "
+                    f"{m.referred_expr[0].output_names[0]!r}. Use "
+                    "extended_expression.aggregate_function(...) rather than "
+                    "scalar_function(...)."
+                )
 
         _filters = (
             list(filters) if filters is not None else [None] * len(bound_measures)
@@ -854,7 +906,7 @@ def aggregate(
             ),
         )
 
-    return resolve
+    return build_scoped(resolve)
 
 
 def write_named_table(
@@ -865,7 +917,7 @@ def write_named_table(
     output_mode: Union[stalg.WriteRel.OutputMode.ValueType, None] = None,
 ) -> UnboundPlan:
     def resolve(registry: ExtensionRegistry) -> stp.Plan:
-        bound_input = input if isinstance(input, stp.Plan) else input(registry)
+        bound_input = _bind(input, registry)
         ns = infer_plan_schema(bound_input, registry=registry)
         _table_names = [table_names] if isinstance(table_names, str) else table_names
         _create_mode = create_mode or stalg.WriteRel.CREATE_MODE_ERROR_IF_EXISTS
@@ -890,7 +942,7 @@ def write_named_table(
             include_version=False,
         )
 
-    return resolve
+    return build_scoped(resolve)
 
 
 def ddl(
@@ -913,11 +965,7 @@ def ddl(
         bound_inputs = []
         schema = table_schema
         if view_definition is not None:
-            view_plan = (
-                view_definition
-                if isinstance(view_definition, stp.Plan)
-                else view_definition(registry)
-            )
+            view_plan = _bind(view_definition, registry)
             bound_inputs = [view_plan]
             merge_sources.append(view_plan)
             if schema is None:
@@ -940,7 +988,7 @@ def ddl(
             tuple(merge_sources),
         )
 
-    return resolve
+    return build_scoped(resolve)
 
 
 def update(
@@ -995,7 +1043,7 @@ def update(
             **_merge_plan_metadata(*merge_sources),
         )
 
-    return resolve
+    return build_scoped(resolve)
 
 
 def consistent_partition_window(
@@ -1011,7 +1059,7 @@ def consistent_partition_window(
     extension: Optional[AdvancedExtension] = None,
 ) -> UnboundPlan:
     def resolve(registry: ExtensionRegistry) -> stp.Plan:
-        bound_plan = plan if isinstance(plan, stp.Plan) else plan(registry)
+        bound_plan = _bind(plan, registry)
         ns = infer_plan_schema(bound_plan, registry=registry)
 
         bound_partitions = [
@@ -1088,7 +1136,7 @@ def consistent_partition_window(
             ),
         )
 
-    return resolve
+    return build_scoped(resolve)
 
 
 def expand(
@@ -1105,7 +1153,7 @@ def expand(
     """
 
     def resolve(registry: ExtensionRegistry) -> stp.Plan:
-        bound_input = plan if isinstance(plan, stp.Plan) else plan(registry)
+        bound_input = _bind(plan, registry)
         ns = infer_plan_schema(bound_input, registry=registry)
 
         expand_fields = []
@@ -1142,7 +1190,7 @@ def expand(
             tuple(merge_sources),
         )
 
-    return resolve
+    return build_scoped(resolve)
 
 
 def nested_loop_join(
@@ -1155,8 +1203,8 @@ def nested_loop_join(
     """A NestedLoopJoinRel: join over the Cartesian product using ``expression``."""
 
     def resolve(registry: ExtensionRegistry) -> stp.Plan:
-        bound_left = left if isinstance(left, stp.Plan) else left(registry)
-        bound_right = right if isinstance(right, stp.Plan) else right(registry)
+        bound_left = _bind(left, registry)
+        bound_right = _bind(right, registry)
         left_ns = infer_plan_schema(bound_left, registry=registry)
         right_ns = infer_plan_schema(bound_right, registry=registry)
 
@@ -1189,7 +1237,7 @@ def nested_loop_join(
             (bound_left, bound_right, bound_expression),
         )
 
-    return resolve
+    return build_scoped(resolve)
 
 
 def _comparison_join_keys(left_keys, right_keys, left_ns, right_ns, registry):
@@ -1235,8 +1283,8 @@ def _physical_equi_join(rel_name, rel_cls):
         extension: Optional[AdvancedExtension] = None,
     ) -> UnboundPlan:
         def resolve(registry: ExtensionRegistry) -> stp.Plan:
-            bound_left = left if isinstance(left, stp.Plan) else left(registry)
-            bound_right = right if isinstance(right, stp.Plan) else right(registry)
+            bound_left = _bind(left, registry)
+            bound_right = _bind(right, registry)
             left_ns = infer_plan_schema(bound_left, registry=registry)
             right_ns = infer_plan_schema(bound_right, registry=registry)
             keys = _comparison_join_keys(
@@ -1303,7 +1351,7 @@ def _physical_equi_join(rel_name, rel_cls):
                 (bound_left, bound_right, bound_post, bound_residual),
             )
 
-        return resolve
+        return build_scoped(resolve)
 
     return builder
 
@@ -1338,7 +1386,7 @@ def extension_leaf(detail, names: Optional[Iterable[str]] = None) -> UnboundPlan
             relations=[stp.PlanRel(root=stalg.RelRoot(input=rel, names=out_names))],
         )
 
-    return resolve
+    return build_scoped(resolve)
 
 
 def extension_single(plan: PlanOrUnbound, detail) -> UnboundPlan:
@@ -1350,7 +1398,7 @@ def extension_single(plan: PlanOrUnbound, detail) -> UnboundPlan:
     """
 
     def resolve(registry: ExtensionRegistry) -> stp.Plan:
-        bound_plan = plan if isinstance(plan, stp.Plan) else plan(registry)
+        bound_plan = _bind(plan, registry)
         if hasattr(detail, "derive_schema"):
             input_struct = infer_plan_schema(bound_plan, registry=registry).struct
             names = list(detail.derive_schema(input_struct).names)
@@ -1367,14 +1415,14 @@ def extension_single(plan: PlanOrUnbound, detail) -> UnboundPlan:
             (bound_plan,),
         )
 
-    return resolve
+    return build_scoped(resolve)
 
 
 def extension_multi(inputs: Iterable[PlanOrUnbound], detail) -> UnboundPlan:
     """An ExtensionMultiRel over ``inputs`` from an ExtensionMultiDetail."""
 
     def resolve(registry: ExtensionRegistry) -> stp.Plan:
-        bound_inputs = [i if isinstance(i, stp.Plan) else i(registry) for i in inputs]
+        bound_inputs = [_bind(i, registry) for i in inputs]
         input_structs = [
             infer_plan_schema(b, registry=registry).struct for b in bound_inputs
         ]
@@ -1391,7 +1439,7 @@ def extension_multi(inputs: Iterable[PlanOrUnbound], detail) -> UnboundPlan:
             tuple(bound_inputs),
         )
 
-    return resolve
+    return build_scoped(resolve)
 
 
 def exchange(
@@ -1406,7 +1454,7 @@ def exchange(
     """
 
     def resolve(registry: ExtensionRegistry) -> stp.Plan:
-        bound_plan = plan if isinstance(plan, stp.Plan) else plan(registry)
+        bound_plan = _bind(plan, registry)
         kind = (
             {"broadcast": stalg.ExchangeRel.Broadcast()}
             if broadcast
@@ -1425,7 +1473,7 @@ def exchange(
             (bound_plan,),
         )
 
-    return resolve
+    return build_scoped(resolve)
 
 
 def top_n(
@@ -1445,7 +1493,7 @@ def top_n(
     """
 
     def resolve(registry: ExtensionRegistry) -> stp.Plan:
-        bound_plan = plan if isinstance(plan, stp.Plan) else plan(registry)
+        bound_plan = _bind(plan, registry)
         ns = infer_plan_schema(bound_plan, registry=registry)
         bound_sorts = [
             (resolve_expression(e, ns, registry), direction) for e, direction in sorts
@@ -1480,4 +1528,4 @@ def top_n(
             (bound_plan, *[s for s, _ in bound_sorts], bound_count, bound_offset),
         )
 
-    return resolve
+    return build_scoped(resolve)

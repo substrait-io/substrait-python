@@ -9,16 +9,19 @@ from typing import Any, Callable, Iterable, Union
 
 import substrait.algebra_pb2 as stalg
 import substrait.extended_expression_pb2 as stee
-import substrait.extensions.extensions_pb2 as ste
 import substrait.type_pb2 as stp
 
-from substrait.extension_registry import ExtensionRegistry
+from substrait.extension_registry import (
+    ExtensionRegistry,
+    build_scoped,
+    current_collector,
+    function_reference,
+)
 from substrait.type_inference import infer_extended_expression_schema, outer_schemas
 from substrait.utils import (
     inline_reference_rels,
-    merge_extension_declarations,
-    merge_extension_urns,
     plan_subtrees,
+    remap_function_references,
     type_num_names,
 )
 
@@ -85,11 +88,20 @@ def resolve_expression(
     base_schema: stp.NamedStruct,
     registry: ExtensionRegistry,
 ) -> stee.ExtendedExpression:
-    return (
-        expression
-        if isinstance(expression, stee.ExtendedExpression)
-        else expression(base_schema, registry)
-    )
+    """Resolve ``expression``, folding its extensions into the build in progress.
+
+    An already-bound ExtendedExpression numbered its function references against
+    whichever build produced it, so the collector re-derives them from the durable
+    ``(urn, name)`` identities and the expression is rewritten to match -- the
+    expression-level counterpart of ``builders.plan._bind``. Unchanged when the
+    numbering already agrees, as it does for anything this build resolved.
+    """
+    if not isinstance(expression, stee.ExtendedExpression):
+        return expression(base_schema, registry)
+    collector = current_collector()
+    if collector is None:
+        return expression
+    return remap_function_references(expression, collector.adopt(expression))
 
 
 def alias(
@@ -107,10 +119,23 @@ def alias(
         base_schema: stp.NamedStruct, registry: ExtensionRegistry
     ) -> stee.ExtendedExpression:
         bound_expression = resolve_expression(expression, base_schema, registry)
-        bound_expression.referred_expr[0].output_names[0] = name
-        return bound_expression
+        # The rename lands on a copy, never on ``bound_expression``:
+        # ``resolve_expression`` hands back the caller's own message whenever the
+        # remap is empty (the common case), so renaming in place would rewrite an
+        # output name in an ExtendedExpression the caller still holds. Copying
+        # wholesale means dropping the copied declarations too -- the collector, not
+        # this expression, owns the anchor space until the outermost resolver writes
+        # it (see ``builders.plan._bind``), and left in place an enclosing builder
+        # would adopt the stale numbering a second time and re-apply a remap the
+        # expression already carries.
+        result = stee.ExtendedExpression()
+        result.CopyFrom(bound_expression)
+        result.ClearField("extension_urns")
+        result.ClearField("extensions")
+        result.referred_expr[0].output_names[0] = name
+        return result
 
-    return resolve
+    return build_scoped(resolve)
 
 
 _EPOCH_DATE = date(1970, 1, 1)
@@ -386,7 +411,7 @@ def literal(
             base_schema=base_schema,
         )
 
-    return resolve
+    return build_scoped(resolve)
 
 
 def outer_reference(field: Union[str, int], steps_out: int = 1):
@@ -430,7 +455,7 @@ def outer_reference(field: Union[str, int], steps_out: int = 1):
             base_schema=base_schema,
         )
 
-    return resolve
+    return build_scoped(resolve)
 
 
 class LateralInput:
@@ -476,7 +501,7 @@ class LateralInput:
                 base_schema=base_schema,
             )
 
-        return resolve
+        return build_scoped(resolve)
 
 
 def column(field: Union[str, int], alias: Union[Iterable[str], str, None] = None):
@@ -526,7 +551,7 @@ def column(field: Union[str, int], alias: Union[Iterable[str], str, None] = None
             base_schema=base_schema,
         )
 
-    return resolve
+    return build_scoped(resolve)
 
 
 def scalar_function(
@@ -561,36 +586,14 @@ def scalar_function(
         if not func:
             raise Exception(f"Unknown function {function} for {signature}")
 
-        func_extension_urns = [
-            ste.SimpleExtensionURN(
-                extension_urn_anchor=registry.lookup_urn(urn), urn=urn
-            )
-        ]
-
-        func_extensions = [
-            ste.SimpleExtensionDeclaration(
-                extension_function=ste.SimpleExtensionDeclaration.ExtensionFunction(
-                    extension_urn_reference=registry.lookup_urn(urn),
-                    function_anchor=func[0].anchor,
-                    name=str(func[0]),
-                )
-            )
-        ]
-
-        extension_urns = merge_extension_urns(
-            func_extension_urns, *[b.extension_urns for b in bound_expressions]
-        )
-
-        extensions = merge_extension_declarations(
-            func_extensions, *[b.extensions for b in bound_expressions]
-        )
+        func_ref = function_reference(urn, str(func[0]))
 
         return stee.ExtendedExpression(
             referred_expr=[
                 stee.ExpressionReference(
                     expression=stalg.Expression(
                         scalar_function=stalg.Expression.ScalarFunction(
-                            function_reference=func[0].anchor,
+                            function_reference=func_ref,
                             arguments=[
                                 stalg.FunctionArgument(
                                     value=e.referred_expr[0].expression
@@ -609,11 +612,9 @@ def scalar_function(
                 )
             ],
             base_schema=base_schema,
-            extension_urns=extension_urns,
-            extensions=extensions,
         )
 
-    return resolve
+    return build_scoped(resolve)
 
 
 def aggregate_function(
@@ -658,39 +659,13 @@ def aggregate_function(
         if not func:
             raise Exception(f"Unknown function {function} for {signature}")
 
-        func_extension_urns = [
-            ste.SimpleExtensionURN(
-                extension_urn_anchor=registry.lookup_urn(urn), urn=urn
-            )
-        ]
-
-        func_extensions = [
-            ste.SimpleExtensionDeclaration(
-                extension_function=ste.SimpleExtensionDeclaration.ExtensionFunction(
-                    extension_urn_reference=registry.lookup_urn(urn),
-                    function_anchor=func[0].anchor,
-                    name=str(func[0]),
-                )
-            )
-        ]
-
-        extension_urns = merge_extension_urns(
-            func_extension_urns,
-            *[b.extension_urns for b in bound_expressions],
-            *[s.extension_urns for s, _ in bound_sorts],
-        )
-
-        extensions = merge_extension_declarations(
-            func_extensions,
-            *[b.extensions for b in bound_expressions],
-            *[s.extensions for s, _ in bound_sorts],
-        )
+        func_ref = function_reference(urn, str(func[0]))
 
         return stee.ExtendedExpression(
             referred_expr=[
                 stee.ExpressionReference(
                     measure=stalg.AggregateFunction(
-                        function_reference=func[0].anchor,
+                        function_reference=func_ref,
                         arguments=[
                             stalg.FunctionArgument(value=e.referred_expr[0].expression)
                             for e in bound_expressions
@@ -715,11 +690,9 @@ def aggregate_function(
                 )
             ],
             base_schema=base_schema,
-            extension_urns=extension_urns,
-            extensions=extensions,
         )
 
-    return resolve
+    return build_scoped(resolve)
 
 
 # TODO bounds, sorts
@@ -756,40 +729,14 @@ def window_function(
         if not func:
             raise Exception(f"Unknown function {function} for {signature}")
 
-        func_extension_urns = [
-            ste.SimpleExtensionURN(
-                extension_urn_anchor=registry.lookup_urn(urn), urn=urn
-            )
-        ]
-
-        func_extensions = [
-            ste.SimpleExtensionDeclaration(
-                extension_function=ste.SimpleExtensionDeclaration.ExtensionFunction(
-                    extension_urn_reference=registry.lookup_urn(urn),
-                    function_anchor=func[0].anchor,
-                    name=str(func[0]),
-                )
-            )
-        ]
-
-        extension_urns = merge_extension_urns(
-            func_extension_urns,
-            *[b.extension_urns for b in bound_expressions],
-            *[b.extension_urns for b in bound_partitions],
-        )
-
-        extensions = merge_extension_declarations(
-            func_extensions,
-            *[b.extensions for b in bound_expressions],
-            *[b.extensions for b in bound_partitions],
-        )
+        func_ref = function_reference(urn, str(func[0]))
 
         return stee.ExtendedExpression(
             referred_expr=[
                 stee.ExpressionReference(
                     expression=stalg.Expression(
                         window_function=stalg.Expression.WindowFunction(
-                            function_reference=func[0].anchor,
+                            function_reference=func_ref,
                             arguments=[
                                 stalg.FunctionArgument(
                                     value=e.referred_expr[0].expression
@@ -811,11 +758,9 @@ def window_function(
                 )
             ],
             base_schema=base_schema,
-            extension_urns=extension_urns,
-            extensions=extensions,
         )
 
-    return resolve
+    return build_scoped(resolve)
 
 
 def if_then(
@@ -837,18 +782,6 @@ def if_then(
         ]
 
         bound_else = resolve_expression(_else, base_schema, registry)
-
-        extension_urns = merge_extension_urns(
-            *[b[0].extension_urns for b in bound_ifs],
-            *[b[1].extension_urns for b in bound_ifs],
-            bound_else.extension_urns,
-        )
-
-        extensions = merge_extension_declarations(
-            *[b[0].extensions for b in bound_ifs],
-            *[b[1].extensions for b in bound_ifs],
-            bound_else.extensions,
-        )
 
         return stee.ExtendedExpression(
             referred_expr=[
@@ -889,11 +822,9 @@ def if_then(
                 )
             ],
             base_schema=base_schema,
-            extension_urns=extension_urns,
-            extensions=extensions,
         )
 
-    return resolve
+    return build_scoped(resolve)
 
 
 def switch(
@@ -915,18 +846,6 @@ def switch(
             for a, b in ifs
         ]
         bound_else = resolve_expression(_else, base_schema, registry)
-
-        extension_urns = merge_extension_urns(
-            bound_match.extension_urns,
-            *[b.extension_urns for _, b in bound_ifs],
-            bound_else.extension_urns,
-        )
-
-        extensions = merge_extension_declarations(
-            bound_match.extensions,
-            *[b.extensions for _, b in bound_ifs],
-            bound_else.extensions,
-        )
 
         return stee.ExtendedExpression(
             referred_expr=[
@@ -950,11 +869,9 @@ def switch(
                 )
             ],
             base_schema=base_schema,
-            extension_urns=extension_urns,
-            extensions=extensions,
         )
 
-    return resolve
+    return build_scoped(resolve)
 
 
 def singular_or_list(
@@ -967,14 +884,6 @@ def singular_or_list(
     ) -> stee.ExtendedExpression:
         bound_value = resolve_expression(value, base_schema, registry)
         bound_options = [resolve_expression(o, base_schema, registry) for o in options]
-
-        extension_urns = merge_extension_urns(
-            bound_value.extension_urns, *[b.extension_urns for b in bound_options]
-        )
-
-        extensions = merge_extension_declarations(
-            bound_value.extensions, *[b.extensions for b in bound_options]
-        )
 
         return stee.ExtendedExpression(
             referred_expr=[
@@ -993,11 +902,9 @@ def singular_or_list(
                 )
             ],
             base_schema=base_schema,
-            extension_urns=extension_urns,
-            extensions=extensions,
         )
 
-    return resolve
+    return build_scoped(resolve)
 
 
 def multi_or_list(
@@ -1013,16 +920,6 @@ def multi_or_list(
         bound_options = [
             [resolve_expression(e, base_schema, registry) for e in o] for o in options
         ]
-
-        extension_urns = merge_extension_urns(
-            *[b.extension_urns for b in bound_value],
-            *[e.extension_urns for b in bound_options for e in b],
-        )
-
-        extensions = merge_extension_declarations(
-            *[b.extensions for b in bound_value],
-            *[e.extensions for b in bound_options for e in b],
-        )
 
         return stee.ExtendedExpression(
             referred_expr=[
@@ -1044,11 +941,9 @@ def multi_or_list(
                 )
             ],
             base_schema=base_schema,
-            extension_urns=extension_urns,
-            extensions=extensions,
         )
 
-    return resolve
+    return build_scoped(resolve)
 
 
 def cast(
@@ -1079,11 +974,9 @@ def cast(
                 )
             ],
             base_schema=base_schema,
-            extension_urns=bound_input.extension_urns,
-            extensions=bound_input.extensions,
         )
 
-    return resolve
+    return build_scoped(resolve)
 
 
 # -- subqueries -----------------------------------------------------------
@@ -1091,7 +984,7 @@ def cast(
 # (a ``registry -> Plan`` callable) -- e.g. a DataFrame's underlying plan.
 
 
-def _subquery(subquery, base_schema, output_name, *extension_sources):
+def _subquery(subquery, base_schema, output_name):
     return stee.ExtendedExpression(
         referred_expr=[
             stee.ExpressionReference(
@@ -1100,16 +993,17 @@ def _subquery(subquery, base_schema, output_name, *extension_sources):
             )
         ],
         base_schema=base_schema,
-        extension_urns=merge_extension_urns(
-            *[s.extension_urns for s in extension_sources]
-        ),
-        extensions=merge_extension_declarations(
-            *[s.extensions for s in extension_sources]
-        ),
     )
 
 
-def _inner_rel(query, registry: ExtensionRegistry, base_schema):
+def _inner_rel(query, registry: ExtensionRegistry, base_schema) -> stalg.Rel:
+    """Resolve a subquery's ``query`` and lift the self-contained Rel to embed.
+
+    The plan itself is not returned: everything of it that survives the subquery
+    boundary is either folded into the build's collector or inlined into the Rel
+    below, so a caller holding on to it could only reintroduce the numbering this
+    already reconciled.
+    """
     # Push the enclosing schema so field references inside the subquery that use
     # an OuterReference (i.e. correlated columns) resolve against it.
     stack = outer_schemas.get()
@@ -1118,6 +1012,18 @@ def _inner_rel(query, registry: ExtensionRegistry, base_schema):
         plan = query(registry) if callable(query) else query
     finally:
         outer_schemas.reset(token)
+    # Fold the inner plan's extensions into this build before lifting its Rel: only
+    # the Rel travels into the Expression.Subquery, so the declarations its function
+    # references name stay behind with the plan. A plan built elsewhere therefore
+    # arrives numbered against a table that is about to be discarded -- its
+    # references dangle, or, worse, silently name one of *this* build's declarations
+    # where the numbering happens to overlap. The collector re-derives them from the
+    # durable ``(urn, name)`` identities, the expression-level counterpart of
+    # ``builders.plan._bind``; unchanged for a plan this build resolved, which
+    # allocated through the same collector.
+    collector = current_collector()
+    if collector is not None:
+        plan = remap_function_references(plan, collector.adopt(plan))
     rel = plan.relations[-1].root.input
     # An Expression.Subquery embeds only a bare Rel, but a ReferenceRel is
     # plan-global -- it cannot resolve once lifted out of its plan. So if the
@@ -1128,58 +1034,58 @@ def _inner_rel(query, registry: ExtensionRegistry, base_schema):
     subtrees = plan_subtrees(plan)
     if subtrees:
         rel = inline_reference_rels(rel, subtrees)
-    return plan, rel
+    return rel
 
 
 def scalar_subquery(query, alias: Union[str, None] = None):
     """A scalar (one-row, one-column) subquery expression."""
 
     def resolve(base_schema, registry):
-        plan, rel = _inner_rel(query, registry, base_schema)
+        rel = _inner_rel(query, registry, base_schema)
         subquery = stalg.Expression.Subquery(
             scalar=stalg.Expression.Subquery.Scalar(input=rel)
         )
-        return _subquery(subquery, base_schema, alias or "subquery", plan)
+        return _subquery(subquery, base_schema, alias or "subquery")
 
-    return resolve
+    return build_scoped(resolve)
 
 
 def set_predicate(query, op, alias: Union[str, None] = None):
     """An EXISTS / UNIQUE subquery predicate."""
 
     def resolve(base_schema, registry):
-        plan, rel = _inner_rel(query, registry, base_schema)
+        rel = _inner_rel(query, registry, base_schema)
         subquery = stalg.Expression.Subquery(
             set_predicate=stalg.Expression.Subquery.SetPredicate(
                 predicate_op=op, tuples=rel
             )
         )
-        return _subquery(subquery, base_schema, alias or "exists", plan)
+        return _subquery(subquery, base_schema, alias or "exists")
 
-    return resolve
+    return build_scoped(resolve)
 
 
 def in_predicate(needles, query, alias: Union[str, None] = None):
     """A ``needles IN (subquery)`` predicate."""
 
     def resolve(base_schema, registry):
-        plan, rel = _inner_rel(query, registry, base_schema)
+        rel = _inner_rel(query, registry, base_schema)
         bound = [resolve_expression(n, base_schema, registry) for n in needles]
         subquery = stalg.Expression.Subquery(
             in_predicate=stalg.Expression.Subquery.InPredicate(
                 needles=[b.referred_expr[0].expression for b in bound], haystack=rel
             )
         )
-        return _subquery(subquery, base_schema, alias or "in_subquery", plan, *bound)
+        return _subquery(subquery, base_schema, alias or "in_subquery")
 
-    return resolve
+    return build_scoped(resolve)
 
 
 def set_comparison(left, query, reduction_op, comparison_op, alias=None):
     """A ``left <op> ANY/ALL (subquery)`` predicate."""
 
     def resolve(base_schema, registry):
-        plan, rel = _inner_rel(query, registry, base_schema)
+        rel = _inner_rel(query, registry, base_schema)
         bound_left = resolve_expression(left, base_schema, registry)
         subquery = stalg.Expression.Subquery(
             set_comparison=stalg.Expression.Subquery.SetComparison(
@@ -1189,11 +1095,9 @@ def set_comparison(left, query, reduction_op, comparison_op, alias=None):
                 right=rel,
             )
         )
-        return _subquery(
-            subquery, base_schema, alias or "set_comparison", plan, bound_left
-        )
+        return _subquery(subquery, base_schema, alias or "set_comparison")
 
-    return resolve
+    return build_scoped(resolve)
 
 
 def execution_context_variable(variable: str, type_value, alias=None):
@@ -1218,7 +1122,7 @@ def execution_context_variable(variable: str, type_value, alias=None):
             base_schema=base_schema,
         )
 
-    return resolve
+    return build_scoped(resolve)
 
 
 def dynamic_parameter(parameter_reference: int, type: stp.Type, alias=None):
@@ -1245,4 +1149,4 @@ def dynamic_parameter(parameter_reference: int, type: stp.Type, alias=None):
             base_schema=base_schema,
         )
 
-    return resolve
+    return build_scoped(resolve)

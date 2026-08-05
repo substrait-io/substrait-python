@@ -143,19 +143,22 @@ def test_nested_scalar_calls():
         extension_urns=[
             ste.SimpleExtensionURN(extension_urn_anchor=1, urn="extension:test:urn")
         ],
+        # Declarations are emitted in anchor order, which is the order the functions
+        # were first referenced: the inner test_func resolves before the outer
+        # is_positive that wraps it.
         extensions=[
-            ste.SimpleExtensionDeclaration(
-                extension_function=ste.SimpleExtensionDeclaration.ExtensionFunction(
-                    extension_urn_reference=1,
-                    function_anchor=2,
-                    name="is_positive:i8",
-                )
-            ),
             ste.SimpleExtensionDeclaration(
                 extension_function=ste.SimpleExtensionDeclaration.ExtensionFunction(
                     extension_urn_reference=1,
                     function_anchor=1,
                     name="test_func:i8",
+                )
+            ),
+            ste.SimpleExtensionDeclaration(
+                extension_function=ste.SimpleExtensionDeclaration.ExtensionFunction(
+                    extension_urn_reference=1,
+                    function_anchor=2,
+                    name="is_positive:i8",
                 )
             ),
         ],

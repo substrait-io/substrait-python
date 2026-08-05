@@ -1,6 +1,5 @@
 """Extension Registry class."""
 
-import itertools
 import re
 from collections import defaultdict
 from importlib.resources import files as importlib_files
@@ -20,11 +19,17 @@ URN_PATTERN = re.compile(r"^extension:[^:]+:[^:]+$")
 
 
 class ExtensionRegistry:
+    """A catalog of extension functions, keyed by URN.
+
+    Plan-independent: the registry knows which functions exist and what signatures
+    they accept, but assigns no anchors. Extension anchors are plan-local in
+    Substrait, so they belong to a single build rather than to the catalog -- see
+    :class:`~substrait.extension_registry.ExtensionCollector`.
+    """
+
     def __init__(self, load_default_extensions=True) -> None:
-        self._urn_mapping: dict = defaultdict(dict)  # URN -> anchor ID
-        self._urn_id_generator = itertools.count(1)
+        self._urns: set = set()
         self._function_mapping: dict = defaultdict(lambda: defaultdict(list))
-        self._id_generator = itertools.count(1)
         # {type_url: detail class} for user-defined extension relations, so an
         # extension relation's output schema can be derived during inference.
         self._extension_relations: dict = {}
@@ -72,7 +77,7 @@ class ExtensionRegistry:
         if not unverified_urn:
             raise ValueError("Extension definitions must contain a 'urn' field")
         urn = validate_urn_format(unverified_urn)
-        self._urn_mapping[urn] = next(self._urn_id_generator)
+        self._urns.add(urn)
         simple_extensions = build_simple_extensions(definitions)
 
         # Helper to register functions by type
@@ -89,7 +94,6 @@ class ExtensionRegistry:
                             urn=urn,
                             name=function.name,
                             impl=impl,
-                            anchor=next(self._id_generator),
                             function_type=func_type,
                         )
                         for impl in function.impls
@@ -175,8 +179,13 @@ class ExtensionRegistry:
         matches = self._find_matching_functions(function_name, signature, urns)
         return matches[0] if matches else None
 
-    def lookup_urn(self, urn: str) -> Optional[int]:
-        return self._urn_mapping.get(urn, None)
+    def has_urn(self, urn: str) -> bool:
+        """Whether ``urn`` has been registered."""
+        return urn in self._urns
+
+    def urns(self) -> "list[str]":
+        """The registered extension URNs, sorted lexicographically."""
+        return sorted(self._urns)
 
     def iter_functions(self):
         """Yield ``(urn, name, function_type)`` for every registered function.

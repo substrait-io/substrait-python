@@ -1,3 +1,4 @@
+import pytest
 import substrait.algebra_pb2 as stalg
 import substrait.extensions.extensions_pb2 as ste
 import substrait.plan_pb2 as stp
@@ -96,3 +97,23 @@ def test_aggregate():
     )
 
     assert actual == expected
+
+
+def test_aggregate_rejects_a_non_aggregate_measure():
+    """A measure that is not an aggregate function used to be emitted as a measure
+    that is *set but empty*: reading ``.measure`` off a reference holding an
+    ``expression`` yields a default-constructed AggregateFunction, and assigning it
+    sets the field.
+
+    Beyond being malformed on its own, that is the one shape breaking the premise
+    ``remap_function_references`` relies on -- that a present message implies a real
+    reference -- so folding such a plan into another build renumbered its *unset*
+    reference along with the genuine ones, silently pointing an empty measure at a
+    real function.
+    """
+    table = read_named_table("table", named_struct)
+
+    with pytest.raises(ValueError, match="must be aggregate functions"):
+        aggregate(table, grouping_expressions=[column("id")], measures=[column("id")])(
+            registry
+        )

@@ -26,6 +26,13 @@ This project is not an execution engine for Substrait Plans.
 ## Status
 This is an experimental package that is still under development.
 
+## Substrait version
+The specification version a release targets is set by the `substrait-protobuf`,
+`substrait-extensions` and `substrait-antlr` requirements in
+[`pyproject.toml`](pyproject.toml) — the proto bindings, the standard extension
+definitions and the grammar all come from those packages rather than being vendored
+here. `substrait.version.substrait_version` reports it at runtime.
+
 # Building plans with the DataFrame API
 
 The `substrait.dataframe` module is an ergonomic, fluent API for authoring
@@ -120,7 +127,7 @@ relations {
     names: "first_name"
   }
 }
->>> serialized_plan = p.SerializeToString()
+>>> serialized_plan = plan.SerializeToString()
 >>> serialized_plan
 b'\x1aA\x12?\n1\n/\x12#\n\nfirst_name\n\x07surname\x12\x0c\n\x04b\x02\x10\x02\n\x04b\x02\x10\x02:\x08\n\x06people\x12\nfirst_name'
 ```
@@ -169,7 +176,6 @@ relations {
 ## Load a Substrait Plan from JSON
 A substrait plan can be loaded [from the JSON representation
 of the protobuf message](https://protobuf.dev/programming-guides/json/) using the [`protobuf` python library](https://pypi.org/project/protobuf/):
-functions:
 
 ```
 >>> from substrait.proto import Plan
@@ -214,7 +220,7 @@ functions:
 ...     }
 ...   ]
 ... }"""
->>> json_format.Parse(text=jsontext, mesage=Plan())
+>>> json_format.Parse(text=jsontext, message=Plan())
 relations {
   root {
     input {
@@ -391,3 +397,15 @@ version {
   producer: "ibis-substrait"
 }
 ```
+
+# Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for how the specification relates to this
+repository, the development environment, the lint / format / test commands, and the
+commit and pull request conventions. Releases are automated — [RELEASING.md](RELEASING.md)
+describes that process.
+
+# Getting Involved
+
+To learn more, head over to [Substrait](https://substrait.io/), our parent project, and
+join our [community](https://substrait.io/community/).

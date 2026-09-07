@@ -684,6 +684,56 @@ def _set_output_struct(op_name: str, inputs: list) -> stt.Type.Struct:
     return stt.Type.Struct(types=types, nullability=primary.nullability)
 
 
+def _project_read_struct(
+    struct: stt.Type.Struct, select: stalg.Expression.MaskExpression.StructSelect
+) -> stt.Type.Struct:
+    """Project fields in mask order, matching Java and keeping struct metadata."""
+    fields = []
+    for item in select.struct_items:
+        if not 0 <= item.field < len(struct.types):
+            raise ValueError(
+                f"Read projection field index {item.field} is out of range "
+                f"for a struct with {len(struct.types)} fields"
+            )
+        field = struct.types[item.field]
+        if item.HasField("child"):
+            field = _project_read_type(field, item.child)
+        fields.append(field)
+    result = stt.Type.Struct()
+    result.CopyFrom(struct)
+    del result.types[:]
+    result.types.extend(fields)
+    return result
+
+
+def _project_read_type(
+    field: stt.Type, select: stalg.Expression.MaskExpression.Select
+) -> stt.Type:
+    kind = select.WhichOneof("type")
+    if kind is None:
+        raise ValueError("Read projection child selection must have a type")
+    field_kind = field.WhichOneof("kind")
+    if field_kind != kind:
+        raise ValueError(
+            f"Read projection {kind} selection requires a {kind} type, got {field_kind}"
+        )
+    result = stt.Type()
+    result.CopyFrom(field)
+    if kind == "struct":
+        result.struct.CopyFrom(_project_read_struct(field.struct, select.struct))
+    else:
+        # List positions and map keys filter values without changing their type.
+        # Child masks project the list element or map value, retaining the wrapper.
+        selection = getattr(select, kind)
+        if selection.HasField("child"):
+            member = "type" if kind == "list" else "value"
+            child_type = getattr(getattr(field, kind), member)
+            getattr(getattr(result, kind), member).CopyFrom(
+                _project_read_type(child_type, selection.child)
+            )
+    return result
+
+
 def infer_rel_schema(rel: stalg.Rel, *, registry=None, subtrees=()) -> stt.Type.Struct:
     """Infer a relation's output struct.
 
@@ -696,6 +746,12 @@ def infer_rel_schema(rel: stalg.Rel, *, registry=None, subtrees=()) -> stt.Type.
 
     if rel_type == "read":
         (common, struct) = (rel.read.common, rel.read.base_schema.struct)
+        if rel.read.HasField("projection"):
+            # Spec v0.99.0 describes default unwrapping but leaves its
+            # serialization open. Match Java by keeping structs and containers
+            # at every level, regardless of maintain_singular_struct.
+            # Apply the projection before the common emit mapping below.
+            struct = _project_read_struct(struct, rel.read.projection.select)
     elif rel_type == "filter":
         (common, struct) = (
             rel.filter.common,

@@ -39,7 +39,7 @@ from substrait.builders import plan as _plan
 from substrait.builders import type as _type
 from substrait.builders.extended_expression import LateralInput, fresh_rel_anchors
 from substrait.dataframe.expr import Expr, Measure, col, lit, sort_direction
-from substrait.extension_registry import ExtensionRegistry
+from substrait.extension_registry import ExtensionRegistry, build_scoped
 from substrait.type_inference import infer_plan_schema
 from substrait.utils import to_id_based_outer_references
 
@@ -260,7 +260,7 @@ class DataFrame:
             ]
             return _plan.select(bound, expressions=expressions)(registry)
 
-        return self._next(resolve)
+        return self._next(build_scoped(resolve))
 
     def drop(self, *columns: str) -> "DataFrame":
         """Drop the named columns, keeping the rest in their original order."""
@@ -278,7 +278,7 @@ class DataFrame:
                 raise ValueError("drop would remove every column")
             return _plan.select(bound, expressions=expressions)(registry)
 
-        return self._next(resolve)
+        return self._next(build_scoped(resolve))
 
     def unpivot(
         self,
@@ -652,7 +652,7 @@ class DataFrame:
                 common.hint.output_names.extend(output_names)
             return bound
 
-        return self._next(resolve)
+        return self._next(build_scoped(resolve))
 
     def cache(self) -> "DataFrame":
         """Mark this DataFrame as a reusable common subplan (a CTE).

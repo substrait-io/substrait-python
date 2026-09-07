@@ -1,12 +1,13 @@
 import contextlib
 import contextvars
+from typing import Optional
 
 import substrait.algebra_pb2 as stalg
 import substrait.extended_expression_pb2 as stee
 import substrait.plan_pb2 as stp
 import substrait.type_pb2 as stt
 
-from substrait.utils import iter_plan_rels, plan_subtrees, rel_anchor_of
+from substrait.utils import child_rels, iter_plan_rels, plan_subtrees, rel_anchor_of
 
 
 class _SubtreeScope:
@@ -71,12 +72,25 @@ class _AnchorScope:
     sub-tree whose anchoring relation is not yet assembled (a lateral join's right
     input, at build or inference time). ``parent`` chains to an enclosing scope so
     nested correlations still resolve outer anchors.
+
+    The index arrives as a zero-argument factory and is built only if an id-based
+    reference actually asks for an anchor. Indexing a plan means walking every relation
+    *and* every expression in it to find the relations embedded in subqueries, which is
+    whole-plan work; plans carrying an id-based ``OuterReference`` at all are the
+    exception, and a builder re-infers its input's schema at every level (see
+    :class:`_SchemaMemo`), so building the index eagerly made that walk the single
+    largest cost of assembling a long pipeline.
     """
 
-    __slots__ = ("_rels", "_subtrees", "_schemas", "_resolving", "_parent")
+    __slots__ = ("_rels", "_index", "_subtrees", "_schemas", "_resolving", "_parent")
 
-    def __init__(self, rels: dict, subtrees, *, parent=None):
-        self._rels = rels
+    def __init__(self, index, subtrees, *, parent=None):
+        # ``index`` is always a factory, never the index itself: a caller with an
+        # already-built dict passes ``dict`` or a lambda, which keeps this from having
+        # to tell the two apart -- a test that got it wrong would report the mistake as
+        # an uncallable-object TypeError from deep inside a later lookup.
+        self._rels: Optional[dict] = None
+        self._index = index
         self._subtrees = subtrees
         self._schemas: dict = {}
         self._resolving: set = set()
@@ -86,10 +100,17 @@ class _AnchorScope:
         """Pre-bind ``anchor`` to an already-known schema."""
         self._schemas[anchor] = struct
 
+    def _anchors(self) -> dict:
+        """The anchor index, built on first use and kept."""
+        if self._rels is None:
+            self._rels = self._index()
+            self._index = None
+        return self._rels
+
     def schema_of(self, anchor, registry) -> stt.Type.Struct:
         if anchor in self._schemas:
             return self._schemas[anchor]
-        if anchor not in self._rels:
+        if anchor not in self._anchors():
             if self._parent is not None:
                 return self._parent.schema_of(anchor, registry)
             raise Exception(f"outer reference to unknown rel_anchor {anchor}")
@@ -99,7 +120,7 @@ class _AnchorScope:
             )
         self._resolving.add(anchor)
         try:
-            rel = self._rels[anchor]
+            rel = self._anchors()[anchor]
             # A lateral-join anchor denotes the current left row, not the join's
             # own output; every other anchor resolves against its output schema.
             target = (
@@ -135,6 +156,192 @@ anchor_scope: contextvars.ContextVar = contextvars.ContextVar(
 )
 
 
+class _SchemaMemo:
+    """Output structs already known for particular ``Rel`` *objects*, for the
+    duration of one build.
+
+    A builder assembles its output relation by assigning its input's root ``Rel``
+    into a fresh message, which protobuf copies. The schema it inferred for that
+    input one level down is therefore unreachable by object identity from the copy,
+    so every level re-walks the whole subtree beneath it and an N-verb chain does
+    O(N^2) inference (#207). The copy *is* reachable at the moment it is made,
+    though, so the builder records "this relation's output schema is that plan's
+    output schema" and :func:`infer_rel_schema` stops at the boundary instead of
+    recursing through it.
+
+    Keying that on ``id(rel)`` only works because the entry holds the ``Rel`` itself:
+    a protobuf message wrapper is *not* permanently cached, so under the upb
+    implementation a submessage whose last Python reference is dropped is re-wrapped
+    at a fresh -- possibly recycled -- address on the next access. Holding it pins
+    both the object and its id for the memo's lifetime, which is what makes a hit
+    provably the relation that was recorded rather than a later tenant of its id.
+
+    What is recorded is the ``Plan`` the schema comes from, not the schema, resolved
+    on first lookup and then kept. Recording it eagerly would mean inferring schemas
+    no one asked for, and inference can legitimately fail where building does not --
+    ``set``, ``reference`` and ``exchange`` (and, among the builders that copy rather
+    than assemble, ``with_execution_behavior``) never look at their input's schema
+    today, so a plan they accept (an extension relation with no registered deriver,
+    say) has to keep building.
+
+    An entry costs more memory than a schema: keying on identity means holding a live
+    submessage, and a submessage keeps its whole plan's arena allocated, so each entry
+    holds an entire intermediate plan. Left to accumulate, that makes peak memory over
+    an N-verb build the sum of the intermediates rather than the couple of levels in
+    flight (measured at 10 MB flat versus 26 MB at 32 verbs over a 2000-column table).
+    Entries are therefore dropped as soon as they are unreachable, which happens at two
+    points: once a lookup has resolved through a plan (:meth:`_release_boundaries_of`),
+    and
+    once a new entry is recorded over an unresolved one
+    (:meth:`remember_plan_output`) -- the second being what bounds a chain of builders
+    that resolve nothing at all. Which entries each can drop safely is the whole of the
+    reasoning; see both.
+
+    Only builders write here; inference never memoizes on its own. A relation's
+    output struct can depend on ambient correlation context (``outer_schemas``,
+    ``anchor_scope``) -- a projection of a correlated column is one -- and every
+    relation that crosses into another context is copied on the way, so an entry can
+    only ever be read back under the context it was recorded in. Caching inference
+    results wholesale would not have that property.
+    """
+
+    __slots__ = ("_structs", "_pending", "_resolving")
+
+    def __init__(self) -> None:
+        # id(Rel) -> (Rel, struct) resolved, and id(Rel) -> (Rel, Plan) not yet. The
+        # Rel is held in the value so its id stays valid -- and stays *that* Rel's --
+        # for the lifetime of the memo.
+        self._structs: dict = {}
+        self._pending: dict = {}
+        self._resolving: set = set()
+
+    def remember_plan_output(self, rel: stalg.Rel, plan: stp.Plan) -> None:
+        """Record that ``rel``'s output schema is the output schema of ``plan``.
+
+        Recording drops the *unresolved* entries inside ``plan``, which is what bounds
+        retention for the builders that never ask their input for a schema. Those
+        builders (``set``, ``exchange``, ``reference``, ``with_execution_behavior``)
+        resolve nothing, so nothing prompts a release, and a chain of them would
+        otherwise hold one live intermediate plan per level. An entry dropped here would
+        only ever have been reached by walking into ``plan``, which is what resolving
+        ``rel`` does, so dropping it costs one deeper walk of that subtree at the first
+        inference above the chain -- paid once, since that inference resolves ``rel``
+        itself -- and buys a bound on how many intermediate plans a build holds at once.
+
+        Resolved entries stay, because they are what makes that walk unnecessary
+        everywhere else, and they cost nothing to keep: they key on submessages of
+        ``plan``, which the new entry pins anyway. A builder that *does* infer its input
+        has already resolved the boundary below by the time it assembles anything, so
+        this drops nothing on the pipelines the memo exists for.
+        """
+        self._release_boundaries_of(plan, keep_resolved=True)
+        self._pending[id(rel)] = (rel, plan)
+
+    @staticmethod
+    def _boundary_rels(plan: stp.Plan):
+        """The relations of ``plan`` a builder can have recorded an entry for.
+
+        A builder records either the root input of the plan it assembled (the ones that
+        copy a plan rather than wrap its root: ``with_execution_behavior``,
+        ``reference``) or that relation's own inputs (everything assembled through
+        ``_plan_from``), so those two levels are where every entry keyed inside a plan
+        sits. Walking deeper would find only relations no builder ever named, because
+        each level embeds a copy of what is beneath it.
+        """
+        relations = plan.relations
+        if not relations or relations[-1].WhichOneof("rel_type") != "root":
+            return
+        root_input = relations[-1].root.input
+        yield root_input
+        yield from child_rels(root_input)
+
+    def _release_boundaries_of(
+        self, plan: stp.Plan, *, keep_resolved: bool = False
+    ) -> None:
+        """Drop the entries recorded inside ``plan`` (see :meth:`_boundary_rels`).
+
+        Called once a lookup has resolved through ``plan``: those entries existed to
+        answer that resolution, and nothing above can reach the relations they key on
+        again, because each enclosing level embedded a *copy*. Dropping them is what
+        keeps retention flat -- the key of a resolved entry is a live submessage, and
+        a submessage keeps its whole plan's arena allocated, so holding one holds an
+        entire intermediate plan. Kept, they would make peak memory over an N-verb
+        build the sum of the intermediates instead of the two levels in flight.
+
+        ``keep_resolved`` spares the resolved entries, for the caller that is recording
+        rather than resolving (see :meth:`remember_plan_output`). Dropping an unresolved
+        entry cascades either way: the plan it held will never be walked now, so
+        whatever was recorded inside *that* plan is unreachable too, resolved entries
+        included.
+        """
+        unswept = [(plan, keep_resolved)]
+        while unswept:
+            owner, keep = unswept.pop()
+            for boundary in self._boundary_rels(owner):
+                if not keep:
+                    self._structs.pop(id(boundary), None)
+                unresolved = self._pending.pop(id(boundary), None)
+                if unresolved is not None:
+                    unswept.append((unresolved[1], False))
+
+    def struct_of(self, rel: stalg.Rel, registry) -> Optional[stt.Type.Struct]:
+        """``rel``'s remembered output struct, or None if nothing was recorded."""
+        key = id(rel)
+        known = self._structs.get(key)
+        if known is not None:
+            return known[1]
+        pending = self._pending.get(key)
+        if pending is None:
+            return None
+        if key in self._resolving:
+            raise Exception(
+                "remembered schema resolves to itself; a relation cannot be its own "
+                "input"
+            )
+        self._resolving.add(key)
+        try:
+            struct = infer_plan_schema(pending[1], registry=registry).struct
+        finally:
+            self._resolving.discard(key)
+        self._release_boundaries_of(pending[1])
+        self._structs[key] = (rel, struct)
+        # The plan was held only to answer this; the struct replaces it.
+        del self._pending[key]
+        return struct
+
+
+# The schema memo (a ``_SchemaMemo``) for the build in progress, or None outside a
+# build -- so inference used directly as a library function memoizes nothing and
+# behaves exactly as before. Entered by ``extension_registry.build_scope`` alongside
+# the build's ExtensionCollector, the two being the same kind of state: derived from
+# the plan being assembled, and meaningless once it is finished.
+schema_memo: contextvars.ContextVar = contextvars.ContextVar(
+    "schema_memo", default=None
+)
+
+
+@contextlib.contextmanager
+def schema_memo_scope():
+    """Scope a fresh :class:`_SchemaMemo` to the build in progress."""
+    token = schema_memo.set(_SchemaMemo())
+    try:
+        yield
+    finally:
+        schema_memo.reset(token)
+
+
+def remember_rel_output_schema(rel: stalg.Rel, plan: stp.Plan) -> None:
+    """Record that ``rel``'s output schema is ``plan``'s, for the build in progress.
+
+    Called by a builder for the input relations it has just embedded in the output it
+    assembled, so a later inference of that output stops at the boundary rather than
+    re-walking everything below it. A no-op outside a build.
+    """
+    memo = schema_memo.get()
+    if memo is not None:
+        memo.remember_plan_output(rel, plan)
+
+
 @contextlib.contextmanager
 def _outer_anchor_binding(anchor, struct):
     """Bind ``anchor`` -> ``struct`` for id-based outer references resolved within
@@ -145,7 +352,7 @@ def _outer_anchor_binding(anchor, struct):
     though the join relation is not yet in an anchor index. Nested lateral joins
     compose via the parent chain.
     """
-    scope = _AnchorScope({}, (), parent=anchor_scope.get())
+    scope = _AnchorScope(dict, (), parent=anchor_scope.get())
     scope.register(anchor, struct)
     token = anchor_scope.set(scope)
     try:
@@ -692,6 +899,16 @@ def infer_rel_schema(rel: stalg.Rel, *, registry=None, subtrees=()) -> stt.Type.
     ``ReferenceRel`` resolves its schema against ``subtrees[subtree_ordinal]``. It
     defaults to ``()`` so plans without shared subtrees behave exactly as before.
     """
+    # A builder may already have recorded this exact relation's output schema while
+    # embedding it (see _SchemaMemo), in which case the subtree below it needs no
+    # walking. The recorded struct is the post-emit output struct -- what this
+    # function returns -- so it is returned as-is.
+    memo = schema_memo.get()
+    if memo is not None:
+        remembered = memo.struct_of(rel, registry)
+        if remembered is not None:
+            return remembered
+
     rel_type = rel.WhichOneof("rel_type")
 
     if rel_type == "read":
@@ -953,12 +1170,18 @@ def infer_plan_schema(plan: stp.Plan, *, registry=None) -> stt.NamedStruct:
     # ReferenceRel anywhere in the tree resolves against them by ordinal. Wrap them
     # in a _SubtreeScope so repeated references are memoized and cycles are caught.
     subtrees = _SubtreeScope(plan_subtrees(plan))
+
     # Index every RelCommon.rel_anchor in the plan (across subtrees, the root, and
     # subquery-embedded relations) so an id-based OuterReference (rel_reference)
-    # anywhere resolves against the anchored relation's output schema.
-    anchors = {
-        a: rel for rel in iter_plan_rels(plan) if (a := rel_anchor_of(rel)) is not None
-    }
+    # anywhere resolves against the anchored relation's output schema. Passed as a
+    # factory: indexing walks the whole plan, and most plans never ask for an anchor.
+    def anchors():
+        return {
+            a: rel
+            for rel in iter_plan_rels(plan)
+            if (a := rel_anchor_of(rel)) is not None
+        }
+
     # Chain to any enclosing anchor scope (e.g. a lateral join binding its left
     # schema while its right input -- a separate plan being inferred here -- is
     # built) so references to an outer anchor still resolve.

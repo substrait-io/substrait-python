@@ -3,15 +3,18 @@ import substrait.algebra_pb2 as stalg
 import substrait.plan_pb2 as stp
 import substrait.type_pb2 as stt
 
-from substrait.builders.extended_expression import literal
+from substrait.builders.extended_expression import column, literal
 from substrait.builders.plan import (
     default_version,
     fetch,
+    hash_join,
+    join,
+    merge_join,
     read_named_table,
     reference,
     set,
 )
-from substrait.builders.type import i64
+from substrait.builders.type import boolean, i64
 from substrait.extension_registry import ExtensionRegistry
 from substrait.type_inference import infer_plan_schema
 
@@ -102,3 +105,49 @@ def test_reference_out_of_range_ordinal_raises():
     )
     with pytest.raises(Exception, match="out of range"):
         infer_plan_schema(ref_plan, registry=registry)
+
+
+# The joins that resolve a post_join_filter against their output schema. That schema is
+# combined from the schemas already inferred for each side; deriving it by re-inferring
+# from the input relations instead would do so without either input's shared-subtree
+# list in scope, and a promoted input's root is a plan-global ReferenceRel that cannot
+# resolve on its own.
+POST_JOIN_FILTER_BUILDERS = {
+    "join": lambda left, right, predicate: join(
+        left,
+        right,
+        literal(True, boolean()),
+        stalg.JoinRel.JOIN_TYPE_INNER,
+        post_join_filter=predicate,
+    ),
+    "hash_join": lambda left, right, predicate: hash_join(
+        left,
+        right,
+        ["id"],
+        ["id"],
+        stalg.HashJoinRel.JOIN_TYPE_INNER,
+        post_join_filter=predicate,
+    ),
+    "merge_join": lambda left, right, predicate: merge_join(
+        left,
+        right,
+        ["id"],
+        ["id"],
+        stalg.MergeJoinRel.JOIN_TYPE_INNER,
+        post_join_filter=predicate,
+    ),
+}
+
+
+@pytest.mark.parametrize(
+    "builder", POST_JOIN_FILTER_BUILDERS.values(), ids=POST_JOIN_FILTER_BUILDERS
+)
+def test_post_join_filter_resolves_over_a_referenced_input(builder):
+    cached = reference(read_named_table("t", named_struct))
+    plan = builder(cached, read_named_table("u", named_struct), column("id"))(registry)
+
+    # Both sides' columns are in scope for the filter, so it binds to the first "id".
+    root = plan.relations[-1].root
+    assert list(root.names) == ["id", "v", "id", "v"]
+    node = getattr(root.input, root.input.WhichOneof("rel_type"))
+    assert node.post_join_filter.selection.direct_reference.struct_field.field == 0

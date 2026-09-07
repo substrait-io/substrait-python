@@ -6,6 +6,7 @@ import substrait.plan_pb2 as stplan
 import substrait.type_pb2 as stt
 
 from substrait.utils import (
+    child_rels,
     iter_plan_rels,
     merge_extension_declarations,
     merge_extension_urns,
@@ -762,3 +763,28 @@ def test_convert_is_idempotent():
     once = to_id_based_outer_references(plan)
     twice = to_id_based_outer_references(once)
     assert twice == once
+
+
+def test_child_rels_yields_the_live_submessages_in_declaration_order():
+    left = _read("l")
+    right = _read("r")
+    rel = stalg.Rel(
+        join=stalg.JoinRel(left=left, right=right, type=stalg.JoinRel.JOIN_TYPE_INNER)
+    )
+
+    children = list(child_rels(rel))
+
+    # Declaration order, and the messages themselves -- callers key on identity, so
+    # yielding a copy would silently break them.
+    assert children == [left, right]
+    assert children[0] is rel.join.left
+    assert children[1] is rel.join.right
+
+
+def test_child_rels_yields_repeated_inputs_and_nothing_for_a_leaf():
+    inputs = [_read("a"), _read("b"), _read("c")]
+    union = stalg.Rel(set=stalg.SetRel(inputs=inputs, op=stalg.SetRel.SET_OP_UNION_ALL))
+
+    assert list(child_rels(union)) == inputs
+    assert list(child_rels(_read("a"))) == []
+    assert list(child_rels(stalg.Rel())) == []

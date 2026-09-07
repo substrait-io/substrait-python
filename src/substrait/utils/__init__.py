@@ -138,6 +138,26 @@ def _child_rel(container, key):
     return container[key] if isinstance(key, int) else getattr(container, key)
 
 
+def child_rels(rel: stalg.Rel):
+    """``rel``'s direct child ``Rel`` messages, in field declaration order.
+
+    Yields the messages themselves rather than the ``(container, key)`` pairs
+    :func:`_iter_child_rels` uses for in-place rewriting, for callers that only read
+    them -- note they are the live submessages, not copies, so mutating one mutates
+    ``rel``. Subquery-embedded relations are not direct children and are not yielded.
+
+    A yielded message is only *identity*-stable while a reference to it is held: a
+    protobuf submessage wrapper is not permanently cached, so under the upb
+    implementation dropping the last reference lets the next access re-wrap it at a
+    fresh -- possibly recycled -- address. A caller keying on ``id()`` (as
+    ``type_inference._SchemaMemo`` does) must therefore keep the message alive
+    alongside the key; consuming this generator lazily and keeping only the ids will
+    collide.
+    """
+    for container, key in _iter_child_rels(rel):
+        yield _child_rel(container, key)
+
+
 def rebase_reference_ordinals(rel: stalg.Rel, remap: dict) -> stalg.Rel:
     """A copy of ``rel`` with every nested ``ReferenceRel.subtree_ordinal`` remapped
     (old -> new) per ``remap``. Recurses through direct child relations only."""

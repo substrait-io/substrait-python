@@ -10,8 +10,6 @@ from substrait.derivation_expression import _parse, evaluate
 
 from .signature_checker_helpers import covers, normalize_substrait_type_names
 
-_MISSING = object()
-
 
 class FunctionType(Enum):
     SCALAR = "scalar"
@@ -33,10 +31,6 @@ class FunctionEntry:
         self.urn: str = urn
         self.function_type = function_type
         self.arguments = []
-        # Argument names parallel to ``arguments`` / ``normalized_inputs``. Used to
-        # match enumeration selections, which arrive by name (e.g. component="YEAR")
-        # rather than by position, back to their declared signature slot.
-        self.arg_names: list = []
         self.nullability = (
             impl.nullability if impl.nullability else se.NullabilityHandling.MIRROR
         )
@@ -47,99 +41,37 @@ class FunctionEntry:
                     self.normalized_inputs.append(
                         normalize_substrait_type_names(arg.value)
                     )
-                    self.arg_names.append(arg.name)
                 elif isinstance(arg, se.EnumerationArg):
                     self.arguments.append(arg.options)
                     self.normalized_inputs.append("req")
-                    self.arg_names.append(arg.name)
 
     def __repr__(self) -> str:
         return f"{self.name}:{'_'.join(self.normalized_inputs)}"
 
-    def interleave_arguments(self, value_items, options):
-        """Order value operands and enumeration selections per the signature.
+    def satisfies_signature(self, signature: tuple | list) -> Optional[Type]:
+        """Match ``signature`` against this overload, returning its output type.
 
-        Substrait interleaves enumeration arguments with value arguments in
-        declared order (``extract`` is ``[component (enum), x (value)]``), but the
-        two arrive separately: value operands positionally, enumeration selections
-        by argument name in ``options``. This walks the declared arguments and
-        weaves them back together.
-
-        ``value_items`` is an iterator of value operands (consumed in order for
-        each value argument). Returns ``(ordered, remaining_options)`` where each
-        entry of ``ordered`` is ``("value", item)`` or ``("enum", selection)``, and
-        ``remaining_options`` are the options *not* consumed as enumeration
-        arguments -- i.e. the behavioral options. Returns ``None`` if the value
-        arity is wrong or a required enumeration argument is absent from
-        ``options``.
+        ``signature`` interleaves value-operand ``Type``\\ s with enumeration
+        selections as plain string tokens, in declared argument order (an enum
+        argument's token must be a member of the overload's option domain).
+        Returns the derived output ``Type`` on a match, or ``None`` otherwise.
         """
-        remaining = dict(options or {})
-        if self.impl.variadic:
-            # Variadic functions have no enumeration arguments; every operand is a
-            # value and every option is behavioral.
-            return [("value", item) for item in value_items], remaining
-        ordered: list = []
-        for kind, name in zip(self.normalized_inputs, self.arg_names):
-            if kind == "req":  # enumeration argument
-                if name not in remaining:
-                    return None
-                ordered.append(("enum", str(remaining.pop(name))))
-            else:
-                item = next(value_items, _MISSING)
-                if item is _MISSING:
-                    return None
-                ordered.append(("value", item))
-        if next(value_items, _MISSING) is not _MISSING:
-            return None  # too many value operands
-        return ordered, remaining
-
-    def _resolve_signature(
-        self, signature: tuple | list, options: Optional[dict]
-    ) -> Optional[list]:
-        """Interleave ``signature`` with enumeration selections for matching.
-
-        Enumeration selections may be supplied two ways: interleaved into
-        ``signature`` as strings in declared order (the low-level registry
-        contract), or by argument name in ``options`` (how the DataFrame builders
-        pass them, keeping the value-only signature intact). An enum position
-        prefers ``options`` and otherwise consumes the next ``signature`` item.
-        Returns the value-and-enum sequence to match against ``self.arguments``,
-        or ``None`` on an arity mismatch.
-        """
-        remaining = dict(options or {})
-        items = iter(signature)
-        interleaved: list = []
-        for kind, name in zip(self.normalized_inputs, self.arg_names):
-            if kind == "req" and name in remaining:  # enum selection by name
-                interleaved.append(str(remaining.pop(name)))
-                continue
-            item = next(items, _MISSING)
-            if item is _MISSING:
-                return None
-            interleaved.append(item)
-        if next(items, _MISSING) is not _MISSING:
-            return None  # more operands than the signature declares
-        return interleaved
-
-    def satisfies_signature(
-        self, signature: tuple | list, options: Optional[dict] = None
-    ) -> Optional[str]:
         if self.impl.variadic:
             min_args_allowed = self.impl.variadic.min or 0
             if len(signature) < min_args_allowed:
                 return None
             inputs = [self.arguments[0]] * len(signature)
-            interleaved: list = list(signature)
         else:
-            interleaved = self._resolve_signature(signature, options)
-            if interleaved is None:
-                return None
             inputs = self.arguments
-        if len(inputs) != len(interleaved):
+        if len(inputs) != len(signature):
             return None
-        zipped_args = list(zip(inputs, interleaved))
+        zipped_args = list(zip(inputs, signature))
         parameters = {}
         for x, y in zipped_args:
+            if isinstance(x, list) != isinstance(y, str):
+                # An enumeration slot (domain list) accepts only a selection token,
+                # and a value slot only a Type -- reject either kind in the other.
+                return None
             if isinstance(y, str):
                 if y not in x:
                     return None
@@ -152,7 +84,10 @@ class FunctionEntry:
                     == se.NullabilityHandling.DISCRETE,
                 ):
                     return None
-        output_type = evaluate(self.impl.return_, parameters)
+        try:
+            output_type = evaluate(self.impl.return_, parameters)
+        except Exception:
+            return None  # return type cannot be derived for these arguments
         if self.nullability == se.NullabilityHandling.MIRROR and isinstance(
             output_type, Type
         ):
@@ -160,7 +95,7 @@ class FunctionEntry:
                 [
                     p.__getattribute__(p.WhichOneof("kind")).nullability
                     == Type.NULLABILITY_NULLABLE
-                    for p in interleaved
+                    for p in signature
                     if isinstance(p, Type)
                 ]
             )

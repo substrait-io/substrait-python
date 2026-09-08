@@ -116,14 +116,11 @@ class ExtensionRegistry:
         function_name: str,
         signature: tuple[Type] | list[Type],
         urns: list[str] | None = None,
-        options: Optional[dict] = None,
     ) -> list[tuple[FunctionEntry, Type]]:
         """Helper method to find matching functions across specified URNs.
 
-        ``options`` carries enumeration-argument selections by name (e.g.
-        ``{"component": "YEAR"}``); an overload with enumeration arguments only
-        matches when ``signature`` supplies its value operands and ``options``
-        supplies each enumeration selection.
+        ``signature`` interleaves value-operand ``Type``\\ s with enumeration
+        selections as plain string tokens, in declared argument order.
         """
         matches = []
         urns_to_search = (
@@ -137,7 +134,7 @@ class ExtensionRegistry:
                 continue
             functions = self._function_mapping[urn][function_name]
             for f in functions:
-                rtn = f.satisfies_signature(signature, options)
+                rtn = f.satisfies_signature(signature)
                 if rtn is not None:
                     matches.append((f, rtn))
         return matches
@@ -148,22 +145,24 @@ class ExtensionRegistry:
         urn: str,
         function_name: str,
         signature: tuple[Type] | list[Type],
-        options: Optional[dict] = None,
     ) -> Optional[tuple[FunctionEntry, Type]]:
         """Look up a function within a specific URN."""
-        matches = self._find_matching_functions(
-            function_name, signature, [urn], options
-        )
+        matches = self._find_matching_functions(function_name, signature, [urn])
         return matches[0] if matches else None
 
     def list_functions(
-        self, urn: str, function_name: str, signature: tuple[Type] | list[Type]
+        self,
+        urn: str,
+        function_name: str,
+        signature: tuple[Type] | list[Type],
     ) -> list[tuple[FunctionEntry, Type]]:
         """List all matching functions within a specific URN."""
         return self._find_matching_functions(function_name, signature, [urn])
 
     def list_functions_across_urns(
-        self, function_name: str, signature: tuple[Type] | list[Type]
+        self,
+        function_name: str,
+        signature: tuple[Type] | list[Type],
     ) -> list[tuple[FunctionEntry, Type]]:
         """List all matching functions across all URNs."""
         return self._find_matching_functions(function_name, signature)
@@ -173,15 +172,12 @@ class ExtensionRegistry:
         function_name: str,
         signature: tuple[Type] | list[Type],
         urns: Optional[list[str]] = None,
-        options: Optional[dict] = None,
     ) -> Optional[tuple[FunctionEntry, Type]]:
         """Find the best-matching function for ``function_name`` across ``urns``.
 
         Searches ``urns`` in order (every registered URN when ``None``) and returns
         the first ``(FunctionEntry, output_type)`` whose overload satisfies
         ``signature``, or ``None``. The winning extension URN is ``entry.urn``.
-        ``options`` carries enumeration-argument selections by name (see
-        :meth:`_find_matching_functions`).
 
         Generalizes :meth:`lookup_function` (a single URN) and
         :meth:`list_functions_across_urns` (every URN) to an ordered subset, so a
@@ -189,7 +185,7 @@ class ExtensionRegistry:
         the base arithmetic extension over its decimal variant -- needs one call
         rather than a per-URN ``lookup_function`` loop.
         """
-        matches = self._find_matching_functions(function_name, signature, urns, options)
+        matches = self._find_matching_functions(function_name, signature, urns)
         return matches[0] if matches else None
 
     def has_urn(self, urn: str) -> bool:

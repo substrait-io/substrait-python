@@ -36,6 +36,7 @@ from collections import defaultdict
 from typing import Any
 
 from substrait.builders.extended_expression import (
+    EnumArg,
     aggregate_function,
     resolve_expression,
     scalar_function,
@@ -63,7 +64,7 @@ def _urn_priority(urn: str) -> int:
 
 def _single_urn_helper(builder, urn: str, name: str):
     def helper(*args: Any, alias: str | None = None, **options: Any) -> Expr:
-        exprs = [Expr._coerce(a).unbound for a in args]
+        exprs = [a if isinstance(a, EnumArg) else Expr._coerce(a).unbound for a in args]
         return Expr(
             builder(urn, name, expressions=exprs, alias=alias, options=options or None)
         )
@@ -73,10 +74,15 @@ def _single_urn_helper(builder, urn: str, name: str):
 
 def _multi_urn_helper(builder, urns: list[str], name: str):
     def helper(*args: Any, alias: str | None = None, **options: Any) -> Expr:
-        exprs = [Expr._coerce(a).unbound for a in args]
+        exprs = [a if isinstance(a, EnumArg) else Expr._coerce(a).unbound for a in args]
 
         def resolve(base_schema, registry):
-            bound = [resolve_expression(e, base_schema, registry) for e in exprs]
+            bound = [
+                e
+                if isinstance(e, EnumArg)
+                else resolve_expression(e, base_schema, registry)
+                for e in exprs
+            ]
             return _resolve_over_urns(
                 builder,
                 urns,

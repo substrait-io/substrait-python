@@ -184,6 +184,16 @@ def test_join_unknown_type_raises():
         left.join(right, on=sub.col("x") == sub.col("x"), how="banana")
 
 
+def test_join_on_bare_column_name_raises():
+    # `on` is a boolean match predicate, not a key name. The pandas `on="key"`
+    # idiom binds to a bare (non-boolean) column reference, which would silently
+    # build a Cartesian product; it is rejected at build time instead.
+    left = sub.read_named_table("customers", {"cust_id": sub.i64, "name": sub.string})
+    right = sub.read_named_table("orders", {"order_id": sub.i64, "cust_ref": sub.i64})
+    with pytest.raises(ValueError, match="boolean predicate"):
+        left.join(right, on="cust_id", how="inner").to_plan()
+
+
 @pytest.mark.parametrize("how, join_type", sorted(_JOIN_TYPES.items()))
 def test_join_all_types_match_builder(how, join_type):
     left_ns = named_struct(

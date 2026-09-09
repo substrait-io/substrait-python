@@ -29,6 +29,7 @@ from substrait.type_inference import (
     _join_output_struct,
     _join_struct_from_schemas,
     _outer_anchor_binding,
+    infer_expression_type,
     infer_plan_schema,
     join_output_names,
 )
@@ -451,6 +452,44 @@ def select(
     return build_scoped(resolve)
 
 
+def _require_boolean_condition(
+    bound_expression: stee.ExtendedExpression,
+    schema: stt.NamedStruct,
+    registry: ExtensionRegistry,
+    *,
+    context: str,
+    hint: str = "",
+) -> None:
+    """Reject a ``filter``/join condition that does not infer to ``boolean``.
+
+    Substrait requires a ``FilterRel``/``JoinRel`` condition to be a boolean
+    predicate, but ``resolve_expression`` will happily bind any expression --
+    including a bare column reference. Such a condition builds a legit-looking
+    plan that behaves very differently at execution (a non-boolean join
+    condition degrades to a Cartesian product), so we catch it at build time.
+
+    ``context`` names the relation for the message; ``hint`` adds a caller-specific
+    suggestion (e.g. how to spell an equi-join).
+    """
+    condition = bound_expression.referred_expr[0].expression
+    cond_type = infer_expression_type(condition, schema.struct, registry=registry)
+    kind = cond_type.WhichOneof("kind")
+    if kind != "bool":
+        message = (
+            f"{context} condition must be a boolean predicate, but got type {kind!r}."
+        )
+        if hint:
+            message = f"{message} {hint}"
+        raise ValueError(message)
+
+
+_JOIN_CONDITION_HINT = (
+    "A bare column name is a column reference, not a match key -- it does not "
+    "join on that column. Use a predicate such as col('a') == col('b'); for a "
+    "Cartesian product use cross_join()."
+)
+
+
 def filter(
     plan: PlanOrUnbound,
     expression: ExtendedExpressionOrUnbound,
@@ -462,6 +501,7 @@ def filter(
         bound_expression: stee.ExtendedExpression = resolve_expression(
             expression, ns, registry
         )
+        _require_boolean_condition(bound_expression, ns, registry, context="filter")
 
         return _plan_from(
             [bound_plan],
@@ -635,6 +675,9 @@ def join(
         bound_expression: stee.ExtendedExpression = resolve_expression(
             expression, ns, registry
         )
+        _require_boolean_condition(
+            bound_expression, ns, registry, context="join", hint=_JOIN_CONDITION_HINT
+        )
 
         # The output names must match the columns the join type actually emits
         # (semi/anti drop a side, mark appends a boolean).
@@ -729,6 +772,14 @@ def lateral_join(
                 if expression is not None
                 else None
             )
+            if bound_expression is not None:
+                _require_boolean_condition(
+                    bound_expression,
+                    ns,
+                    registry,
+                    context="lateral join",
+                    hint=_JOIN_CONDITION_HINT,
+                )
 
             # Output names/columns follow the same per-join-type shape as a
             # regular join (semi/anti drop the right side, mark appends a boolean).
@@ -1216,6 +1267,13 @@ def nested_loop_join(
             names=list(left_ns.names) + list(right_ns.names),
         )
         bound_expression = resolve_expression(expression, ns, registry)
+        _require_boolean_condition(
+            bound_expression,
+            ns,
+            registry,
+            context="nested loop join",
+            hint=_JOIN_CONDITION_HINT,
+        )
 
         out_names = join_output_names(
             stalg.NestedLoopJoinRel.JoinType.Name(type),

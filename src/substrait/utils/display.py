@@ -654,10 +654,11 @@ class PlanPrinter:
                 # For nested scalar functions, we'll handle them specially in the main printing
                 # Return a placeholder that indicates it needs recursive expansion
                 return "<nested_scalar_function>"
-            elif arg.value.HasField("enum"):
-                return f"enum: {arg.value.enum}"
             else:
                 return "<unknown_function_argument_value>"
+        elif arg.HasField("enum"):
+            # enum is a FunctionArgument field, not an Expression field.
+            return f"enum: {arg.enum}"
         else:
             return "<function_argument>"
 
@@ -704,10 +705,11 @@ class PlanPrinter:
                     stream.write(f"{indent}field: root\n")
             elif arg.value.HasField("scalar_function"):
                 self._stream_scalar_function(arg.value.scalar_function, stream, depth)
-            elif arg.value.HasField("enum"):
-                stream.write(f"{indent}enum: {arg.value.enum}\n")
             else:
                 stream.write(f"{indent}<unknown_function_argument_value>\n")
+        elif arg.HasField("enum"):
+            # enum is a FunctionArgument field, not an Expression field.
+            stream.write(f"{indent}enum: {arg.enum}\n")
         else:
             stream.write(f"{indent}<function_argument>\n")
 

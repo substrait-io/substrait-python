@@ -30,7 +30,9 @@ import substrait.type_pb2 as stp
 
 from substrait.builders import type as _t
 from substrait.builders.extended_expression import (
+    EnumArg,
     UnboundExtendedExpression,
+    _function_signature,
     cast,
     column,
     if_then,
@@ -246,18 +248,14 @@ def _resolve_over_urns(
     winning extension across every candidate URN in one call; ``entry.urn``
     recovers it so ``builder`` can rebuild against the concrete overload.
     """
-    signature = [
-        typ
-        for b in bound
-        for typ in infer_extended_expression_schema(b, registry=registry).types
-    ]
+    signature = _function_signature(bound, registry)
     match = registry.find_function(name, signature, urns)
     if match is not None:
         winning_urn = match[0].urn
         return builder(
             winning_urn, name, expressions=bound, alias=alias, options=options
         )(base_schema, registry)
-    kinds = [t.WhichOneof("kind") for t in signature]
+    kinds = [t if isinstance(t, str) else t.WhichOneof("kind") for t in signature]
     raise Exception(
         f"No matching overload for '{name}' across {urns} with signature {kinds}"
     )
@@ -1005,6 +1003,21 @@ def all_(subquery: Any) -> _SubqueryReduction:
 def col(name: Union[str, int]) -> Expr:
     """Reference an input column by name or index."""
     return Expr(column(name))
+
+
+def enum(value: str) -> EnumArg:
+    """A positional enumeration-argument selection for an ``f.*`` call.
+
+    Some standard functions take an enumeration argument -- a positional operand
+    drawn from a fixed domain (e.g. ``extract``'s ``component``) that serializes
+    as a ``FunctionArgument.enum`` -- distinct from a behavioral option. Pass it
+    positionally, in declared argument order::
+
+        sub.f.extract(sub.enum("YEAR"), sub.col("d"))
+
+    Mirrors substrait-go's ``types.Enum`` and substrait-java's ``EnumArg``.
+    """
+    return EnumArg(value)
 
 
 def outer(name: Union[str, int], steps_out: int = 1) -> Expr:

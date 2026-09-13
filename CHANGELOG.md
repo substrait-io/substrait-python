@@ -1,6 +1,16 @@
 Release Notes
 ---
 
+## [0.32.0](https://github.com/substrait-io/substrait-python/compare/v0.31.0...v0.32.0) (2026-09-13)
+
+### Features
+
+* implement enum function arguments ([#259](https://github.com/substrait-io/substrait-python/issues/259)) ([f45be3a](https://github.com/substrait-io/substrait-python/commit/f45be3acb5b493f7508cec818d32661a6f8fa99f)), closes [#258](https://github.com/substrait-io/substrait-python/issues/258)
+
+### Bug Fixes
+
+* reject non-boolean filter/join conditions at build time ([#271](https://github.com/substrait-io/substrait-python/issues/271)) ([e001537](https://github.com/substrait-io/substrait-python/commit/e001537ed200f46cac43a54b5f24461d673ae382)), closes [#270](https://github.com/substrait-io/substrait-python/issues/270)
+
 ## [0.31.0](https://github.com/substrait-io/substrait-python/compare/v0.30.0...v0.31.0) (2026-08-16)
 
 ### ⚠ BREAKING CHANGES

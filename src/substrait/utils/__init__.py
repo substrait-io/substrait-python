@@ -471,19 +471,21 @@ def _plan_has_steps_out(plan: stplan.Plan) -> bool:
 # against the join *output* (semantically a Filter above the join), the condition
 # and ``residual_expression`` against the *combined* left+right inputs. The join
 # relation's own output equals that combined row for every non-reducing join, but a
-# reducing join (semi/anti) emits a single side -- so a correlation into its
+# reducing join (semi/anti/mark) drops a side -- so a correlation into its
 # condition scope names columns the output drops and has no anchorable relation.
 _JOIN_COMBINED_SCOPED_FIELDS = frozenset({"expression", "residual_expression"})
 
 
 def _is_reducing_join(node) -> bool:
-    """Whether a join relation-variant ``node`` emits only one side (semi/anti), so
+    """Whether a join relation-variant ``node`` drops one side (semi/anti/mark), so
     its output row differs from its combined left+right condition scope."""
     field = node.DESCRIPTOR.fields_by_name.get("type")
     if field is None or field.enum_type is None:
         return False
     name = field.enum_type.values_by_number.get(node.type)
-    return name is not None and ("SEMI" in name.name or "ANTI" in name.name)
+    return name is not None and (
+        "SEMI" in name.name or "ANTI" in name.name or "MARK" in name.name
+    )
 
 
 def to_id_based_outer_references(plan: stplan.Plan) -> stplan.Plan:
@@ -512,7 +514,7 @@ def to_id_based_outer_references(plan: stplan.Plan) -> stplan.Plan:
       output row, so the host is anchored.
     * a join *condition* / ``residual_expression`` exposes the **combined** left+right
       row; the join's own output equals that row for a non-reducing join, so the join
-      is anchored. For a *reducing* join (semi/anti) the two differ and no relation
+      is anchored. For a *reducing* join (semi/anti/mark) the two differ and no relation
       carries that row -- such a reference is left offset-based (still spec-valid, and
       read by inference), rather than mis-anchored.
     * a ``LateralJoinRel``'s ``rel_anchor`` is reserved (per the Substrait spec) for

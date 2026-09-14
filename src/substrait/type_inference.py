@@ -535,14 +535,16 @@ JOIN_MARK_COLUMN_NAME = "mark"
 def _join_column_shape(type_name: str) -> str:
     """Which columns a join emits, by join-type NAME (shared across all join
     relations, whose enum integer values differ): ``left`` / ``right`` only for
-    semi/anti, ``both+mark`` for mark joins, ``both`` otherwise. Single source of
-    truth for both the inferred type list and the RelRoot names."""
+    semi/anti, ``left+mark`` / ``right+mark`` for mark joins, ``both`` otherwise.
+    Single source of truth for the inferred type list and the RelRoot names."""
     if type_name in ("JOIN_TYPE_LEFT_SEMI", "JOIN_TYPE_LEFT_ANTI"):
         return "left"
     if type_name in ("JOIN_TYPE_RIGHT_SEMI", "JOIN_TYPE_RIGHT_ANTI"):
         return "right"
-    if type_name in ("JOIN_TYPE_LEFT_MARK", "JOIN_TYPE_RIGHT_MARK"):
-        return "both+mark"
+    if type_name == "JOIN_TYPE_LEFT_MARK":
+        return "left+mark"
+    if type_name == "JOIN_TYPE_RIGHT_MARK":
+        return "right+mark"
     return "both"  # inner / outer / left / right / single
 
 
@@ -555,8 +557,10 @@ def join_output_names(type_name: str, left_names, right_names) -> list:
         return list(left_names)
     if shape == "right":
         return list(right_names)
-    if shape == "both+mark":
-        return list(left_names) + list(right_names) + [JOIN_MARK_COLUMN_NAME]
+    if shape == "left+mark":
+        return list(left_names) + [JOIN_MARK_COLUMN_NAME]
+    if shape == "right+mark":
+        return list(right_names) + [JOIN_MARK_COLUMN_NAME]
     return list(left_names) + list(right_names)
 
 
@@ -568,22 +572,16 @@ def _join_struct_from_schemas(
     values differ)."""
     required = stt.Type.Nullability.NULLABILITY_REQUIRED
     shape = _join_column_shape(type_name)
-    if shape == "left":
+    if shape in ("left", "left+mark"):
         types = list(left.types)
-    elif shape == "right":
+    elif shape in ("right", "right+mark"):
         types = list(right.types)
-    elif shape == "both+mark":
-        types = (
-            list(left.types)
-            + list(right.types)
-            + [
-                stt.Type(
-                    bool=stt.Type.Boolean(nullability=stt.Type.NULLABILITY_NULLABLE)
-                )
-            ]
-        )
     else:
         types = list(left.types) + list(right.types)
+    if shape in ("left+mark", "right+mark"):
+        types.append(
+            stt.Type(bool=stt.Type.Boolean(nullability=stt.Type.NULLABILITY_NULLABLE))
+        )
     return stt.Type.Struct(types=types, nullability=required)
 
 

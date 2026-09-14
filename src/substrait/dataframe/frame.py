@@ -544,7 +544,8 @@ class DataFrame:
         to ``left_on``. ``how`` accepts the same values as :meth:`join`.
         ``post_filter`` is an optional predicate applied to the join output;
         ``residual`` is an optional non-equi condition evaluated alongside the
-        key equalities. Both bind against the concatenated left+right schema.
+        key equalities. ``post_filter`` binds against the join output schema;
+        ``residual`` binds against the concatenated left+right schema.
         """
         return self._equi_join(
             _plan.hash_join,

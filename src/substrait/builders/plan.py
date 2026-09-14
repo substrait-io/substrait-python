@@ -679,15 +679,15 @@ def join(
             bound_expression, ns, registry, context="join", hint=_JOIN_CONDITION_HINT
         )
 
-        # The output names must match the columns the join type actually emits
-        # (semi/anti drop a side, mark appends a boolean).
+        # Output names use the selected side for semi/anti/mark joins,
+        # with a nullable boolean marker appended for mark joins.
         type_name = stalg.JoinRel.JoinType.Name(type)
         out_names = join_output_names(type_name, left_ns.names, right_ns.names)
 
         # post_join_filter is applied to each output record after
         # join-type-specific output formation (semantically a FilterRel above the
-        # join), so it resolves against the output schema -- which for semi/anti
-        # joins is a single side, not the combined schema.
+        # join), so it resolves against the output schema. Semi/anti joins expose
+        # the selected side; mark joins expose that side plus the marker.
         bound_post = None
         if post_join_filter is not None:
             output_ns = stt.NamedStruct(
@@ -781,16 +781,15 @@ def lateral_join(
                     hint=_JOIN_CONDITION_HINT,
                 )
 
-            # Output names/columns follow the same per-join-type shape as a
-            # regular join (semi/anti drop the right side, mark appends a boolean).
+            # Output names use the selected side for semi/anti/mark joins,
+            # with a nullable boolean marker appended for mark joins.
             type_name = stalg.JoinRel.JoinType.Name(type)
             out_names = join_output_names(type_name, left_ns.names, right_ns.names)
 
             # post_join_filter is applied to each output record after
             # join-type-specific output formation (semantically a FilterRel above
-            # the join), so it resolves against the *output* schema -- which for
-            # semi/anti joins is a single side and for a mark join carries the
-            # appended marker column -- not the combined input row.
+            # the join), so it resolves against the output schema. Semi/anti joins
+            # expose the selected side; mark joins expose that side plus the marker.
             bound_post = None
             if post_join_filter is not None:
                 output_ns = stt.NamedStruct(
@@ -1353,11 +1352,11 @@ def _physical_equi_join(rel_name, rel_cls):
 
             # post_join_filter is applied to each output record after
             # join-type-specific output formation (semantically a FilterRel above
-            # the join), so it resolves against the output schema -- which for
-            # semi/anti joins is a single side. residual_expression is evaluated
-            # on each candidate key-match (both rows present), so it resolves
-            # against the combined left+right schema. Each is built only when the
-            # corresponding predicate is supplied.
+            # the join), so it resolves against the output schema. Semi/anti joins
+            # expose the selected side; mark joins expose that side plus the marker.
+            # residual_expression resolves against the combined left+right schema
+            # because each candidate key-match contains both rows. Each schema is
+            # built only when its corresponding predicate is supplied.
             bound_post = None
             if post_join_filter is not None:
                 output_ns = stt.NamedStruct(

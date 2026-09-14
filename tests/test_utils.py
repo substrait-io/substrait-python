@@ -662,12 +662,21 @@ def test_convert_multi_input_join_condition_anchors_the_join():
     assert ref.rel_reference == 1
 
 
-def test_convert_post_join_filter_anchors_the_join():
+@pytest.mark.parametrize(
+    "join_type",
+    [
+        stalg.JoinRel.JOIN_TYPE_INNER,
+        stalg.JoinRel.JOIN_TYPE_LEFT_MARK,
+        stalg.JoinRel.JOIN_TYPE_RIGHT_MARK,
+    ],
+)
+def test_convert_post_join_filter_anchors_the_join(join_type):
     # A correlation in a join's post_join_filter resolves against the join output,
     # i.e. the join itself -- anchored the same way.
     join = _join(
         _read("l"),
         _read("r"),
+        type=join_type,
         post_join_filter=_exists(_filter(_read("i"), _outer(1))),
     )
     out = to_id_based_outer_references(_plan(join))
@@ -678,15 +687,26 @@ def test_convert_post_join_filter_anchors_the_join():
     assert ref.rel_reference == 1
 
 
-def test_convert_reducing_join_condition_left_as_steps_out():
-    # A reducing join (semi/anti) emits only one side, so its output row differs
-    # from the combined condition scope the reference sees. No relation carries
+@pytest.mark.parametrize(
+    "join_type",
+    [
+        stalg.JoinRel.JOIN_TYPE_LEFT_SEMI,
+        stalg.JoinRel.JOIN_TYPE_RIGHT_SEMI,
+        stalg.JoinRel.JOIN_TYPE_LEFT_ANTI,
+        stalg.JoinRel.JOIN_TYPE_RIGHT_ANTI,
+        stalg.JoinRel.JOIN_TYPE_LEFT_MARK,
+        stalg.JoinRel.JOIN_TYPE_RIGHT_MARK,
+    ],
+)
+def test_convert_reducing_join_condition_left_as_steps_out(join_type):
+    # A semi/anti/mark join emits one side (plus a marker for mark joins), so its
+    # output differs from the combined condition scope. No relation carries
     # that row, so the reference stays offset-based (still spec-valid) rather than
     # being mis-anchored to the join's narrower output.
     join = _join(
         _read("l"),
         _read("r"),
-        type=stalg.JoinRel.JOIN_TYPE_LEFT_SEMI,
+        type=join_type,
         expression=_exists(_filter(_read("i"), _outer(1))),
     )
     out = to_id_based_outer_references(_plan(join))

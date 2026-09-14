@@ -1397,8 +1397,8 @@ def test_lateral_join_post_filter_binds_output_schema():
     lj = plan.relations[-1].root.input.lateral_join
     assert lj.HasField("post_join_filter")
     field = lj.post_join_filter.selection.direct_reference.struct_field.field
-    assert field == 3  # output is [k, v, w, mark]
-    assert list(infer_plan_schema(plan).names) == ["k", "v", "w", "mark"]
+    assert field == 2  # output is [k, v, mark]
+    assert list(infer_plan_schema(plan).names) == ["k", "v", "mark"]
 
 
 def test_correlated_exists_above_lateral_join_stays_steps_out():
@@ -1488,14 +1488,16 @@ def test_semi_join_output_names_match_types():
     assert len(ns.names) == len(ns.struct.types)
 
 
-def test_mark_join_output_names_match_types():
+@pytest.mark.parametrize(
+    "how,names", [("left_mark", ["x", "y", "mark"]), ("right_mark", ["w", "z", "mark"])]
+)
+def test_mark_join_output_names_match_types(how, names):
     from substrait.type_inference import infer_plan_schema
 
     left, right = _ab()
-    plan = left.hash_join(right, "x", "w", how="left_mark").to_plan()
+    plan = left.hash_join(right, "x", "w", how=how).to_plan()
     ns = infer_plan_schema(plan)
-    # left + right + a trailing boolean mark column.
-    assert list(ns.names) == ["x", "y", "w", "z", "mark"]
+    assert list(ns.names) == names
     assert len(ns.names) == len(ns.struct.types)
     assert ns.struct.types[-1].WhichOneof("kind") == "bool"
 

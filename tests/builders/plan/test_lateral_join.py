@@ -97,7 +97,7 @@ def test_lateral_join_left_mark_appends_boolean():
         )(registry)
 
     ns = infer_plan_schema(plan, registry=registry)
-    assert list(ns.names)[-1] == "mark"
+    assert list(ns.names) == ["k", "v", "mark"]
     assert ns.struct.types[-1].WhichOneof("kind") == "bool"
     assert len(ns.names) == len(ns.struct.types)
 
@@ -158,8 +158,7 @@ def test_lateral_join_post_join_filter_binds_output_schema():
     # above the lateral join), so it resolves against the *output* schema, not the
     # combined left+right inputs. For an inner join the output is [k, v, w], so a
     # filter on the right column `w` binds to index 2; for a left-mark join the
-    # output appends a `mark` column absent from the combined inputs, binding to
-    # index 3.
+    # output is [k, v, mark], with the marker at index 2.
     with fresh_rel_anchors():
         inner = lateral_join(
             _left(),
@@ -177,8 +176,8 @@ def test_lateral_join_post_join_filter_binds_output_schema():
             type=stalg.JoinRel.JOIN_TYPE_LEFT_MARK,
             post_join_filter=column("mark"),
         )(registry)
-    assert list(mark.relations[-1].root.names) == ["k", "v", "w", "mark"]
-    assert _post_field(mark) == 3
+    assert list(mark.relations[-1].root.names) == ["k", "v", "mark"]
+    assert _post_field(mark) == 2
     infer_plan_schema(mark, registry=registry)
 
 

@@ -548,6 +548,33 @@ def _join_column_shape(type_name: str) -> str:
     return "both"  # inner / outer / left / right / single
 
 
+def _join_null_padded_sides(type_name: str) -> tuple:
+    """Which inputs a join fills with nulls, by join-type NAME (shared across all
+    join relations, whose enum integer values differ).
+
+    A join that returns a row whose partner is missing fills the other input's
+    columns with nulls, so those columns are nullable in the output even where
+    the input declared them required. Inner joins return only matched pairs, and
+    semi, anti and mark joins return one input's rows unchanged, so those pad
+    nothing."""
+    if type_name in ("JOIN_TYPE_LEFT", "JOIN_TYPE_LEFT_SINGLE"):
+        return ("right",)
+    if type_name in ("JOIN_TYPE_RIGHT", "JOIN_TYPE_RIGHT_SINGLE"):
+        return ("left",)
+    if type_name == "JOIN_TYPE_OUTER":
+        return ("left", "right")
+    return ()
+
+
+def _null_padded_types(struct: stt.Type.Struct, padded: bool) -> list:
+    """``struct``'s field types, made nullable when the join pads that side."""
+    if not padded:
+        return list(struct.types)
+    return [
+        _with_field_nullability(t, stt.Type.NULLABILITY_NULLABLE) for t in struct.types
+    ]
+
+
 def join_output_names(type_name: str, left_names, right_names) -> list:
     """RelRoot output names for a join, matching the columns
     :func:`_join_output_struct` emits so names and inferred types never disagree
@@ -577,7 +604,10 @@ def _join_struct_from_schemas(
     elif shape in ("right", "right+mark"):
         types = list(right.types)
     else:
-        types = list(left.types) + list(right.types)
+        padded = _join_null_padded_sides(type_name)
+        types = _null_padded_types(left, "left" in padded) + _null_padded_types(
+            right, "right" in padded
+        )
     if shape in ("left+mark", "right+mark"):
         types.append(
             stt.Type(bool=stt.Type.Boolean(nullability=stt.Type.NULLABILITY_NULLABLE))

@@ -747,10 +747,11 @@ def infer_rel_schema(rel: stalg.Rel, *, registry=None, subtrees=()) -> stt.Type.
     if rel_type == "read":
         (common, struct) = (rel.read.common, rel.read.base_schema.struct)
         if rel.read.HasField("projection"):
-            # Spec v0.99.0 describes default unwrapping but leaves its
-            # serialization open. Match Java by keeping structs and containers
-            # at every level, regardless of maintain_singular_struct.
-            # Apply the projection before the common emit mapping below.
+            # The mask selects fields. Where the spec would unwrap a
+            # single-field selection, this keeps the struct: at this level a
+            # relation's schema is a struct, and nested levels follow it, so
+            # maintain_singular_struct is never read. The projection runs
+            # before the emit mapping below, which indexes its output.
             struct = _project_read_struct(struct, rel.read.projection.select)
     elif rel_type == "filter":
         (common, struct) = (

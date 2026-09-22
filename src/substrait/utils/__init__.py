@@ -613,7 +613,7 @@ def to_id_based_outer_references(plan: stplan.Plan) -> stplan.Plan:
             single_input = _child_rel(*children[0]) if len(children) == 1 else None
             reducing = single_input is None and _is_reducing_join(node)
             projected_read = rel_type == "read" and (
-                node.HasField("projection")
+                node.projection.HasField("select")
                 or node.common.WhichOneof("emit_kind") == "emit"
             )
             for name, expr in _iter_named_direct_expressions(node):

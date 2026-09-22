@@ -526,10 +526,14 @@ def _outer_refs(plan: stplan.Plan):
 
 
 @pytest.mark.parametrize("filter_field", ["filter", "best_effort_filter"])
-@pytest.mark.parametrize("reshaped", [None, "projection", "emit"])
+@pytest.mark.parametrize("reshaped", [None, "no_select", "projection", "emit"])
 def test_convert_read_filter_uses_unprojected_scope(filter_field, reshaped):
     read = _read("o", ncols=3)
-    if reshaped == "emit":
+    if reshaped == "no_select":
+        # A mask with no select keeps every field, so the read's row is unchanged.
+        read.read.projection.maintain_singular_struct = True
+        reshaped = None
+    elif reshaped == "emit":
         read.read.common.emit.output_mapping.append(0)
     elif reshaped == "projection":
         read.read.projection.CopyFrom(

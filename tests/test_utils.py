@@ -645,7 +645,7 @@ def test_convert_reference_rel_binding_anchors_the_shared_subtree():
 
 
 def test_convert_multi_input_join_condition_anchors_the_join():
-    # A correlation into a (non-reducing) join's condition resolves against the
+    # A correlation into an inner join's condition resolves against the
     # combined left+right row, which equals the join's own output -- so the join
     # relation is anchored and the reference names it.
     join = _join(
@@ -696,13 +696,19 @@ def test_convert_post_join_filter_anchors_the_join(join_type):
         stalg.JoinRel.JOIN_TYPE_RIGHT_ANTI,
         stalg.JoinRel.JOIN_TYPE_LEFT_MARK,
         stalg.JoinRel.JOIN_TYPE_RIGHT_MARK,
+        stalg.JoinRel.JOIN_TYPE_LEFT,
+        stalg.JoinRel.JOIN_TYPE_RIGHT,
+        stalg.JoinRel.JOIN_TYPE_OUTER,
+        stalg.JoinRel.JOIN_TYPE_LEFT_SINGLE,
+        stalg.JoinRel.JOIN_TYPE_RIGHT_SINGLE,
     ],
 )
-def test_convert_reducing_join_condition_left_as_steps_out(join_type):
-    # A semi/anti/mark join emits one side (plus a marker for mark joins), so its
-    # output differs from the combined condition scope. No relation carries
+def test_convert_non_inner_join_condition_left_as_steps_out(join_type):
+    # A semi/anti/mark join emits one side (plus a marker for mark joins), and an
+    # outer, left, right or single join makes its null-padded side nullable, so
+    # the output differs from the combined condition scope. No relation carries
     # that row, so the reference stays offset-based (still spec-valid) rather than
-    # being mis-anchored to the join's narrower output.
+    # being mis-anchored to the join's output.
     join = _join(
         _read("l"),
         _read("r"),
@@ -741,7 +747,7 @@ def test_convert_correlation_above_lateral_join_left_as_steps_out():
     # join's output row. A correlation stacked above the lateral join (into its
     # output) must not reuse that anchor -- doing so would alias the left-row anchor
     # and corrupt any reference beyond the left columns. Such a reference is left
-    # offset-based (still spec-valid), like a reducing join's condition.
+    # offset-based (still spec-valid), like a non-inner join's condition.
     lj = _lateral_join(_read("l", ncols=2), _read("r", ncols=2), rel_anchor=5)
     plan = _plan(_filter(lj, _exists(_filter(_read("i"), _outer(1, field=3)))))
     out = to_id_based_outer_references(plan)

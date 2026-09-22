@@ -1,3 +1,4 @@
+import pytest
 import substrait.algebra_pb2 as stalg
 import substrait.plan_pb2 as stp
 import substrait.type_pb2 as stt
@@ -57,8 +58,8 @@ def test_stringify_fetch_unset_offset_and_count():
     assert "fetch: offset=0, count=all" in out
 
 
-def _projected_read(*fields: int) -> stalg.ReadRel:
-    return stalg.ReadRel(
+def _projected_read(*fields: int, emit=None) -> stalg.ReadRel:
+    read = stalg.ReadRel(
         base_schema=stt.NamedStruct(
             names=["id", "txt", "flag"],
             struct=stt.Type.Struct(
@@ -76,10 +77,26 @@ def _projected_read(*fields: int) -> stalg.ReadRel:
             maintain_singular_struct=True,
         ),
     )
+    if emit is not None:
+        read.common.emit.output_mapping.extend(emit)
+    return read
 
 
-def test_stringify_resolves_names_through_a_read_projection():
-    read = _projected_read(2)
+# The field a filter above the read names as field 0.
+@pytest.mark.parametrize(
+    "mask, emit, name",
+    [
+        ([2], None, "flag"),
+        ([2, 0], [1], "id"),
+        ([2, 0], [0], "flag"),
+        ([1, 2], [1], "flag"),
+        (None, [2], "flag"),
+    ],
+)
+def test_stringify_resolves_names_through_a_read_projection(mask, emit, name):
+    read = _projected_read(*(mask or []), emit=emit)
+    if mask is None:
+        read.ClearField("projection")
     condition = stalg.Expression(
         selection=stalg.Expression.FieldReference(
             direct_reference=stalg.Expression.ReferenceSegment(
@@ -105,22 +122,18 @@ def test_stringify_resolves_names_through_a_read_projection():
 
     out = _printer().stringify_plan(plan)
 
-    assert "field: flag" in out
-    assert "field: id" not in out
+    assert f"field: {name}\n" in out
 
 
-def test_stringify_tolerates_a_read_mask_out_of_range():
+def test_stringify_tolerates_read_indices_out_of_range():
+    read = _projected_read(5, -1, 2, 0, emit=[3, -1, 1])
     plan = stp.Plan(
         relations=[
-            stp.PlanRel(
-                root=stalg.RelRoot(
-                    input=stalg.Rel(read=_projected_read(5, -1, 2)), names=["flag"]
-                )
-            )
+            stp.PlanRel(root=stalg.RelRoot(input=stalg.Rel(read=read), names=["id"]))
         ]
     )
     printer = _printer()
 
     printer.stringify_plan(plan)
 
-    assert printer.schema_names == ["flag"]
+    assert printer.schema_names == ["id"]

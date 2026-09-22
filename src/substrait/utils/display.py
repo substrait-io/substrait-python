@@ -15,22 +15,27 @@ from substrait.utils import type_num_names
 
 
 def _read_output_names(read: stalg.ReadRel) -> list:
-    """The base schema's names in the order the read's projection outputs them.
+    """The base schema's names in the order the read outputs them.
 
-    Each top-level field owns a block of the depth-first names, and a mask
-    selects whole blocks in its order; a child mask does not prune a block.
+    Each top-level field owns a block of the depth-first names. The mask selects
+    whole blocks in its order, then the emit picks among those; a child mask does
+    not prune a block. Indices outside the schema are skipped.
     """
     names = list(read.base_schema.names)
-    if not read.projection.HasField("select"):
+    projected = read.projection.HasField("select")
+    emitted = read.common.WhichOneof("emit_kind") == "emit"
+    if not projected and not emitted:
         return names
     lengths = [type_num_names(t) for t in read.base_schema.struct.types]
     starts = [0, *itertools.accumulate(lengths)]
-    return [
-        name
-        for item in read.projection.select.struct_items
-        if 0 <= item.field < len(lengths)
-        for name in names[starts[item.field] : starts[item.field + 1]]
-    ]
+    blocks = [names[starts[i] : starts[i + 1]] for i in range(len(lengths))]
+    if projected:
+        fields = [item.field for item in read.projection.select.struct_items]
+        blocks = [blocks[i] for i in fields if 0 <= i < len(blocks)]
+    if emitted:
+        mapping = read.common.emit.output_mapping
+        blocks = [blocks[i] for i in mapping if 0 <= i < len(blocks)]
+    return [name for block in blocks for name in block]
 
 
 # ANSI color codes

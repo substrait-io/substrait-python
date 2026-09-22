@@ -103,3 +103,24 @@ def test_column_nested_struct():
         ],
         base_schema=nested_named_struct,
     )
+
+
+def test_column_by_ordinal():
+    # column() takes an index as well as a name, and the index is a top-level field
+    # ordinal -- so the output name is read from the same slice of base_schema.names
+    # that a lookup by name would have landed on.
+    assert column(1)(named_struct, None) == column("description")(named_struct, None)
+
+
+def test_column_by_ordinal_over_a_nested_struct():
+    # A struct field consumes several entries of base_schema.names (its own plus one
+    # per member), so the ordinal indexes top-level fields while the output names come
+    # from the flattened list: field 1 is shop_details, carrying its two members.
+    by_ordinal = column(1)(nested_named_struct, None)
+
+    assert by_ordinal == column("shop_details")(nested_named_struct, None)
+    assert list(by_ordinal.referred_expr[0].output_names) == [
+        "shop_details",
+        "shop_id",
+        "shop_total",
+    ]

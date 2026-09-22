@@ -899,3 +899,88 @@ def test_infer_rel_reference_anchor_zero_is_a_distinct_anchor():
         + [stt.Type(fp32=stt.Type.FP32(nullability=stt.Type.NULLABILITY_NULLABLE))]
     )
     assert infer_plan_schema(plan).struct == expected
+
+
+def test_anchor_index_is_built_only_when_a_rel_reference_needs_it(monkeypatch):
+    # Indexing rel_anchors walks every relation *and* every expression of the plan to
+    # reach the relations embedded in subqueries, so it is whole-plan work on every
+    # call. Plans carrying an id-based OuterReference are the exception, and the
+    # builders re-infer their input's schema at every level, so the index is built on
+    # demand rather than for every inference.
+    import substrait.type_inference as type_inference
+
+    iter_plan_rels = type_inference.iter_plan_rels
+    indexed = []
+
+    def counting_iter_plan_rels(plan):
+        indexed.append(plan)
+        return iter_plan_rels(plan)
+
+    monkeypatch.setattr(type_inference, "iter_plan_rels", counting_iter_plan_rels)
+
+    plain = stp.Plan(
+        relations=[stp.PlanRel(root=stalg.RelRoot(input=read_rel, names=["a"]))]
+    )
+    assert infer_plan_schema(plain).struct == struct
+    assert indexed == []
+
+    # A rel_reference does need it, and still gets it.
+    anchored = stalg.Rel(
+        read=stalg.ReadRel(
+            base_schema=named_struct,
+            common=stalg.RelCommon(rel_anchor=7),
+            named_table=stalg.ReadRel.NamedTable(names=["shared"]),
+        )
+    )
+    correlated = stp.Plan(
+        relations=[
+            stp.PlanRel(rel=anchored),
+            stp.PlanRel(
+                root=stalg.RelRoot(
+                    input=stalg.Rel(
+                        project=stalg.ProjectRel(
+                            input=right_read_rel,
+                            expressions=[_outer_ref(2, rel_reference=7)],
+                        )
+                    ),
+                    names=["a", "b", "c"],
+                )
+            ),
+        ]
+    )
+    assert len(infer_plan_schema(correlated).struct.types) == 3
+    assert len(indexed) == 1
+
+
+# The relations that emit their input's rows unchanged. Their schema is their input's,
+# so they are worth pinning together: the builders reach them only when a further verb
+# resolves the schema above one, which no test happened to do for sort.
+PASS_THROUGH_RELS = {
+    "filter": stalg.Rel(filter=stalg.FilterRel(input=read_rel)),
+    "fetch": stalg.Rel(fetch=stalg.FetchRel(input=read_rel)),
+    # Bare of sort fields, like the fetch/top_n entries are of counts: a pass-through
+    # relation's schema comes from its input and its own emit, and inference reads
+    # neither the sorts nor the counts.
+    "sort": stalg.Rel(sort=stalg.SortRel(input=read_rel)),
+    "exchange": stalg.Rel(exchange=stalg.ExchangeRel(input=read_rel)),
+    "top_n": stalg.Rel(top_n=stalg.TopNRel(input=read_rel)),
+}
+
+
+@pytest.mark.parametrize("rel", PASS_THROUGH_RELS.values(), ids=PASS_THROUGH_RELS)
+def test_inference_pass_through_rels_keep_the_input_schema(rel):
+    assert infer_rel_schema(rel) == struct
+
+
+@pytest.mark.parametrize("rel", PASS_THROUGH_RELS.values(), ids=PASS_THROUGH_RELS)
+def test_inference_pass_through_rels_apply_emit(rel):
+    # A pass-through relation still projects through its own emit, so the schema it
+    # reports is not unconditionally its input's.
+    emitted = stalg.Rel()
+    emitted.CopyFrom(rel)
+    node = getattr(emitted, emitted.WhichOneof("rel_type"))
+    node.common.emit.output_mapping.extend([2, 0])
+
+    assert infer_rel_schema(emitted) == stt.Type.Struct(
+        types=[struct.types[2], struct.types[0]], nullability=struct.nullability
+    )

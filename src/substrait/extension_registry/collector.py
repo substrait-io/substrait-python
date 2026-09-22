@@ -28,6 +28,8 @@ import substrait.extended_expression_pb2 as stee
 import substrait.extensions.extensions_pb2 as ste
 import substrait.plan_pb2 as stplan
 
+from substrait.type_inference import schema_memo_scope
+
 # Identity of a function as declared in a plan: (extension URN, function name).
 # The name is the compound form carried by SimpleExtensionDeclaration (e.g.
 # "add:i64_i64"), which is what makes an identity resolvable without the catalog.
@@ -217,6 +219,12 @@ def build_scope():
     extensions onto its output. Nested resolvers get the same collector and write
     nothing, which is what lets a build accumulate extensions once instead of
     re-merging them at every level.
+
+    The outermost resolver also opens the build's schema memo
+    (:func:`substrait.type_inference.schema_memo_scope`), which spares the builders
+    the matching re-derivation on the schema side: both are state derived from the
+    plan being assembled and meaningless once it is finished, so both live and die
+    with this scope.
     """
     collector = _collector.get()
     if collector is not None:
@@ -225,7 +233,8 @@ def build_scope():
     collector = ExtensionCollector()
     token = _collector.set(collector)
     try:
-        yield collector, True
+        with schema_memo_scope():
+            yield collector, True
     finally:
         _collector.reset(token)
 

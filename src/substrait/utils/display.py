@@ -5,9 +5,31 @@ This module provides a concise pretty printer for Substrait plans and expression
 in a readable format using indentation, -> characters, and colors.
 """
 
+import itertools
+
 import substrait.algebra_pb2 as stalg
 import substrait.plan_pb2 as stp
 import substrait.type_pb2 as stt
+
+from substrait.utils import type_num_names
+
+
+def _read_output_names(read: stalg.ReadRel) -> list:
+    """The base schema's names in the order the read's projection outputs them.
+
+    Each top-level field owns a block of the depth-first names, and a mask
+    selects whole blocks in its order; a child mask does not prune a block.
+    """
+    names = list(read.base_schema.names)
+    if not read.projection.HasField("select"):
+        return names
+    lengths = [type_num_names(t) for t in read.base_schema.struct.types]
+    starts = [0, *itertools.accumulate(lengths)]
+    return [
+        name
+        for item in read.projection.select.struct_items
+        for name in names[starts[item.field] : starts[item.field + 1]]
+    ]
 
 
 # ANSI color codes
@@ -202,7 +224,7 @@ class PlanPrinter:
 
         if read.HasField("base_schema"):
             # Capture schema names for field resolution
-            self.schema_names = list(read.base_schema.names)
+            self.schema_names = _read_output_names(read)
             if self.show_metadata:
                 stream.write(
                     f"{self._get_indent_with_arrow(depth + 1)}{self._color('schema:', Colors.BLUE)} {self._color(self.schema_names, Colors.YELLOW)}\n"

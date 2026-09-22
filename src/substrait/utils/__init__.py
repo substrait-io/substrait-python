@@ -475,6 +475,10 @@ def _plan_has_steps_out(plan: stplan.Plan) -> bool:
 # condition scope names columns the output drops and has no anchorable relation.
 _JOIN_COMBINED_SCOPED_FIELDS = frozenset({"expression", "residual_expression"})
 
+# A read's filters bind against its base schema, before the projection and the
+# emit that reshape its output row.
+_READ_FILTER_FIELDS = frozenset({"filter", "best_effort_filter"})
+
 
 def _is_reducing_join(node) -> bool:
     """Whether a join relation-variant ``node`` emits only one side (semi/anti), so
@@ -621,7 +625,7 @@ def to_id_based_outer_references(plan: stplan.Plan) -> stplan.Plan:
                     binding = single_input
                 elif reducing and name in _JOIN_COMBINED_SCOPED_FIELDS:
                     binding = None
-                elif projected_read and name in ("filter", "best_effort_filter"):
+                elif projected_read and name in _READ_FILTER_FIELDS:
                     binding = None
                 else:
                     binding = rel

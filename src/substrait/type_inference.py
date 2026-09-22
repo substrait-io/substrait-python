@@ -687,7 +687,11 @@ def _set_output_struct(op_name: str, inputs: list) -> stt.Type.Struct:
 def _project_read_struct(
     struct: stt.Type.Struct, select: stalg.Expression.MaskExpression.StructSelect
 ) -> stt.Type.Struct:
-    """Project fields in mask order, matching Java and keeping struct metadata."""
+    """Project fields in mask order, as substrait-java does.
+
+    The result keeps the struct's nullability but not its type variation, which
+    describes the unprojected row's layout.
+    """
     fields = []
     for item in select.struct_items:
         if not 0 <= item.field < len(struct.types):
@@ -699,11 +703,7 @@ def _project_read_struct(
         if item.HasField("child"):
             field = _project_read_type(field, item.child)
         fields.append(field)
-    result = stt.Type.Struct()
-    result.CopyFrom(struct)
-    del result.types[:]
-    result.types.extend(fields)
-    return result
+    return stt.Type.Struct(types=fields, nullability=struct.nullability)
 
 
 def _project_read_type(
@@ -722,8 +722,10 @@ def _project_read_type(
     if kind == "struct":
         result.struct.CopyFrom(_project_read_struct(field.struct, select.struct))
     else:
-        # List positions and map keys filter values without changing their type.
-        # Child masks project the list element or map value, retaining the wrapper.
+        # The spec leaves this open: it unwraps a single-element list selection by
+        # default and says nothing of map keys. As substrait-java and the validator
+        # do, a list or map selection keeps the wrapper and its type, and a child
+        # mask projects the element or the value.
         selection = getattr(select, kind)
         if selection.HasField("child"):
             member = "type" if kind == "list" else "value"

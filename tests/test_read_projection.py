@@ -49,9 +49,8 @@ def test_read_projection_selects_fields_in_mask_order(fields):
     rel = _read(schema, _select(*fields), names=["id", "text", "flag"])
     before = rel.SerializeToString()
 
-    assert infer_rel_schema(rel) == _struct(
-        *(schema.types[i] for i in fields), variation=7
-    )
+    # The variation describes the unprojected row, so the projection drops it.
+    assert infer_rel_schema(rel) == _struct(*(schema.types[i] for i in fields))
     assert rel.SerializeToString() == before
 
 
@@ -128,7 +127,6 @@ def test_read_projection_keeps_nested_structure_and_root_names():
                     boolean(nullable=False),
                     i64(nullable=False),
                     nullable=NULL,
-                    variation=8,
                 )
             ),
             i32(),
@@ -161,7 +159,7 @@ def test_read_projection_prunes_collection_children(kind):
         )
         expected = stt.Type(
             list=stt.Type.List(
-                type=stt.Type(struct=_struct(string(), nullable=NULL, variation=9)),
+                type=stt.Type(struct=_struct(string(), nullable=NULL)),
                 nullability=NULL,
                 type_variation_reference=10,
             )
@@ -181,7 +179,7 @@ def test_read_projection_prunes_collection_children(kind):
         expected = stt.Type(
             map=stt.Type.Map(
                 key=string(nullable=False),
-                value=stt.Type(struct=_struct(string(), nullable=NULL, variation=9)),
+                value=stt.Type(struct=_struct(string(), nullable=NULL)),
                 nullability=NULL,
                 type_variation_reference=10,
             )

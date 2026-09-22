@@ -526,10 +526,12 @@ def _outer_refs(plan: stplan.Plan):
 
 
 @pytest.mark.parametrize("filter_field", ["filter", "best_effort_filter"])
-@pytest.mark.parametrize("projected", [False, True])
-def test_convert_read_filter_uses_unprojected_scope(filter_field, projected):
+@pytest.mark.parametrize("reshaped", [None, "projection", "emit"])
+def test_convert_read_filter_uses_unprojected_scope(filter_field, reshaped):
     read = _read("o", ncols=3)
-    if projected:
+    if reshaped == "emit":
+        read.read.common.emit.output_mapping.append(0)
+    elif reshaped == "projection":
         read.read.projection.CopyFrom(
             stalg.Expression.MaskExpression(
                 select=stalg.Expression.MaskExpression.StructSelect(
@@ -549,7 +551,7 @@ def test_convert_read_filter_uses_unprojected_scope(filter_field, projected):
         out_read.read, filter_field
     ).subquery.set_predicate.tuples.filter.condition.selection
     assert ref.direct_reference.struct_field.field == 2
-    if projected:
+    if reshaped:
         assert rel_anchor_of(out_read) is None
         assert ref.outer_reference.WhichOneof("outer_reference_type") == "steps_out"
         assert ref.outer_reference.steps_out == 1

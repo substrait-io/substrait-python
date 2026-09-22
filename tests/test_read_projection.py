@@ -60,6 +60,13 @@ def test_read_without_projection_keeps_the_schema():
     assert infer_rel_schema(_read(schema)) == schema
 
 
+def test_read_projection_without_select_keeps_the_schema():
+    schema = _struct(i64(nullable=False), string(), variation=7)
+    rel = _read(schema)
+    rel.read.projection.maintain_singular_struct = True
+    assert infer_rel_schema(rel) == schema
+
+
 @pytest.mark.parametrize("maintain", [False, True])
 def test_single_field_read_projection_preserves_the_row_struct(maintain):
     rel = _read(_struct(i64(), string(), boolean(nullable=False)), _select(2))

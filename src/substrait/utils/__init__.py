@@ -607,11 +607,15 @@ def to_id_based_outer_references(plan: stplan.Plan) -> stplan.Plan:
         if node is not None:
             # The relation whose output row a subquery here would see one level up:
             # a single-input host exposes its input; a leaf or multi-input host its
-            # own output. Join conditions and projected read filters may use a
-            # different row with no relation to anchor (binding None -> left as-is).
+            # own output. Join conditions and the filters of a projected or
+            # emitting read may use a different row with no relation to anchor
+            # (binding None -> left as-is).
             single_input = _child_rel(*children[0]) if len(children) == 1 else None
             reducing = single_input is None and _is_reducing_join(node)
-            projected_read = rel_type == "read" and node.HasField("projection")
+            projected_read = rel_type == "read" and (
+                node.HasField("projection")
+                or node.common.WhichOneof("emit_kind") == "emit"
+            )
             for name, expr in _iter_named_direct_expressions(node):
                 if single_input is not None:
                     binding = single_input

@@ -746,7 +746,7 @@ def infer_rel_schema(rel: stalg.Rel, *, registry=None, subtrees=()) -> stt.Type.
 
     if rel_type == "read":
         (common, struct) = (rel.read.common, rel.read.base_schema.struct)
-        if rel.read.HasField("projection"):
+        if rel.read.projection.HasField("select"):
             # The mask selects fields. Where the spec would unwrap a
             # single-field selection, this keeps the struct: at this level a
             # relation's schema is a struct, and nested levels follow it, so

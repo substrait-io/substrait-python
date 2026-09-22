@@ -48,7 +48,14 @@ class FunctionEntry:
     def __repr__(self) -> str:
         return f"{self.name}:{'_'.join(self.normalized_inputs)}"
 
-    def satisfies_signature(self, signature: tuple | list) -> Optional[str]:
+    def satisfies_signature(self, signature: tuple | list) -> Optional[Type]:
+        """Match ``signature`` against this overload, returning its output type.
+
+        ``signature`` interleaves value-operand ``Type``\\ s with enumeration
+        selections as plain string tokens, in declared argument order (an enum
+        argument's token must be a member of the overload's option domain).
+        Returns the derived output ``Type`` on a match, or ``None`` otherwise.
+        """
         if self.impl.variadic:
             min_args_allowed = self.impl.variadic.min or 0
             if len(signature) < min_args_allowed:
@@ -61,6 +68,10 @@ class FunctionEntry:
         zipped_args = list(zip(inputs, signature))
         parameters = {}
         for x, y in zipped_args:
+            if isinstance(x, list) != isinstance(y, str):
+                # An enumeration slot (domain list) accepts only a selection token,
+                # and a value slot only a Type -- reject either kind in the other.
+                return None
             if isinstance(y, str):
                 if y not in x:
                     return None
@@ -73,7 +84,10 @@ class FunctionEntry:
                     == se.NullabilityHandling.DISCRETE,
                 ):
                     return None
-        output_type = evaluate(self.impl.return_, parameters)
+        try:
+            output_type = evaluate(self.impl.return_, parameters)
+        except Exception:
+            return None  # return type cannot be derived for these arguments
         if self.nullability == se.NullabilityHandling.MIRROR and isinstance(
             output_type, Type
         ):

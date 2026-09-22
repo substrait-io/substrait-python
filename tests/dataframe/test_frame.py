@@ -184,6 +184,16 @@ def test_join_unknown_type_raises():
         left.join(right, on=sub.col("x") == sub.col("x"), how="banana")
 
 
+def test_join_on_bare_column_name_raises():
+    # `on` is a boolean match predicate, not a key name. The pandas `on="key"`
+    # idiom binds to a bare (non-boolean) column reference, which would silently
+    # build a Cartesian product; it is rejected at build time instead.
+    left = sub.read_named_table("customers", {"cust_id": sub.i64, "name": sub.string})
+    right = sub.read_named_table("orders", {"order_id": sub.i64, "cust_ref": sub.i64})
+    with pytest.raises(ValueError, match="boolean predicate"):
+        left.join(right, on="cust_id", how="inner").to_plan()
+
+
 @pytest.mark.parametrize("how, join_type", sorted(_JOIN_TYPES.items()))
 def test_join_all_types_match_builder(how, join_type):
     left_ns = named_struct(
@@ -1387,8 +1397,8 @@ def test_lateral_join_post_filter_binds_output_schema():
     lj = plan.relations[-1].root.input.lateral_join
     assert lj.HasField("post_join_filter")
     field = lj.post_join_filter.selection.direct_reference.struct_field.field
-    assert field == 3  # output is [k, v, w, mark]
-    assert list(infer_plan_schema(plan).names) == ["k", "v", "w", "mark"]
+    assert field == 2  # output is [k, v, mark]
+    assert list(infer_plan_schema(plan).names) == ["k", "v", "mark"]
 
 
 def test_correlated_exists_above_lateral_join_stays_steps_out():
@@ -1478,14 +1488,16 @@ def test_semi_join_output_names_match_types():
     assert len(ns.names) == len(ns.struct.types)
 
 
-def test_mark_join_output_names_match_types():
+@pytest.mark.parametrize(
+    "how,names", [("left_mark", ["x", "y", "mark"]), ("right_mark", ["w", "z", "mark"])]
+)
+def test_mark_join_output_names_match_types(how, names):
     from substrait.type_inference import infer_plan_schema
 
     left, right = _ab()
-    plan = left.hash_join(right, "x", "w", how="left_mark").to_plan()
+    plan = left.hash_join(right, "x", "w", how=how).to_plan()
     ns = infer_plan_schema(plan)
-    # left + right + a trailing boolean mark column.
-    assert list(ns.names) == ["x", "y", "w", "z", "mark"]
+    assert list(ns.names) == names
     assert len(ns.names) == len(ns.struct.types)
     assert ns.struct.types[-1].WhichOneof("kind") == "bool"
 

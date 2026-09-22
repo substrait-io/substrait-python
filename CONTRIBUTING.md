@@ -2,12 +2,17 @@
 
 This page provides some orientation and recommendations on how to get the best results when engaging with the community.
 
-1. [The specification is the source of truth](#the-specification-is-the-source-of-truth)
-2. [Getting started](#getting-started)
-3. [Lint & format](#lint--format)
-4. [Testing](#testing)
-5. [Commit conventions](#commit-conventions)
-6. [Pull requests](#pull-requests)
+1. [Contributor License Agreement](#contributor-license-agreement)
+2. [The specification is the source of truth](#the-specification-is-the-source-of-truth)
+3. [Getting started](#getting-started)
+4. [Lint & format](#lint--format)
+5. [Testing](#testing)
+6. [Commit conventions](#commit-conventions)
+7. [Pull requests](#pull-requests)
+
+## Contributor License Agreement
+
+Substrait requires all contributors to sign the [Contributor License Agreement (CLA)](https://cla-assistant.io/substrait-io/substrait) before their contributions can be merged. A GitHub app checks this on every pull request and guides new contributors through signing it.
 
 ## The specification is the source of truth
 

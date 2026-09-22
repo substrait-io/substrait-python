@@ -1,6 +1,47 @@
 Release Notes
 ---
 
+## [0.33.0](https://github.com/substrait-io/substrait-python/compare/v0.32.0...v0.33.0) (2026-09-20)
+
+### ⚠ BREAKING CHANGES
+
+* Mark joins no longer expose columns from the other
+input. Output field indices change, and post-join filters must use only
+the selected input and the marker.
+
+### Bug Fixes
+
+* derive mark join output from the selected input ([#265](https://github.com/substrait-io/substrait-python/issues/265)) ([45c8ca7](https://github.com/substrait-io/substrait-python/commit/45c8ca7d14f90b687e54e053751779409def9ee1)), closes [#263](https://github.com/substrait-io/substrait-python/issues/263)
+
+## [0.32.0](https://github.com/substrait-io/substrait-python/compare/v0.31.0...v0.32.0) (2026-09-13)
+
+### Features
+
+* implement enum function arguments ([#259](https://github.com/substrait-io/substrait-python/issues/259)) ([f45be3a](https://github.com/substrait-io/substrait-python/commit/f45be3acb5b493f7508cec818d32661a6f8fa99f)), closes [#258](https://github.com/substrait-io/substrait-python/issues/258)
+
+### Bug Fixes
+
+* reject non-boolean filter/join conditions at build time ([#271](https://github.com/substrait-io/substrait-python/issues/271)) ([e001537](https://github.com/substrait-io/substrait-python/commit/e001537ed200f46cac43a54b5f24461d673ae382)), closes [#270](https://github.com/substrait-io/substrait-python/issues/270)
+
+## [0.31.0](https://github.com/substrait-io/substrait-python/compare/v0.30.0...v0.31.0) (2026-08-16)
+
+### ⚠ BREAKING CHANGES
+
+* emitted extension anchors are numbered per plan, so
+plans compared byte-for-byte against output from an earlier release will
+differ. Anchors are plan-local by spec, so plan semantics are
+unaffected. `ExtensionRegistry.lookup_urn` and `FunctionEntry.anchor`
+are removed; use `has_urn()` / `urns()` for URN membership, and
+`(entry.urn, str(entry))` as a function's durable identity.
+`ExtensionCollector.adopt` raises on an input declaring two different
+functions at one anchor, and `aggregate` raises on a measure that is not
+an aggregate function; both previously produced a plan with an ambiguous
+or dangling function reference.
+
+### Features
+
+* assign extension anchors per plan, not per registry ([#245](https://github.com/substrait-io/substrait-python/issues/245)) ([4834cae](https://github.com/substrait-io/substrait-python/commit/4834cae77acf248330faae6cef2f8de2d8d58156))
+
 ## [0.30.0](https://github.com/substrait-io/substrait-python/compare/v0.29.0...v0.30.0) (2026-07-29)
 
 ### ⚠ BREAKING CHANGES

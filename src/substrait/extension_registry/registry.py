@@ -117,7 +117,11 @@ class ExtensionRegistry:
         signature: tuple[Type] | list[Type],
         urns: list[str] | None = None,
     ) -> list[tuple[FunctionEntry, Type]]:
-        """Helper method to find matching functions across specified URNs."""
+        """Helper method to find matching functions across specified URNs.
+
+        ``signature`` interleaves value-operand ``Type``\\ s with enumeration
+        selections as plain string tokens, in declared argument order.
+        """
         matches = []
         urns_to_search = (
             urns if urns is not None else list(self._function_mapping.keys())
@@ -147,13 +151,18 @@ class ExtensionRegistry:
         return matches[0] if matches else None
 
     def list_functions(
-        self, urn: str, function_name: str, signature: tuple[Type] | list[Type]
+        self,
+        urn: str,
+        function_name: str,
+        signature: tuple[Type] | list[Type],
     ) -> list[tuple[FunctionEntry, Type]]:
         """List all matching functions within a specific URN."""
         return self._find_matching_functions(function_name, signature, [urn])
 
     def list_functions_across_urns(
-        self, function_name: str, signature: tuple[Type] | list[Type]
+        self,
+        function_name: str,
+        signature: tuple[Type] | list[Type],
     ) -> list[tuple[FunctionEntry, Type]]:
         """List all matching functions across all URNs."""
         return self._find_matching_functions(function_name, signature)

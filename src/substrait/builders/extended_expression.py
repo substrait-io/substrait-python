@@ -58,6 +58,30 @@ UnboundExtendedExpression = Callable[
 ExtendedExpressionOrUnbound = Union[stee.ExtendedExpression, UnboundExtendedExpression]
 
 
+class EnumArg:
+    """A positional enumeration-argument selection (e.g. ``extract``'s component).
+
+    Substrait models an enumeration argument as a positional member of a
+    function's argument list -- interleaved with value operands in declared
+    order -- that serializes as ``FunctionArgument.enum`` (not as a behavioral
+    ``FunctionOption``). Its valid domain is defined per overload by the
+    extension YAML and only checked at resolve time, so the selection is carried
+    as a plain string token, mirroring substrait-go's ``types.Enum`` and
+    substrait-java's ``EnumArg``. Pass one positionally into an ``f.*`` call via
+    :func:`substrait.dataframe.enum`.
+    """
+
+    __slots__ = ("value",)
+
+    def __init__(self, value: str) -> None:
+        if not isinstance(value, str):
+            raise ValueError(f"enum() takes a selection string, got {value!r}")
+        self.value = value
+
+    def __repr__(self) -> str:
+        return f"enum({self.value!r})"
+
+
 def _alias_or_inferred(
     alias: Union[Iterable[str], str, None],
     op: str,
@@ -81,6 +105,48 @@ def _function_options(options):
         prefs = [preference] if isinstance(preference, str) else list(preference)
         result.append(stalg.FunctionOption(name=name, preference=prefs))
     return result
+
+
+def _function_signature(bound_expressions, registry):
+    """The flattened match signature for a call's positional arguments.
+
+    Enumeration arguments (:class:`EnumArg`) contribute their selection *string
+    token* -- which the registry matches against the overload's domain -- while
+    value operands contribute their inferred Substrait ``Type``\\ s, interleaved
+    in call order. This mixed sequence of tokens and types is what
+    :meth:`FunctionEntry.satisfies_signature` expects.
+    """
+    signature: list = []
+    for b in bound_expressions:
+        if isinstance(b, EnumArg):
+            signature.append(b.value)
+        else:
+            signature.extend(
+                infer_extended_expression_schema(b, registry=registry).types
+            )
+    return signature
+
+
+def _function_arguments(bound_expressions):
+    """Build FunctionArguments from a call's positional arguments, in call order.
+
+    An :class:`EnumArg` becomes a ``FunctionArgument.enum`` carrying its selection
+    token; every other operand becomes a ``FunctionArgument.value``. Returns
+    ``(arguments, names)`` where ``names`` are the per-argument labels used to
+    infer an output column name.
+    """
+    arguments = []
+    names = []
+    for b in bound_expressions:
+        if isinstance(b, EnumArg):
+            arguments.append(stalg.FunctionArgument(enum=b.value))
+            names.append(b.value)
+        else:
+            arguments.append(
+                stalg.FunctionArgument(value=b.referred_expr[0].expression)
+            )
+            names.append(b.referred_expr[0].output_names[0])
+    return arguments, names
 
 
 def resolve_expression(
@@ -571,15 +637,13 @@ def scalar_function(
         base_schema: stp.NamedStruct, registry: ExtensionRegistry
     ) -> stee.ExtendedExpression:
         bound_expressions = [
-            resolve_expression(e, base_schema, registry) for e in expressions
+            e
+            if isinstance(e, EnumArg)
+            else resolve_expression(e, base_schema, registry)
+            for e in expressions
         ]
 
-        expression_schemas = [
-            infer_extended_expression_schema(b, registry=registry)
-            for b in bound_expressions
-        ]
-
-        signature = [typ for es in expression_schemas for typ in es.types]
+        signature = _function_signature(bound_expressions, registry)
 
         func = registry.lookup_function(urn, function, signature)
 
@@ -588,27 +652,20 @@ def scalar_function(
 
         func_ref = function_reference(urn, str(func[0]))
 
+        arguments, arg_names = _function_arguments(bound_expressions)
+
         return stee.ExtendedExpression(
             referred_expr=[
                 stee.ExpressionReference(
                     expression=stalg.Expression(
                         scalar_function=stalg.Expression.ScalarFunction(
                             function_reference=func_ref,
-                            arguments=[
-                                stalg.FunctionArgument(
-                                    value=e.referred_expr[0].expression
-                                )
-                                for e in bound_expressions
-                            ],
+                            arguments=arguments,
                             options=_function_options(options),
                             output_type=func[1],
                         )
                     ),
-                    output_names=_alias_or_inferred(
-                        alias,
-                        function,
-                        [e.referred_expr[0].output_names[0] for e in bound_expressions],
-                    ),
+                    output_names=_alias_or_inferred(alias, function, arg_names),
                 )
             ],
             base_schema=base_schema,
@@ -640,19 +697,17 @@ def aggregate_function(
         base_schema: stp.NamedStruct, registry: ExtensionRegistry
     ) -> stee.ExtendedExpression:
         bound_expressions: Iterable[stee.ExtendedExpression] = [
-            resolve_expression(e, base_schema, registry) for e in expressions
+            e
+            if isinstance(e, EnumArg)
+            else resolve_expression(e, base_schema, registry)
+            for e in expressions
         ]
         bound_sorts = [
             (resolve_expression(e, base_schema, registry), direction)
             for e, direction in sorts
         ]
 
-        expression_schemas = [
-            infer_extended_expression_schema(b, registry=registry)
-            for b in bound_expressions
-        ]
-
-        signature = [typ for es in expression_schemas for typ in es.types]
+        signature = _function_signature(bound_expressions, registry)
 
         func = registry.lookup_function(urn, function, signature)
 
@@ -661,15 +716,14 @@ def aggregate_function(
 
         func_ref = function_reference(urn, str(func[0]))
 
+        arguments, arg_names = _function_arguments(bound_expressions)
+
         return stee.ExtendedExpression(
             referred_expr=[
                 stee.ExpressionReference(
                     measure=stalg.AggregateFunction(
                         function_reference=func_ref,
-                        arguments=[
-                            stalg.FunctionArgument(value=e.referred_expr[0].expression)
-                            for e in bound_expressions
-                        ],
+                        arguments=arguments,
                         options=_function_options(options),
                         output_type=func[1],
                         invocation=invocation
@@ -682,11 +736,7 @@ def aggregate_function(
                             for s, direction in bound_sorts
                         ],
                     ),
-                    output_names=_alias_or_inferred(
-                        alias,
-                        "IfThen",
-                        [e.referred_expr[0].output_names[0] for e in bound_expressions],
-                    ),
+                    output_names=_alias_or_inferred(alias, "IfThen", arg_names),
                 )
             ],
             base_schema=base_schema,
@@ -710,19 +760,17 @@ def window_function(
         base_schema: stp.NamedStruct, registry: ExtensionRegistry
     ) -> stee.ExtendedExpression:
         bound_expressions: Iterable[stee.ExtendedExpression] = [
-            resolve_expression(e, base_schema, registry) for e in expressions
+            e
+            if isinstance(e, EnumArg)
+            else resolve_expression(e, base_schema, registry)
+            for e in expressions
         ]
 
         bound_partitions = [
             resolve_expression(e, base_schema, registry) for e in partitions
         ]
 
-        expression_schemas = [
-            infer_extended_expression_schema(b, registry=registry)
-            for b in bound_expressions
-        ]
-
-        signature = [typ for es in expression_schemas for typ in es.types]
+        signature = _function_signature(bound_expressions, registry)
 
         func = registry.lookup_function(urn, function, signature)
 
@@ -731,18 +779,15 @@ def window_function(
 
         func_ref = function_reference(urn, str(func[0]))
 
+        arguments, arg_names = _function_arguments(bound_expressions)
+
         return stee.ExtendedExpression(
             referred_expr=[
                 stee.ExpressionReference(
                     expression=stalg.Expression(
                         window_function=stalg.Expression.WindowFunction(
                             function_reference=func_ref,
-                            arguments=[
-                                stalg.FunctionArgument(
-                                    value=e.referred_expr[0].expression
-                                )
-                                for e in bound_expressions
-                            ],
+                            arguments=arguments,
                             options=_function_options(options),
                             output_type=func[1],
                             partitions=[
@@ -750,11 +795,7 @@ def window_function(
                             ],
                         )
                     ),
-                    output_names=_alias_or_inferred(
-                        alias,
-                        function,
-                        [e.referred_expr[0].output_names[0] for e in bound_expressions],
-                    ),
+                    output_names=_alias_or_inferred(alias, function, arg_names),
                 )
             ],
             base_schema=base_schema,

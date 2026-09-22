@@ -28,6 +28,7 @@ from substrait.extension_registry import (
 from substrait.type_inference import (
     _join_struct_from_schemas,
     _outer_anchor_binding,
+    infer_expression_type,
     infer_plan_schema,
     join_output_names,
     remember_rel_output_schema,
@@ -496,6 +497,44 @@ def select(
     return build_scoped(resolve)
 
 
+def _require_boolean_condition(
+    bound_expression: stee.ExtendedExpression,
+    schema: stt.NamedStruct,
+    registry: ExtensionRegistry,
+    *,
+    context: str,
+    hint: str = "",
+) -> None:
+    """Reject a ``filter``/join condition that does not infer to ``boolean``.
+
+    Substrait requires a ``FilterRel``/``JoinRel`` condition to be a boolean
+    predicate, but ``resolve_expression`` will happily bind any expression --
+    including a bare column reference. Such a condition builds a legit-looking
+    plan that behaves very differently at execution (a non-boolean join
+    condition degrades to a Cartesian product), so we catch it at build time.
+
+    ``context`` names the relation for the message; ``hint`` adds a caller-specific
+    suggestion (e.g. how to spell an equi-join).
+    """
+    condition = bound_expression.referred_expr[0].expression
+    cond_type = infer_expression_type(condition, schema.struct, registry=registry)
+    kind = cond_type.WhichOneof("kind")
+    if kind != "bool":
+        message = (
+            f"{context} condition must be a boolean predicate, but got type {kind!r}."
+        )
+        if hint:
+            message = f"{message} {hint}"
+        raise ValueError(message)
+
+
+_JOIN_CONDITION_HINT = (
+    "A bare column name is a column reference, not a match key -- it does not "
+    "join on that column. Use a predicate such as col('a') == col('b'); for a "
+    "Cartesian product use cross_join()."
+)
+
+
 def filter(
     plan: PlanOrUnbound,
     expression: ExtendedExpressionOrUnbound,
@@ -507,6 +546,7 @@ def filter(
         bound_expression: stee.ExtendedExpression = resolve_expression(
             expression, ns, registry
         )
+        _require_boolean_condition(bound_expression, ns, registry, context="filter")
 
         return _plan_from(
             [bound_plan],
@@ -687,20 +727,24 @@ def join(
         bound_expression: stee.ExtendedExpression = resolve_expression(
             expression, ns, registry
         )
+        _require_boolean_condition(
+            bound_expression, ns, registry, context="join", hint=_JOIN_CONDITION_HINT
+        )
 
-        # The output names must match the columns the join type actually emits
-        # (semi/anti drop a side, mark appends a boolean).
+        # Output names use the selected side for semi/anti/mark joins,
+        # with a nullable boolean marker appended for mark joins.
         type_name = stalg.JoinRel.JoinType.Name(type)
         out_names = join_output_names(type_name, left_ns.names, right_ns.names)
 
         # post_join_filter is applied to each output record after
         # join-type-specific output formation (semantically a FilterRel above the
-        # join), so it resolves against the output schema -- which for semi/anti
-        # joins is a single side, not the combined schema. Combined from the schemas
-        # already inferred above rather than re-inferred from the input relations:
-        # re-inference would walk both subtrees again, and it would do so without the
-        # inputs' shared-subtree lists in scope, so a `reference()`-promoted input
-        # (whose root is a plan-global ReferenceRel) could not resolve at all.
+        # join), so it resolves against the output schema. Semi/anti joins expose
+        # the selected side; mark joins expose that side plus the marker. Combined
+        # from the schemas already inferred above rather than re-inferred from the
+        # input relations: re-inference would walk both subtrees again, and it would
+        # do so without the inputs' shared-subtree lists in scope, so a
+        # `reference()`-promoted input (whose root is a plan-global ReferenceRel)
+        # could not resolve at all.
         bound_post = None
         if post_join_filter is not None:
             output_ns = stt.NamedStruct(
@@ -782,17 +826,24 @@ def lateral_join(
                 if expression is not None
                 else None
             )
+            if bound_expression is not None:
+                _require_boolean_condition(
+                    bound_expression,
+                    ns,
+                    registry,
+                    context="lateral join",
+                    hint=_JOIN_CONDITION_HINT,
+                )
 
-            # Output names/columns follow the same per-join-type shape as a
-            # regular join (semi/anti drop the right side, mark appends a boolean).
+            # Output names use the selected side for semi/anti/mark joins,
+            # with a nullable boolean marker appended for mark joins.
             type_name = stalg.JoinRel.JoinType.Name(type)
             out_names = join_output_names(type_name, left_ns.names, right_ns.names)
 
             # post_join_filter is applied to each output record after
             # join-type-specific output formation (semantically a FilterRel above
-            # the join), so it resolves against the *output* schema -- which for
-            # semi/anti joins is a single side and for a mark join carries the
-            # appended marker column -- not the combined input row.
+            # the join), so it resolves against the output schema. Semi/anti joins
+            # expose the selected side; mark joins expose that side plus the marker.
             bound_post = None
             if post_join_filter is not None:
                 output_ns = stt.NamedStruct(
@@ -1269,6 +1320,13 @@ def nested_loop_join(
             names=list(left_ns.names) + list(right_ns.names),
         )
         bound_expression = resolve_expression(expression, ns, registry)
+        _require_boolean_condition(
+            bound_expression,
+            ns,
+            registry,
+            context="nested loop join",
+            hint=_JOIN_CONDITION_HINT,
+        )
 
         out_names = join_output_names(
             stalg.NestedLoopJoinRel.JoinType.Name(type),
@@ -1348,14 +1406,14 @@ def _physical_equi_join(rel_name, rel_cls):
 
             # post_join_filter is applied to each output record after
             # join-type-specific output formation (semantically a FilterRel above
-            # the join), so it resolves against the output schema -- which for
-            # semi/anti joins is a single side. residual_expression is evaluated
-            # on each candidate key-match (both rows present), so it resolves
-            # against the combined left+right schema. Each is built only when the
-            # corresponding predicate is supplied. The output schema is combined from
-            # the schemas already inferred above rather than re-inferred from the
-            # input relations -- see `join` for why re-inference cannot resolve a
-            # `reference()`-promoted input.
+            # the join), so it resolves against the output schema. Semi/anti joins
+            # expose the selected side; mark joins expose that side plus the marker.
+            # residual_expression resolves against the combined left+right schema
+            # because each candidate key-match contains both rows. Each schema is
+            # built only when its corresponding predicate is supplied. The output
+            # schema is combined from the schemas already inferred above rather than
+            # re-inferred from the input relations -- see `join` for why re-inference
+            # cannot resolve a `reference()`-promoted input.
             bound_post = None
             if post_join_filter is not None:
                 output_ns = stt.NamedStruct(

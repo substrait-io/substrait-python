@@ -57,24 +57,29 @@ def test_stringify_fetch_unset_offset_and_count():
     assert "fetch: offset=0, count=all" in out
 
 
-def test_stringify_resolves_names_through_a_read_projection():
-    schema = stt.NamedStruct(
-        names=["id", "txt", "flag"],
-        struct=stt.Type.Struct(
-            types=[i64(nullable=False), string(), boolean()],
-            nullability=stt.Type.NULLABILITY_REQUIRED,
+def _projected_read(*fields: int) -> stalg.ReadRel:
+    return stalg.ReadRel(
+        base_schema=stt.NamedStruct(
+            names=["id", "txt", "flag"],
+            struct=stt.Type.Struct(
+                types=[i64(nullable=False), string(), boolean()],
+                nullability=stt.Type.NULLABILITY_REQUIRED,
+            ),
         ),
-    )
-    read = stalg.ReadRel(
-        base_schema=schema,
         named_table=stalg.ReadRel.NamedTable(names=["t"]),
         projection=stalg.Expression.MaskExpression(
             select=stalg.Expression.MaskExpression.StructSelect(
-                struct_items=[stalg.Expression.MaskExpression.StructItem(field=2)]
+                struct_items=[
+                    stalg.Expression.MaskExpression.StructItem(field=f) for f in fields
+                ]
             ),
             maintain_singular_struct=True,
         ),
     )
+
+
+def test_stringify_resolves_names_through_a_read_projection():
+    read = _projected_read(2)
     condition = stalg.Expression(
         selection=stalg.Expression.FieldReference(
             direct_reference=stalg.Expression.ReferenceSegment(
@@ -102,3 +107,20 @@ def test_stringify_resolves_names_through_a_read_projection():
 
     assert "field: flag" in out
     assert "field: id" not in out
+
+
+def test_stringify_tolerates_a_read_mask_out_of_range():
+    plan = stp.Plan(
+        relations=[
+            stp.PlanRel(
+                root=stalg.RelRoot(
+                    input=stalg.Rel(read=_projected_read(5, -1, 2)), names=["flag"]
+                )
+            )
+        ]
+    )
+    printer = _printer()
+
+    printer.stringify_plan(plan)
+
+    assert printer.schema_names == ["flag"]

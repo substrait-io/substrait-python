@@ -28,6 +28,7 @@ def _read_output_names(read: stalg.ReadRel) -> list:
     return [
         name
         for item in read.projection.select.struct_items
+        if 0 <= item.field < len(lengths)
         for name in names[starts[item.field] : starts[item.field + 1]]
     ]
 

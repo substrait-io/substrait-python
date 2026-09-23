@@ -9,13 +9,20 @@ on:
   pull_request_target:
     types: [opened, edited, synchronize, reopened]
 
-# Serialize runs for the same PR so the comment job can't race with itself, but
-# never cancel in progress: a Dependabot rebase force-pushes and edits the PR
-# body at once, firing synchronize and edited on the same commit. Cancelling one
-# leaves a cancelled check-run on the head commit that fails the status rollup
-# (#198). Letting both finish yields two harmless successes instead.
+# Serialize runs for the same PR so the comment job can't race with itself.
+#
+# cancel-in-progress must stay false: a Dependabot rebase force-pushes and edits
+# the PR body at once, firing synchronize and edited on the same commit.
+# Cancelling one leaves a cancelled check-run on the head commit that fails the
+# status rollup (#198). Letting both finish yields two harmless successes.
+#
+# queue: max is needed for the same reason. The default, queue: single, allows
+# only one pending run and lets a newly arriving run displace it, so the run that
+# gets cancelled is simply the waiting one instead of the running one. max allows
+# up to 100 pending runs, so both finish.
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  queue: max
   cancel-in-progress: false
 
 # Default to the minimum read-only token for all jobs.
@@ -32,39 +39,75 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: "24"
-      - run: npm install @commitlint/config-conventional
-      - run: >
-          echo 'module.exports = {
-            // Workaround for https://github.com/dependabot/dependabot-core/issues/5923
-            "ignores": [
-              (message) => /^Bumps \[.+]\(.+\) from .+ to .+\.$/m.test(message),
-              (message) => /^Updates the requirements on .+ to permit the latest version\.$/m.test(message)
-            ],
-            "rules": {
-              "body-max-line-length": [0, "always", Infinity],
-              "footer-max-line-length": [0, "always", Infinity],
-              "body-leading-blank": [0, "always"]
-            }
-          }' > .commitlintrc.js
+      # pull_request_target runs the workflow from the base ref and checks out
+      # the base ref, so neither this workflow nor commitlint.config.js nor the
+      # pinned toolchain can be altered by the PR being validated.
+      - uses: actions/checkout@v7
+        with:
+          # Do not leave the workflow token in .git/config: npm ci runs
+          # third-party package code in this same workspace.
+          persist-credentials: false
+          sparse-checkout: |
+            commitlint.config.js
+            package.json
+            package-lock.json
+            .npmrc
+          sparse-checkout-cone-mode: false
+      # npm ci installs exactly the tree recorded in package-lock.json, so
+      # neither a new commitlint release nor a compromised transitive dependency
+      # can change what runs here. --ignore-scripts also blocks install hooks.
+      - run: npm ci --ignore-scripts
+      # continue-on-error keeps a lint failure distinguishable from an
+      # infrastructure failure: only outcome == 'failure' means the title or
+      # description is genuinely malformed, and only that should be commented on.
+      # --no-install so this can only run the pinned local CLI, never fetch one.
       - id: commitlint
         continue-on-error: true
-        run: npx commitlint --extends @commitlint/config-conventional --verbose <<< $COMMIT_MSG
+        run: npx --no-install commitlint --verbose <<< "$COMMIT_MSG"
         env:
           COMMIT_MSG: >
             ${{ github.event.pull_request.title }}
 
             ${{ github.event.pull_request.body }}
+      # Fail this job, rather than the comment job, so that the check which goes
+      # red is the one whose name describes what is wrong.
+      - if: steps.commitlint.outcome == 'failure'
+        run: |
+          echo "PR title and description do not follow the Conventional Commits specification." >&2
+          exit 1
 
   comment:
     name: Post / remove PR comment
     runs-on: ubuntu-latest
     needs: commitlint
+    # always(), because the lint job now fails when the message is malformed,
+    # which is exactly when the comment has to be posted.
+    if: always() && contains(fromJSON('["success", "failure"]'), needs.commitlint.outputs.outcome)
     permissions:
       pull-requests: write
     steps:
       - uses: actions/github-script@v9
+        env:
+          # Passed through the environment rather than interpolated into the
+          # script, so a crafted title or body cannot inject JavaScript.
+          LINTED_TITLE: ${{ github.event.pull_request.title }}
+          LINTED_BODY: ${{ github.event.pull_request.body }}
         with:
           script: |
+            // queue: max lets two runs for one commit finish, and their order is
+            // not guaranteed, so an older run could otherwise overwrite a newer
+            // one's result. Skip if the PR text has moved on since this run's
+            // event fired; the run for that edit will handle it.
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number,
+            });
+            if (pr.title !== process.env.LINTED_TITLE || (pr.body ?? "") !== (process.env.LINTED_BODY ?? "")) {
+              core.info("PR title or description changed since this run started; leaving it to the newer run.");
+              return;
+            }
+
             // Hidden marker used to find this job's comment regardless of wording.
             const marker = "<!-- pr-title-check -->";
             const message = `${marker}
@@ -81,7 +124,12 @@ jobs:
               repo: context.repo.repo,
               issue_number: context.issue.number,
             });
-            const existing = comments.find((c) => c.body.includes(marker));
+            // Match on author as well as marker: the marker is a plain string, so
+            // anyone quoting this workflow could otherwise have their comment
+            // deleted on a pass, or suppress the warning on a failure.
+            const existing = comments.find(
+              (c) => c.user?.login === "github-actions[bot]" && c.body.includes(marker)
+            );
 
             if (passed) {
               // Clean up the comment now that the check passes.
@@ -95,7 +143,8 @@ jobs:
               return;
             }
 
-            // Check failed: post the comment if it isn't already there, then fail the job.
+            // Check failed: post the comment if it isn't already there. The lint
+            // job has already gone red, so this job does not need to fail too.
             if (!existing) {
               await github.rest.issues.createComment({
                 owner: context.repo.owner,
@@ -104,6 +153,3 @@ jobs:
                 body: message,
               });
             }
-            core.setFailed(
-              "PR title and description do not follow the Conventional Commits specification."
-            );

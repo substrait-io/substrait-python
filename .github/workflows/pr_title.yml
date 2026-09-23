@@ -33,8 +33,16 @@ jobs:
   commitlint:
     name: PR title / description conforms to semantic-release
     runs-on: ubuntu-latest
+    permissions:
+      # contents for the checkout below, pull-requests to read the PR's current
+      # title and body. A job-level permissions block replaces the workflow
+      # default outright rather than adding to it, so both must be listed.
+      contents: read
+      pull-requests: read
     outputs:
       outcome: ${{ steps.commitlint.outcome }}
+      title: ${{ steps.pr.outputs.title }}
+      body: ${{ steps.pr.outputs.body }}
     steps:
       - uses: actions/setup-node@v7
         with:
@@ -57,18 +65,39 @@ jobs:
       # neither a new commitlint release nor a compromised transitive dependency
       # can change what runs here. --ignore-scripts also blocks install hooks.
       - run: npm ci --ignore-scripts
+      # Lint the PR's text as it is now, not as the triggering event captured
+      # it. This job is the required status check, and GitHub decides it from
+      # the most recent check run of this name, so whichever run finishes last
+      # must not be deciding it from a payload that has since been superseded.
+      # queue: max lets several runs wait at once and the order they are
+      # released in is not guaranteed, so a title that has since been corrected
+      # could otherwise be overruled by an older run and leave the check stuck
+      # red, with no further event to clear it. Reading the current text here
+      # makes the verdict independent of run order in both directions.
+      - id: pr
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number,
+            });
+            core.setOutput("title", pr.title);
+            core.setOutput("body", pr.body ?? "");
+            // Written to a file rather than passed as an argument or a shell
+            // variable, so the untrusted text never reaches a command line.
+            require("node:fs").writeFileSync(
+              `${process.env.RUNNER_TEMP}/commit-msg.txt`,
+              `${pr.title}\n\n${pr.body ?? ""}`,
+            );
       # continue-on-error keeps a lint failure distinguishable from an
       # infrastructure failure: only outcome == 'failure' means the title or
       # description is genuinely malformed, and only that should be commented on.
       # --no-install so this can only run the pinned local CLI, never fetch one.
       - id: commitlint
         continue-on-error: true
-        run: npx --no-install commitlint --verbose <<< "$COMMIT_MSG"
-        env:
-          COMMIT_MSG: >
-            ${{ github.event.pull_request.title }}
-
-            ${{ github.event.pull_request.body }}
+        run: npx --no-install commitlint --verbose < "$RUNNER_TEMP/commit-msg.txt"
       # Fail this job, rather than the comment job, so that the check which goes
       # red is the one whose name describes what is wrong.
       - if: steps.commitlint.outcome == 'failure'
@@ -88,16 +117,16 @@ jobs:
     steps:
       - uses: actions/github-script@v9
         env:
-          # Passed through the environment rather than interpolated into the
-          # script, so a crafted title or body cannot inject JavaScript.
-          LINTED_TITLE: ${{ github.event.pull_request.title }}
-          LINTED_BODY: ${{ github.event.pull_request.body }}
+          # The text the lint job actually linted, passed through the
+          # environment rather than interpolated into the script so that a
+          # crafted title or body cannot inject JavaScript.
+          LINTED_TITLE: ${{ needs.commitlint.outputs.title }}
+          LINTED_BODY: ${{ needs.commitlint.outputs.body }}
         with:
           script: |
-            // queue: max lets two runs for one commit finish, and their order is
-            // not guaranteed, so an older run could otherwise overwrite a newer
-            // one's result. Skip if the PR text has moved on since this run's
-            // event fired; the run for that edit will handle it.
+            // Skip if the PR text has moved on since the lint job read it:
+            // the run for that edit will post or clear the comment, and an
+            // older run must not undo a newer one's result.
             const { data: pr } = await github.rest.pulls.get({
               owner: context.repo.owner,
               repo: context.repo.repo,

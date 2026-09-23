@@ -1,0 +1,45 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    ":semanticCommitTypeAll(chore)",
+    ":maintainLockFilesWeekly"
+  ],
+  "semanticCommits": "enabled",
+  "semanticCommitType": "chore",
+  "semanticCommitScope": "deps",
+  "fetchChangeLogs": "off",
+  "labels": ["dependencies"],
+  "minimumReleaseAge": "14 days",
+  "pre-commit": {
+    "enabled": true
+  },
+  "packageRules": [
+    {
+      "description": "Port of the dependabot substrait group. check_substrait_package_versions.sh requires all three packages to carry the same version, so they have to move together. Exempt from the cooldown: we publish these ourselves, so there is no third-party release to let the ecosystem vet",
+      "matchPackageNames": [
+        "substrait-protobuf",
+        "substrait-antlr",
+        "substrait-extensions"
+      ],
+      "groupName": "substrait packages",
+      "minimumReleaseAge": null
+    },
+    {
+      "description": "ruff is declared in both [tool.pixi.dependencies] and .pre-commit-config.yaml, so keep the hook revision in step with the pixi range rather than letting them drift apart in separate PRs. Both are development tooling, so they take the deps-dev scope",
+      "matchManagers": ["pixi", "pre-commit"],
+      "groupName": "pixi and pre-commit tooling",
+      "semanticCommitScope": "deps-dev"
+    },
+    {
+      "description": "Match the deps-dev scope dependabot used for development dependencies",
+      "matchDepTypes": ["dependency-groups", "project.optional-dependencies"],
+      "semanticCommitScope": "deps-dev"
+    },
+    {
+      "description": "Changing the supported Python version is a project decision, not a routine bump",
+      "matchPackageNames": ["python"],
+      "enabled": false
+    }
+  ]
+}

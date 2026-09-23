@@ -5,9 +5,37 @@ This module provides a concise pretty printer for Substrait plans and expression
 in a readable format using indentation, -> characters, and colors.
 """
 
+import itertools
+
 import substrait.algebra_pb2 as stalg
 import substrait.plan_pb2 as stp
 import substrait.type_pb2 as stt
+
+from substrait.utils import type_num_names
+
+
+def _read_output_names(read: stalg.ReadRel) -> list:
+    """The base schema's names in the order the read outputs them.
+
+    Each top-level field owns a block of the depth-first names. The mask selects
+    whole blocks in its order, then the emit picks among those; a child mask does
+    not prune a block. Indices outside the schema are skipped.
+    """
+    names = list(read.base_schema.names)
+    projected = read.projection.HasField("select")
+    emitted = read.common.WhichOneof("emit_kind") == "emit"
+    if not projected and not emitted:
+        return names
+    lengths = [type_num_names(t) for t in read.base_schema.struct.types]
+    starts = [0, *itertools.accumulate(lengths)]
+    blocks = [names[starts[i] : starts[i + 1]] for i in range(len(lengths))]
+    if projected:
+        fields = [item.field for item in read.projection.select.struct_items]
+        blocks = [blocks[i] for i in fields if 0 <= i < len(blocks)]
+    if emitted:
+        mapping = read.common.emit.output_mapping
+        blocks = [blocks[i] for i in mapping if 0 <= i < len(blocks)]
+    return [name for block in blocks for name in block]
 
 
 # ANSI color codes
@@ -202,7 +230,7 @@ class PlanPrinter:
 
         if read.HasField("base_schema"):
             # Capture schema names for field resolution
-            self.schema_names = list(read.base_schema.names)
+            self.schema_names = _read_output_names(read)
             if self.show_metadata:
                 stream.write(
                     f"{self._get_indent_with_arrow(depth + 1)}{self._color('schema:', Colors.BLUE)} {self._color(self.schema_names, Colors.YELLOW)}\n"

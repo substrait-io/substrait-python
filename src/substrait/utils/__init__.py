@@ -495,6 +495,10 @@ def _plan_has_steps_out(plan: stplan.Plan) -> bool:
 # condition scope names columns the output drops and has no anchorable relation.
 _JOIN_COMBINED_SCOPED_FIELDS = frozenset({"expression", "residual_expression"})
 
+# A read's filters bind against its base schema, before the projection and the
+# emit that reshape its output row.
+_READ_FILTER_FIELDS = frozenset({"filter", "best_effort_filter"})
+
 
 def _is_reducing_join(node) -> bool:
     """Whether a join relation-variant ``node`` drops one side (semi/anti/mark), so
@@ -531,7 +535,10 @@ def to_id_based_outer_references(plan: stplan.Plan) -> stplan.Plan:
       This is the shared-subtree / DAG case that offset-based ``steps_out`` cannot
       address unambiguously.
     * a ``post_join_filter``, or a leaf host's own filter, exposes the **host's**
-      output row, so the host is anchored.
+      output row, so the host is anchored, except for projected reads below.
+    * a ``ReadRel``'s ``filter`` / ``best_effort_filter`` uses its base schema.
+      When the read has a projection, its output need not carry that row, so
+      references into these filters remain offset-based.
     * a join *condition* / ``residual_expression`` exposes the **combined** left+right
       row; the join's own output equals that row for a non-reducing join, so the join
       is anchored. For a *reducing* join (semi/anti/mark) the two differ and no relation
@@ -606,11 +613,11 @@ def to_id_based_outer_references(plan: stplan.Plan) -> stplan.Plan:
                             f"{len(scope)} enclosing query scope(s)"
                         )
                     target = scope[-steps]
-                    # None marks a combined-inputs scope with no anchorable relation
-                    # (a reducing join's condition). A lateral join's rel_anchor is
-                    # reserved for its right input's left-row reference, so it cannot
-                    # double as the output-row anchor a correlation here would need.
-                    # Both are left offset-based (spec-valid, read by inference).
+                    # None marks a scope with no anchorable relation, such as a
+                    # reducing join's condition or a projected read's filter.
+                    # A lateral join's rel_anchor is reserved for its right input's
+                    # left-row reference, so it cannot double as an output anchor.
+                    # These references stay offset-based.
                     if target is not None and not _binding_is_lateral_join(target):
                         oref.rel_reference = anchor_for(target)
         elif rex == "subquery":
@@ -626,14 +633,21 @@ def to_id_based_outer_references(plan: stplan.Plan) -> stplan.Plan:
         if node is not None:
             # The relation whose output row a subquery here would see one level up:
             # a single-input host exposes its input; a leaf or multi-input host its
-            # own output -- except a reducing join's combined-inputs-scoped fields,
-            # whose scope no relation's output carries (binding None -> left as-is).
+            # own output. Join conditions and the filters of a projected or
+            # emitting read may use a different row with no relation to anchor
+            # (binding None -> left as-is).
             single_input = _child_rel(*children[0]) if len(children) == 1 else None
             reducing = single_input is None and _is_reducing_join(node)
+            projected_read = rel_type == "read" and (
+                node.projection.HasField("select")
+                or node.common.WhichOneof("emit_kind") == "emit"
+            )
             for name, expr in _iter_named_direct_expressions(node):
                 if single_input is not None:
                     binding = single_input
                 elif reducing and name in _JOIN_COMBINED_SCOPED_FIELDS:
+                    binding = None
+                elif projected_read and name in _READ_FILTER_FIELDS:
                     binding = None
                 else:
                     binding = rel

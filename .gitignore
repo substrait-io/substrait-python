@@ -145,3 +145,6 @@ src/substrait/_version.py
 # pixi environments
 .pixi/*
 !.pixi/config.toml
+
+# commitlint toolchain (see package.json)
+node_modules/

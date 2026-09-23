@@ -1,0 +1,11 @@
+{
+  "name": "substrait-python-commitlint",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Pinned commitlint toolchain used to lint PR titles and descriptions in CI. Development tooling only; not a dependency of the published Python package.",
+  "license": "Apache-2.0",
+  "devDependencies": {
+    "@commitlint/cli": "21.2.3",
+    "@commitlint/config-conventional": "21.2.3"
+  }
+}

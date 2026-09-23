@@ -33,8 +33,8 @@
       "semanticCommitScope": "deps-dev"
     },
     {
-      "description": "Match the deps-dev scope dependabot used for development dependencies",
-      "matchDepTypes": ["dependency-groups"],
+      "description": "Match the deps-dev scope dependabot used for development dependencies, including the commitlint toolchain in package.json",
+      "matchDepTypes": ["dependency-groups", "devDependencies"],
       "semanticCommitScope": "deps-dev"
     },
     {

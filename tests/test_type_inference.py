@@ -236,6 +236,47 @@ def test_inference_aggregate_multiple_groupings():
     assert infer_rel_schema(rel) == expected
 
 
+def _field_reference(field: int) -> stalg.Expression:
+    return stalg.Expression(
+        selection=stalg.Expression.FieldReference(
+            root_reference=stalg.Expression.FieldReference.RootReference(),
+            direct_reference=stalg.Expression.ReferenceSegment(
+                struct_field=stalg.Expression.ReferenceSegment.StructField(field=field)
+            ),
+        )
+    )
+
+
+@pytest.mark.parametrize(
+    "sets, expected",
+    [
+        ([[0, 1]], [_REQ, _NULL]),
+        ([[0], [1]], [_NULL, _NULL, _REQ]),
+        ([[0, 1], [0]], [_REQ, _NULL, _REQ]),
+        ([[0, 1], [1]], [_NULL, _NULL, _REQ]),
+        ([[0, 1], []], [_NULL, _NULL, _REQ]),
+    ],
+)
+def test_inference_aggregate_grouping_key_absent_from_a_set(sets, expected):
+    # A grouping key missing from any grouping set is null in that set's records,
+    # so its column is nullable; a key in every set keeps its own nullability.
+    rel = stalg.Rel(
+        aggregate=stalg.AggregateRel(
+            input=read_rel,
+            grouping_expressions=[_field_reference(0), _field_reference(2)],
+            groupings=[
+                stalg.AggregateRel.Grouping(expression_references=s) for s in sets
+            ],
+        )
+    )
+
+    schema = infer_rel_schema(rel)
+
+    assert [getattr(t, t.WhichOneof("kind")).nullability for t in schema.types] == (
+        expected
+    )
+
+
 def test_inference_cross():
     rel = stalg.Rel(cross=stalg.CrossRel(left=read_rel, right=right_read_rel))
 

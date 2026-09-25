@@ -990,6 +990,18 @@ def infer_rel_schema(rel: stalg.Rel, *, registry=None, subtrees=()) -> stt.Type.
             )
             for g in rel.aggregate.grouping_expressions
         ]
+        # A grouping expression missing from any grouping set is null in the
+        # records of that set, so its column is nullable.
+        if rel.aggregate.groupings:
+            in_every_set = set.intersection(
+                *(set(g.expression_references) for g in rel.aggregate.groupings)
+            )
+            grouping_types = [
+                t
+                if i in in_every_set
+                else _with_field_nullability(t, stt.Type.NULLABILITY_NULLABLE)
+                for i, t in enumerate(grouping_types)
+            ]
         measure_types = [m.measure.output_type for m in rel.aggregate.measures]
 
         grouping_identifier_types = (

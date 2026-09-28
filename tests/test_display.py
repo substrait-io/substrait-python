@@ -1,8 +1,11 @@
+import pytest
+import substrait.algebra_pb2 as stalg
+import substrait.plan_pb2 as stp
 import substrait.type_pb2 as stt
 
 from substrait.builders.extended_expression import literal
 from substrait.builders.plan import fetch, read_named_table, virtual_table
-from substrait.builders.type import boolean, i64
+from substrait.builders.type import boolean, i64, string
 from substrait.extension_registry import ExtensionRegistry
 from substrait.utils.display import PlanPrinter
 
@@ -53,3 +56,84 @@ def test_stringify_fetch_unset_offset_and_count():
     out = _printer().stringify_plan(plan)
 
     assert "fetch: offset=0, count=all" in out
+
+
+def _projected_read(*fields: int, emit=None) -> stalg.ReadRel:
+    read = stalg.ReadRel(
+        base_schema=stt.NamedStruct(
+            names=["id", "txt", "flag"],
+            struct=stt.Type.Struct(
+                types=[i64(nullable=False), string(), boolean()],
+                nullability=stt.Type.NULLABILITY_REQUIRED,
+            ),
+        ),
+        named_table=stalg.ReadRel.NamedTable(names=["t"]),
+        projection=stalg.Expression.MaskExpression(
+            select=stalg.Expression.MaskExpression.StructSelect(
+                struct_items=[
+                    stalg.Expression.MaskExpression.StructItem(field=f) for f in fields
+                ]
+            ),
+            maintain_singular_struct=True,
+        ),
+    )
+    if emit is not None:
+        read.common.emit.output_mapping.extend(emit)
+    return read
+
+
+# The field a filter above the read names as field 0.
+@pytest.mark.parametrize(
+    "mask, emit, name",
+    [
+        ([2], None, "flag"),
+        ([2, 0], [1], "id"),
+        ([2, 0], [0], "flag"),
+        ([1, 2], [1], "flag"),
+        (None, [2], "flag"),
+    ],
+)
+def test_stringify_resolves_names_through_a_read_projection(mask, emit, name):
+    read = _projected_read(*(mask or []), emit=emit)
+    if mask is None:
+        read.ClearField("projection")
+    condition = stalg.Expression(
+        selection=stalg.Expression.FieldReference(
+            direct_reference=stalg.Expression.ReferenceSegment(
+                struct_field=stalg.Expression.ReferenceSegment.StructField(field=0)
+            ),
+            root_reference=stalg.Expression.FieldReference.RootReference(),
+        )
+    )
+    plan = stp.Plan(
+        relations=[
+            stp.PlanRel(
+                root=stalg.RelRoot(
+                    input=stalg.Rel(
+                        filter=stalg.FilterRel(
+                            input=stalg.Rel(read=read), condition=condition
+                        )
+                    ),
+                    names=["flag"],
+                )
+            )
+        ]
+    )
+
+    out = _printer().stringify_plan(plan)
+
+    assert f"field: {name}\n" in out
+
+
+def test_stringify_tolerates_read_indices_out_of_range():
+    read = _projected_read(5, -1, 2, 0, emit=[3, -1, 1])
+    plan = stp.Plan(
+        relations=[
+            stp.PlanRel(root=stalg.RelRoot(input=stalg.Rel(read=read), names=["id"]))
+        ]
+    )
+    printer = _printer()
+
+    printer.stringify_plan(plan)
+
+    assert printer.schema_names == ["id"]

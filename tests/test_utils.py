@@ -6,6 +6,7 @@ import substrait.plan_pb2 as stplan
 import substrait.type_pb2 as stt
 
 from substrait.utils import (
+    child_rels,
     iter_plan_rels,
     merge_extension_declarations,
     merge_extension_urns,
@@ -525,6 +526,65 @@ def _outer_refs(plan: stplan.Plan):
     ]
 
 
+@pytest.mark.parametrize("filter_field", ["filter", "best_effort_filter"])
+@pytest.mark.parametrize("reshaped", [None, "no_select", "projection", "emit"])
+def test_convert_read_filter_uses_unprojected_scope(filter_field, reshaped):
+    read = _read("o", ncols=3)
+    if reshaped == "no_select":
+        # A mask with no select keeps every field, so the read's row is unchanged.
+        read.read.projection.maintain_singular_struct = True
+        reshaped = None
+    elif reshaped == "emit":
+        read.read.common.emit.output_mapping.append(0)
+    elif reshaped == "projection":
+        read.read.projection.CopyFrom(
+            stalg.Expression.MaskExpression(
+                select=stalg.Expression.MaskExpression.StructSelect(
+                    struct_items=[stalg.Expression.MaskExpression.StructItem(field=0)]
+                ),
+                maintain_singular_struct=True,
+            )
+        )
+    getattr(read.read, filter_field).CopyFrom(
+        _exists(_filter(_read("i"), _outer(1, field=2)))
+    )
+    plan = _plan(read)
+    before = plan.SerializeToString()
+    out = to_id_based_outer_references(plan)
+    out_read = out.relations[-1].root.input
+    ref = getattr(
+        out_read.read, filter_field
+    ).subquery.set_predicate.tuples.filter.condition.selection
+    assert ref.direct_reference.struct_field.field == 2
+    if reshaped:
+        assert rel_anchor_of(out_read) is None
+        assert ref.outer_reference.WhichOneof("outer_reference_type") == "steps_out"
+        assert ref.outer_reference.steps_out == 1
+    else:
+        assert ref.outer_reference.WhichOneof("outer_reference_type") == "rel_reference"
+        assert ref.outer_reference.rel_reference == rel_anchor_of(out_read)
+    assert plan.SerializeToString() == before
+
+
+def test_convert_filter_above_projected_read_anchors_read_output():
+    read = _read("o", ncols=3)
+    read.read.projection.CopyFrom(
+        stalg.Expression.MaskExpression(
+            select=stalg.Expression.MaskExpression.StructSelect(
+                struct_items=[stalg.Expression.MaskExpression.StructItem(field=2)]
+            ),
+            maintain_singular_struct=True,
+        )
+    )
+    out = to_id_based_outer_references(
+        _plan(_filter(read, _exists(_filter(_read("i"), _outer(1)))))
+    )
+    host = out.relations[-1].root.input.filter
+    ref = host.condition.subquery.set_predicate.tuples.filter.condition.selection.outer_reference
+    assert ref.WhichOneof("outer_reference_type") == "rel_reference"
+    assert ref.rel_reference == rel_anchor_of(host.input)
+
+
 def test_convert_correlated_exists_stamps_anchor_and_rewrites():
     plan = _plan(_filter(_read("o"), _exists(_filter(_read("i"), _outer(1)))))
     out = to_id_based_outer_references(plan)
@@ -788,3 +848,28 @@ def test_convert_is_idempotent():
     once = to_id_based_outer_references(plan)
     twice = to_id_based_outer_references(once)
     assert twice == once
+
+
+def test_child_rels_yields_the_live_submessages_in_declaration_order():
+    left = _read("l")
+    right = _read("r")
+    rel = stalg.Rel(
+        join=stalg.JoinRel(left=left, right=right, type=stalg.JoinRel.JOIN_TYPE_INNER)
+    )
+
+    children = list(child_rels(rel))
+
+    # Declaration order, and the messages themselves -- callers key on identity, so
+    # yielding a copy would silently break them.
+    assert children == [left, right]
+    assert children[0] is rel.join.left
+    assert children[1] is rel.join.right
+
+
+def test_child_rels_yields_repeated_inputs_and_nothing_for_a_leaf():
+    inputs = [_read("a"), _read("b"), _read("c")]
+    union = stalg.Rel(set=stalg.SetRel(inputs=inputs, op=stalg.SetRel.SET_OP_UNION_ALL))
+
+    assert list(child_rels(union)) == inputs
+    assert list(child_rels(_read("a"))) == []
+    assert list(child_rels(stalg.Rel())) == []

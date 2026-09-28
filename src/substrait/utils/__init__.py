@@ -138,6 +138,26 @@ def _child_rel(container, key):
     return container[key] if isinstance(key, int) else getattr(container, key)
 
 
+def child_rels(rel: stalg.Rel):
+    """``rel``'s direct child ``Rel`` messages, in field declaration order.
+
+    Yields the messages themselves rather than the ``(container, key)`` pairs
+    :func:`_iter_child_rels` uses for in-place rewriting, for callers that only read
+    them -- note they are the live submessages, not copies, so mutating one mutates
+    ``rel``. Subquery-embedded relations are not direct children and are not yielded.
+
+    A yielded message is only *identity*-stable while a reference to it is held: a
+    protobuf submessage wrapper is not permanently cached, so under the upb
+    implementation dropping the last reference lets the next access re-wrap it at a
+    fresh -- possibly recycled -- address. A caller keying on ``id()`` (as
+    ``type_inference._SchemaMemo`` does) must therefore keep the message alive
+    alongside the key; consuming this generator lazily and keeping only the ids will
+    collide.
+    """
+    for container, key in _iter_child_rels(rel):
+        yield _child_rel(container, key)
+
+
 def rebase_reference_ordinals(rel: stalg.Rel, remap: dict) -> stalg.Rel:
     """A copy of ``rel`` with every nested ``ReferenceRel.subtree_ordinal`` remapped
     (old -> new) per ``remap``. Recurses through direct child relations only."""
@@ -476,6 +496,10 @@ def _plan_has_steps_out(plan: stplan.Plan) -> bool:
 # anchorable relation.
 _JOIN_COMBINED_SCOPED_FIELDS = frozenset({"expression", "residual_expression"})
 
+# A read's filters bind against its base schema, before the projection and the
+# emit that reshape its output row.
+_READ_FILTER_FIELDS = frozenset({"filter", "best_effort_filter"})
+
 
 def _join_output_differs_from_condition_scope(node) -> bool:
     """Whether a join relation-variant ``node``'s output row differs from its
@@ -513,7 +537,10 @@ def to_id_based_outer_references(plan: stplan.Plan) -> stplan.Plan:
       This is the shared-subtree / DAG case that offset-based ``steps_out`` cannot
       address unambiguously.
     * a ``post_join_filter``, or a leaf host's own filter, exposes the **host's**
-      output row, so the host is anchored.
+      output row, so the host is anchored, except for projected reads below.
+    * a ``ReadRel``'s ``filter`` / ``best_effort_filter`` uses its base schema.
+      When the read has a projection, its output need not carry that row, so
+      references into these filters remain offset-based.
     * a join *condition* / ``residual_expression`` exposes the **combined** left+right
       row; an inner join's own output equals that row, so the join is anchored. For
       every other join type the two differ (a side dropped, or made nullable by null
@@ -589,11 +616,11 @@ def to_id_based_outer_references(plan: stplan.Plan) -> stplan.Plan:
                             f"{len(scope)} enclosing query scope(s)"
                         )
                     target = scope[-steps]
-                    # None marks a combined-inputs scope with no anchorable relation
-                    # (a non-inner join's condition). A lateral join's rel_anchor is
-                    # reserved for its right input's left-row reference, so it cannot
-                    # double as the output-row anchor a correlation here would need.
-                    # Both are left offset-based (spec-valid, read by inference).
+                    # None marks a scope with no anchorable relation, such as a
+                    # non-inner join's condition or a projected read's filter.
+                    # A lateral join's rel_anchor is reserved for its right input's
+                    # left-row reference, so it cannot double as an output anchor.
+                    # These references stay offset-based.
                     if target is not None and not _binding_is_lateral_join(target):
                         oref.rel_reference = anchor_for(target)
         elif rex == "subquery":
@@ -609,16 +636,23 @@ def to_id_based_outer_references(plan: stplan.Plan) -> stplan.Plan:
         if node is not None:
             # The relation whose output row a subquery here would see one level up:
             # a single-input host exposes its input; a leaf or multi-input host its
-            # own output -- except a non-inner join's combined-inputs-scoped fields,
-            # whose scope no relation's output carries (binding None -> left as-is).
+            # own output. The condition of a non-inner join and the filters of a
+            # projected or emitting read use a different row with no relation to
+            # anchor (binding None -> left as-is).
             single_input = _child_rel(*children[0]) if len(children) == 1 else None
             reshaped_join = (
                 single_input is None and _join_output_differs_from_condition_scope(node)
+            )
+            projected_read = rel_type == "read" and (
+                node.projection.HasField("select")
+                or node.common.WhichOneof("emit_kind") == "emit"
             )
             for name, expr in _iter_named_direct_expressions(node):
                 if single_input is not None:
                     binding = single_input
                 elif reshaped_join and name in _JOIN_COMBINED_SCOPED_FIELDS:
+                    binding = None
+                elif projected_read and name in _READ_FILTER_FIELDS:
                     binding = None
                 else:
                     binding = rel

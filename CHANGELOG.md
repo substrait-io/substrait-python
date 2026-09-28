@@ -1,6 +1,35 @@
 Release Notes
 ---
 
+## [0.34.0](https://github.com/substrait-io/substrait-python/compare/v0.33.0...v0.34.0) (2026-09-27)
+
+### ⚠ BREAKING CHANGES
+
+* ReadRel projection masks now change inferred output
+schemas and the indices seen by emit and parent relations. Invalid mask
+field indices and selector/type mismatches now raise errors instead of
+being ignored.
+
+### Bug Fixes
+
+* apply ReadRel projection during schema inference ([#266](https://github.com/substrait-io/substrait-python/issues/266)) ([1cf8842](https://github.com/substrait-io/substrait-python/commit/1cf88427a53fff03fb23d54fa1096c584eaf9e7b))
+
+### Performance Improvements
+
+* infer each relation's schema once per build, not once per level ([#250](https://github.com/substrait-io/substrait-python/issues/250)) ([5425a2f](https://github.com/substrait-io/substrait-python/commit/5425a2fc420bfa648ab411a6a70f427e42f71911))
+
+## [0.33.0](https://github.com/substrait-io/substrait-python/compare/v0.32.0...v0.33.0) (2026-09-20)
+
+### ⚠ BREAKING CHANGES
+
+* Mark joins no longer expose columns from the other
+input. Output field indices change, and post-join filters must use only
+the selected input and the marker.
+
+### Bug Fixes
+
+* derive mark join output from the selected input ([#265](https://github.com/substrait-io/substrait-python/issues/265)) ([45c8ca7](https://github.com/substrait-io/substrait-python/commit/45c8ca7d14f90b687e54e053751779409def9ee1)), closes [#263](https://github.com/substrait-io/substrait-python/issues/263)
+
 ## [0.32.0](https://github.com/substrait-io/substrait-python/compare/v0.31.0...v0.32.0) (2026-09-13)
 
 ### Features

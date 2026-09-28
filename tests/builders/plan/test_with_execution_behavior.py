@@ -90,3 +90,33 @@ def test_plans_have_no_execution_behavior_by_default():
     plan = read_named_table("example_table", named_struct)(None)
 
     assert not plan.HasField("execution_behavior")
+
+
+def test_execution_behavior_on_a_plan_carrying_no_relations():
+    # This is the one builder that copies a caller-supplied Plan wholesale instead of
+    # assembling the relations itself, so it has to stay total over the Plans it
+    # accepts -- including degenerate ones it only sets a field on. Recording the
+    # copied root's schema for the build (see builders.plan._remember_input_schemas)
+    # must not turn that into an IndexError.
+    actual = with_execution_behavior(stp.Plan(version=default_version), PER_RECORD)(
+        None
+    )
+
+    assert actual.execution_behavior.variable_eval_mode == PER_RECORD
+    assert not actual.relations
+
+
+def test_execution_behavior_on_a_plan_whose_last_relation_is_a_subtree():
+    # Likewise for a Plan whose trailing entry is a shared subtree rather than a query
+    # root: there is no root schema to record, and reading one would key the build's
+    # memo on an unset-oneof stub that a later write could reify in place.
+    base = read_named_table("example_table", named_struct)(None)
+    subtree_only = stp.Plan(
+        version=default_version,
+        relations=[stp.PlanRel(rel=base.relations[-1].root.input)],
+    )
+
+    actual = with_execution_behavior(subtree_only, PER_RECORD)(None)
+
+    assert actual.execution_behavior.variable_eval_mode == PER_RECORD
+    assert [r.WhichOneof("rel_type") for r in actual.relations] == ["rel"]

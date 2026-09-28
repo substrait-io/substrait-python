@@ -743,7 +743,8 @@ def _join_column_shape(type_name: str) -> str:
     """Which columns a join emits, by join-type NAME (shared across all join
     relations, whose enum integer values differ): ``left`` / ``right`` only for
     semi/anti, ``left+mark`` / ``right+mark`` for mark joins, ``both`` otherwise.
-    Single source of truth for the inferred type list and the RelRoot names."""
+    Single source of truth for which columns the inferred types and the RelRoot
+    names cover; :data:`_JOIN_NULL_PADDING` says which of them become nullable."""
     if type_name in ("JOIN_TYPE_LEFT_SEMI", "JOIN_TYPE_LEFT_ANTI"):
         return "left"
     if type_name in ("JOIN_TYPE_RIGHT_SEMI", "JOIN_TYPE_RIGHT_ANTI"):
@@ -753,6 +754,42 @@ def _join_column_shape(type_name: str) -> str:
     if type_name == "JOIN_TYPE_RIGHT_MARK":
         return "right+mark"
     return "both"  # inner / outer / left / right / single
+
+
+# Which inputs a join fills with nulls, as (left, right), by join-type NAME
+# (shared across all join relations, whose enum integer values differ).
+#
+# A join that returns a row whose partner is missing fills the other input's
+# columns with nulls, so those columns are nullable in the output even where the
+# input declared them required. Inner joins return only matched pairs, and semi,
+# anti and mark joins return one input's rows unchanged, so they pad nothing.
+_JOIN_NULL_PADDING = {
+    "JOIN_TYPE_LEFT": (False, True),
+    "JOIN_TYPE_LEFT_SINGLE": (False, True),
+    "JOIN_TYPE_RIGHT": (True, False),
+    "JOIN_TYPE_RIGHT_SINGLE": (True, False),
+    "JOIN_TYPE_OUTER": (True, True),
+}
+
+# The join types a lateral join allows. Its left row always exists, so none of
+# them pads the left input.
+_LATERAL_JOIN_TYPE_NAMES = frozenset(
+    {
+        "JOIN_TYPE_INNER",
+        "JOIN_TYPE_LEFT",
+        "JOIN_TYPE_LEFT_SEMI",
+        "JOIN_TYPE_LEFT_ANTI",
+        "JOIN_TYPE_LEFT_SINGLE",
+        "JOIN_TYPE_LEFT_MARK",
+    }
+)
+
+
+def _nullable_types(struct: stt.Type.Struct) -> list:
+    """``struct``'s field types, each made nullable."""
+    return [
+        _with_field_nullability(t, stt.Type.NULLABILITY_NULLABLE) for t in struct.types
+    ]
 
 
 def join_output_names(type_name: str, left_names, right_names) -> list:
@@ -784,7 +821,10 @@ def _join_struct_from_schemas(
     elif shape in ("right", "right+mark"):
         types = list(right.types)
     else:
-        types = list(left.types) + list(right.types)
+        pad_left, pad_right = _JOIN_NULL_PADDING.get(type_name, (False, False))
+        types = (_nullable_types(left) if pad_left else list(left.types)) + (
+            _nullable_types(right) if pad_right else list(right.types)
+        )
     if shape in ("left+mark", "right+mark"):
         types.append(
             stt.Type(bool=stt.Type.Boolean(nullability=stt.Type.NULLABILITY_NULLABLE))
@@ -813,7 +853,15 @@ def _lateral_join_output_struct(
     to this relation's ``RelCommon.rel_anchor``. The left schema is bound to that
     anchor (via the anchor scope) while the right schema is inferred, so those
     id-based references resolve.
+
+    Only inner and left-oriented join types are valid for a lateral join; any
+    other raises ``ValueError`` rather than padding a left row that always exists.
     """
+    if type_name not in _LATERAL_JOIN_TYPE_NAMES:
+        raise ValueError(
+            f"LateralJoinRel does not allow {type_name}; expected one of "
+            f"{sorted(_LATERAL_JOIN_TYPE_NAMES)}"
+        )
     left = infer_rel_schema(lateral_join.left, registry=registry, subtrees=subtrees)
     common = lateral_join.common
     if common.HasField("rel_anchor"):
@@ -835,11 +883,14 @@ def _field_nullability(t: stt.Type):
 
 
 def _with_field_nullability(t: stt.Type, nullability) -> stt.Type:
-    """A copy of ``t`` with its nullability replaced (unchanged if it has no kind)."""
+    """A copy of ``t`` with its nullability replaced.
+
+    Unchanged if it has no kind, or is ``unbound``, which carries no nullability.
+    """
     out = stt.Type()
     out.CopyFrom(t)
     kind = out.WhichOneof("kind")
-    if kind:
+    if kind and kind != "unbound":
         getattr(out, kind).nullability = nullability
     return out
 

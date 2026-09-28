@@ -217,3 +217,52 @@ def test_equi_join_optional_args_are_keyword_only(builder, rel_cls):
             rel_cls.JOIN_TYPE_INNER,
             None,  # would have bound to post_join_filter positionally
         )
+
+
+def _physical_join(builder, rel_cls, type_name):
+    join_type = rel_cls.JoinType.Value(type_name)
+    if builder is nested_loop_join:
+        return builder(
+            _left(),
+            _right(),
+            expression=scalar_function(
+                COMPARISON, "equal", expressions=[column("x"), column("w")]
+            ),
+            type=join_type,
+        )
+    return builder(_left(), _right(), ["x"], ["w"], join_type)
+
+
+@pytest.mark.parametrize(
+    "builder, rel_cls",
+    [
+        (hash_join, stalg.HashJoinRel),
+        (merge_join, stalg.MergeJoinRel),
+        (nested_loop_join, stalg.NestedLoopJoinRel),
+    ],
+)
+@pytest.mark.parametrize(
+    "type_name, left_nullable, right_nullable",
+    [
+        ("JOIN_TYPE_INNER", False, False),
+        ("JOIN_TYPE_LEFT", False, True),
+        ("JOIN_TYPE_LEFT_SINGLE", False, True),
+        ("JOIN_TYPE_RIGHT", True, False),
+        ("JOIN_TYPE_RIGHT_SINGLE", True, False),
+        ("JOIN_TYPE_OUTER", True, True),
+    ],
+)
+def test_physical_join_null_pads_by_type_name(
+    builder, rel_cls, type_name, left_nullable, right_nullable
+):
+    # The physical join enums number the join types differently from JoinRel
+    # (LEFT_SINGLE is 7 there, 9 here), so padding is looked up by name. All four
+    # input columns are required, so only a padded side becomes nullable.
+    plan = _physical_join(builder, rel_cls, type_name)(registry)
+
+    nullable = stt.Type.NULLABILITY_NULLABLE
+    nullabilities = [
+        getattr(t, t.WhichOneof("kind")).nullability == nullable
+        for t in infer_plan_schema(plan).struct.types
+    ]
+    assert nullabilities == [left_nullable] * 2 + [right_nullable] * 2

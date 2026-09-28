@@ -277,6 +277,83 @@ def test_inference_join_inner():
     assert infer_rel_schema(rel) == expected
 
 
+@pytest.mark.parametrize(
+    ("join_type", "left_nullability", "right_nullability"),
+    [
+        ("JOIN_TYPE_INNER", _REQ, _REQ),
+        ("JOIN_TYPE_LEFT", _REQ, _NULL),
+        ("JOIN_TYPE_LEFT_SINGLE", _REQ, _NULL),
+        ("JOIN_TYPE_RIGHT", _NULL, _REQ),
+        ("JOIN_TYPE_RIGHT_SINGLE", _NULL, _REQ),
+        ("JOIN_TYPE_OUTER", _NULL, _NULL),
+    ],
+)
+def test_inference_join_null_padded_side(
+    join_type, left_nullability, right_nullability
+):
+    # The side a join fills with nulls for unmatched rows is nullable in the
+    # output; the other side keeps what its input declared. Only the two i64
+    # columns are required in the inputs, so they are the ones that move.
+    rel = stalg.Rel(
+        join=stalg.JoinRel(
+            left=read_rel,
+            right=right_read_rel,
+            type=stalg.JoinRel.JoinType.Value(join_type),
+            expression=None,
+        )
+    )
+
+    expected = stt.Type.Struct(
+        types=[
+            stt.Type(i64=stt.Type.I64(nullability=left_nullability)),
+            stt.Type(string=stt.Type.String(nullability=_NULL)),
+            stt.Type(fp32=stt.Type.FP32(nullability=_NULL)),
+            stt.Type(i64=stt.Type.I64(nullability=right_nullability)),
+            stt.Type(bool=stt.Type.Boolean(nullability=_NULL)),
+        ],
+        nullability=stt.Type.Nullability.NULLABILITY_REQUIRED,
+    )
+
+    assert infer_rel_schema(rel) == expected
+
+
+def test_inference_join_padding_leaves_inputs_alone():
+    # Padding copies each field type, so the inputs still carry what they declare.
+    rel = stalg.Rel(
+        join=stalg.JoinRel(
+            left=read_rel,
+            right=right_read_rel,
+            type=stalg.JoinRel.JOIN_TYPE_OUTER,
+            expression=None,
+        )
+    )
+
+    infer_rel_schema(rel)
+
+    assert infer_rel_schema(rel.join.left) == struct
+    assert infer_rel_schema(rel.join.right) == right_struct
+
+
+def test_inference_join_padding_leaves_an_unbound_field_alone():
+    # An unbound field type carries no nullability, so padding leaves it as it is.
+    unbound = stt.Type(unbound=stt.Type.Unbound())
+    right = stalg.Rel(
+        read=stalg.ReadRel(
+            base_schema=stt.NamedStruct(
+                names=["u"], struct=stt.Type.Struct(types=[unbound], nullability=_REQ)
+            ),
+            named_table=stalg.ReadRel.NamedTable(names=["unbound_table"]),
+        )
+    )
+    rel = stalg.Rel(
+        join=stalg.JoinRel(
+            left=read_rel, right=right, type=stalg.JoinRel.JOIN_TYPE_LEFT
+        )
+    )
+
+    assert list(infer_rel_schema(rel).types)[-1] == unbound
+
+
 def test_inference_join_left_anti():
     rel = stalg.Rel(
         join=stalg.JoinRel(
@@ -366,6 +443,57 @@ def test_inference_lateral_join_inner():
     )
 
     assert infer_rel_schema(rel) == expected
+
+
+def test_inference_lateral_join_left_pads_right():
+    # A lateral join pads like the JoinRel of the same type: a left join leaves
+    # the right columns nullable even where the dependent input requires them.
+    rel = stalg.Rel(
+        lateral_join=stalg.LateralJoinRel(
+            left=read_rel,
+            right=right_read_rel,
+            type=stalg.JoinRel.JOIN_TYPE_LEFT,
+        )
+    )
+
+    expected = stt.Type.Struct(
+        types=[
+            stt.Type(i64=stt.Type.I64(nullability=_REQ)),
+            stt.Type(string=stt.Type.String(nullability=_NULL)),
+            stt.Type(fp32=stt.Type.FP32(nullability=_NULL)),
+            stt.Type(i64=stt.Type.I64(nullability=_NULL)),
+            stt.Type(bool=stt.Type.Boolean(nullability=_NULL)),
+        ],
+        nullability=stt.Type.Nullability.NULLABILITY_REQUIRED,
+    )
+
+    assert infer_rel_schema(rel) == expected
+
+
+@pytest.mark.parametrize(
+    "join_type",
+    [
+        "JOIN_TYPE_RIGHT",
+        "JOIN_TYPE_RIGHT_SINGLE",
+        "JOIN_TYPE_OUTER",
+        "JOIN_TYPE_RIGHT_SEMI",
+        "JOIN_TYPE_RIGHT_ANTI",
+        "JOIN_TYPE_RIGHT_MARK",
+    ],
+)
+def test_inference_lateral_join_rejects_right_oriented_types(join_type):
+    # A lateral join's left row always exists, so the spec allows only inner and
+    # left-oriented types; inference refuses the rest instead of padding the left.
+    rel = stalg.Rel(
+        lateral_join=stalg.LateralJoinRel(
+            left=read_rel,
+            right=right_read_rel,
+            type=stalg.JoinRel.JoinType.Value(join_type),
+        )
+    )
+
+    with pytest.raises(ValueError, match=join_type):
+        infer_rel_schema(rel)
 
 
 def test_inference_lateral_join_left_semi():

@@ -1041,6 +1041,21 @@ def infer_rel_schema(rel: stalg.Rel, *, registry=None, subtrees=()) -> stt.Type.
             )
             for g in rel.aggregate.grouping_expressions
         ]
+        for grouping in rel.aggregate.groupings:
+            for ref in grouping.expression_references:
+                if ref >= len(grouping_types):
+                    raise ValueError(
+                        f"Grouping expression_references index {ref} is out of "
+                        f"range for {len(grouping_types)} grouping expression(s)"
+                    )
+        # A grouping expression missing from any grouping set is null in the
+        # records of that set, so its column is nullable.
+        grouping_types = [
+            t
+            if all(i in g.expression_references for g in rel.aggregate.groupings)
+            else _with_field_nullability(t, stt.Type.NULLABILITY_NULLABLE)
+            for i, t in enumerate(grouping_types)
+        ]
         measure_types = [m.measure.output_type for m in rel.aggregate.measures]
 
         grouping_identifier_types = (

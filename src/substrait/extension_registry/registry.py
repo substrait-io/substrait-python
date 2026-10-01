@@ -34,10 +34,18 @@ class ExtensionRegistry:
         # extension relation's output schema can be derived during inference.
         self._extension_relations: dict = {}
         if load_default_extensions:
-            for fpath in importlib_files("substrait_extensions.extensions").glob(  # type: ignore
-                "functions*.yaml"
-            ):
-                self.register_extension_yaml(fpath)
+            # NB: iterate + filter instead of ``.glob("functions*.yaml")``.
+            # ``importlib.resources.files`` returns a ``Traversable``, which is
+            # not guaranteed to be a filesystem path: when
+            # ``substrait_extensions.extensions`` resolves as a namespace
+            # package the reader returns a ``MultiplexedPath``, and that type
+            # implements ``iterdir``/``open``/``joinpath`` but not ``glob``
+            # (calling ``.glob`` raises ``AttributeError``). ``iterdir`` is part
+            # of the ``Traversable`` protocol and works across ``Path``,
+            # ``MultiplexedPath``, and zip-based readers alike.
+            for fpath in importlib_files("substrait_extensions.extensions").iterdir():
+                if fpath.name.startswith("functions") and fpath.name.endswith(".yaml"):
+                    self.register_extension_yaml(fpath)
 
     def register_extension_yaml(
         self,

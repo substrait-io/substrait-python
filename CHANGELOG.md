@@ -1,6 +1,33 @@
 Release Notes
 ---
 
+## [0.35.0](https://github.com/substrait-io/substrait-python/compare/v0.34.0...v0.35.0) (2026-10-04)
+
+### ⚠ BREAKING CHANGES
+
+* a grouping key absent from some grouping set is now
+inferred nullable, so every schema derived from an aggregate with more
+than one grouping set changes; a single grouping set and plain
+`group_by` are unchanged. A `MIRROR` function over such a key now
+returns a nullable result, and `write_named_table` after a
+`rollup`/`cube` declares those columns nullable in
+`WriteRel.table_schema`, so a `WRITE_OP_CTAS` consumer emits nullable
+columns where it previously emitted `NOT NULL`. A user-registered
+`DISCRETE` overload declared over a required argument no longer binds to
+such a key and raises `Unknown function`; add an explicit cast. No
+standard extension uses `DISCRETE`.
+* Left, right, outer and single joins now infer nullable
+fields on the null-padded side. A schema that repeated a required
+declaration there changes, along with anything derived from it. A
+lateral join of a right-oriented type now raises ValueError, and
+`to_id_based_outer_references` leaves a correlation into the condition
+of any join but an inner one offset-based.
+
+### Bug Fixes
+
+* make a grouping key nullable when a grouping set leaves it out ([#279](https://github.com/substrait-io/substrait-python/issues/279)) ([046a23c](https://github.com/substrait-io/substrait-python/commit/046a23c1b31a4c0d2bf331983d069f4f8ab3d3bd))
+* make a join's null-padded side nullable ([#272](https://github.com/substrait-io/substrait-python/issues/272)) ([24fba23](https://github.com/substrait-io/substrait-python/commit/24fba23b170a69e8192fa4865b13b1d9b6e4da7f))
+
 ## [0.34.0](https://github.com/substrait-io/substrait-python/compare/v0.33.0...v0.34.0) (2026-09-27)
 
 ### ⚠ BREAKING CHANGES

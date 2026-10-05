@@ -614,8 +614,8 @@ def infer_expression_type(
                 schema = stack[len(stack) - steps].struct
         elif root_type == "lambda_parameter_reference":
             stack = _lambda_schemas.get()
+            steps = expression.selection.lambda_parameter_reference.steps_out
             if stack:
-                steps = expression.selection.lambda_parameter_reference.steps_out
                 if steps >= len(stack):
                     raise Exception(
                         "lambda parameter reference outside an enclosing lambda scope"
@@ -624,6 +624,10 @@ def infer_expression_type(
             else:
                 # Builders also infer unwrapped parameter expressions with their
                 # parameter struct supplied as parent_schema.
+                if steps != 0:
+                    raise Exception(
+                        "lambda parameter reference outside an enclosing lambda scope"
+                    )
                 schema = parent_schema
         else:
             assert root_type == "root_reference"

@@ -820,6 +820,11 @@ def test_lambda_parameter_reference_cannot_reach_a_missing_scope():
         infer_expression_type(expr, struct)
 
 
+def test_standalone_lambda_parameter_reference_cannot_reach_a_missing_scope():
+    with pytest.raises(Exception, match="outside an enclosing lambda scope"):
+        infer_expression_type(_lambda_ref(steps_out=1), struct)
+
+
 @pytest.mark.parametrize("fail", [False, True])
 def test_lambda_parameter_scope_does_not_leak(fail):
     parameter = stt.Type(i32=stt.Type.I32(nullability=_REQ))

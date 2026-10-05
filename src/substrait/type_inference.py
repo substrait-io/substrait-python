@@ -146,6 +146,12 @@ outer_schemas: contextvars.ContextVar = contextvars.ContextVar(
     "outer_schemas", default=()
 )
 
+# Lambda parameter structs, outermost first. Root references still resolve
+# against the incoming row supplied to infer_expression_type.
+_lambda_schemas: contextvars.ContextVar = contextvars.ContextVar(
+    "lambda_schemas", default=()
+)
+
 # The anchor scope (an ``_AnchorScope``) for the plan / correlated sub-tree
 # currently being inferred, or None outside inference. Set for the duration of a
 # whole-plan inference (``infer_plan_schema``) so a ``rel_reference`` anywhere in
@@ -606,8 +612,21 @@ def infer_expression_type(
                         "outer reference outside an enclosing (correlated) query"
                     )
                 schema = stack[len(stack) - steps].struct
+        elif root_type == "lambda_parameter_reference":
+            stack = _lambda_schemas.get()
+            if stack:
+                steps = expression.selection.lambda_parameter_reference.steps_out
+                if steps >= len(stack):
+                    raise Exception(
+                        "lambda parameter reference outside an enclosing lambda scope"
+                    )
+                schema = stack[len(stack) - steps - 1]
+            else:
+                # Builders also infer unwrapped parameter expressions with their
+                # parameter struct supplied as parent_schema.
+                schema = parent_schema
         else:
-            assert root_type in ("root_reference", "lambda_parameter_reference")
+            assert root_type == "root_reference"
             schema = parent_schema
 
         reference_type = expression.selection.WhichOneof("reference_type")
@@ -654,13 +673,19 @@ def infer_expression_type(
         return infer_nested_type(
             expression.nested, parent_schema, registry=registry, subtrees=subtrees
         )
-    elif rex_type == "lambda":
-        # A lambda's type is func<param_types -> body_type>; the body's parameter
-        # references resolve against the lambda's own parameter struct.
-        lam = getattr(expression, "lambda")
-        body_type = infer_expression_type(
-            lam.body, lam.parameters, registry=registry, subtrees=subtrees
-        )
+    elif rex_type in ("lambda", "lambda_invocation"):
+        source = expression if rex_type == "lambda" else expression.lambda_invocation
+        lam = getattr(source, "lambda")
+        stack = _lambda_schemas.get()
+        token = _lambda_schemas.set((*stack, lam.parameters))
+        try:
+            body_type = infer_expression_type(
+                lam.body, parent_schema, registry=registry, subtrees=subtrees
+            )
+        finally:
+            _lambda_schemas.reset(token)
+        if rex_type == "lambda_invocation":
+            return body_type
         return stt.Type(
             func=stt.Type.Func(
                 parameter_types=list(lam.parameters.types),
@@ -1163,16 +1188,28 @@ def infer_rel_schema(rel: stalg.Rel, *, registry=None, subtrees=()) -> stt.Type.
                         "expand switching field has no duplicate expressions; its "
                         "output type cannot be inferred"
                     )
-                # All duplicates of a switching field share one type; the first
-                # determines the output column type.
-                field_types.append(
+                # Duplicates share a type class but may differ in nullability.
+                # The output is nullable if any duplicate is nullable.
+                duplicate_types = [
                     infer_expression_type(
-                        duplicates[0],
+                        duplicate,
                         parent_schema,
                         registry=registry,
                         subtrees=subtrees,
                     )
-                )
+                    for duplicate in duplicates
+                ]
+                output_type = duplicate_types[0]
+                # Unbound placeholders carry no nullability.
+                if any(
+                    t.WhichOneof("kind") != "unbound"
+                    and _field_nullability(t) == stt.Type.NULLABILITY_NULLABLE
+                    for t in duplicate_types
+                ):
+                    output_type = _with_field_nullability(
+                        output_type, stt.Type.NULLABILITY_NULLABLE
+                    )
+                field_types.append(output_type)
         # Expand appends an i32 column with the index of the duplicate the row
         # is derived from.
         field_types.append(

@@ -1,3 +1,4 @@
+import pytest
 import substrait.algebra_pb2 as stalg
 import substrait.plan_pb2 as stp
 import substrait.type_pb2 as stt
@@ -84,6 +85,64 @@ def test_expand_schema_inference():
     kinds = [t.WhichOneof("kind") for t in schema.struct.types]
     # region (string), value (fp64), and the appended i32 duplicate index.
     assert kinds == ["string", "fp64", "i32"]
+
+
+@pytest.mark.parametrize(
+    "nullabilities",
+    [
+        pytest.param((False, True), id="nullable-last"),
+        pytest.param((True, False), id="nullable-first"),
+        pytest.param((False, False), id="all-required"),
+        pytest.param((True, True), id="all-nullable"),
+        pytest.param((False, False, True), id="nullable-third"),
+        pytest.param((False,), id="single-required"),
+        pytest.param((True,), id="single-nullable"),
+    ],
+)
+def test_expand_switching_field_nullability(nullabilities):
+    # algebra.proto: a switching field is nullable if any duplicate is nullable.
+    names = [f"value_{i}" for i in range(len(nullabilities))]
+    input_schema = stt.NamedStruct(
+        names=["region", *names],
+        struct=stt.Type.Struct(
+            types=[string(nullable=False)] + [fp64(nullable=n) for n in nullabilities],
+            nullability=stt.Type.NULLABILITY_REQUIRED,
+        ),
+    )
+    plan = expand(
+        read_named_table("sales", input_schema),
+        fields=[
+            ("consistent", column("region")),
+            ("switching", [column(name) for name in names]),
+        ],
+        names=["region", "value", "idx"],
+    )(None)
+    original = stp.Plan()
+    original.CopyFrom(plan)
+
+    schema = infer_plan_schema(plan)
+
+    assert schema.struct.types[0] == string(nullable=False)
+    assert schema.struct.types[1] == fp64(nullable=any(nullabilities))
+    assert plan == original
+
+
+def test_expand_switching_field_preserves_unbound_type():
+    # A partially bound plan may carry a placeholder with no nullability.
+    unbound = stt.Type(unbound=stt.Type.Unbound())
+    input_schema = stt.NamedStruct(
+        names=["u"],
+        struct=stt.Type.Struct(
+            types=[unbound], nullability=stt.Type.NULLABILITY_REQUIRED
+        ),
+    )
+    plan = expand(
+        read_named_table("partial", input_schema),
+        fields=[("switching", [column("u"), column("u")])],
+        names=["value", "idx"],
+    )(None)
+
+    assert infer_plan_schema(plan).struct.types[0] == unbound
 
 
 def test_expand_empty_switching_field_raises_clear_error():

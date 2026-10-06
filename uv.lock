@@ -525,9 +525,9 @@ requires-dist = [
     { name = "protobuf", specifier = ">=5,<7" },
     { name = "pyyaml", marker = "extra == 'extensions'" },
     { name = "sqloxide", marker = "extra == 'sql'" },
-    { name = "substrait-antlr", marker = "extra == 'extensions'", specifier = "==0.100.0" },
-    { name = "substrait-extensions", specifier = "==0.100.0" },
-    { name = "substrait-protobuf", specifier = "==0.100.0" },
+    { name = "substrait-antlr", marker = "extra == 'extensions'", specifier = "==0.101.0" },
+    { name = "substrait-extensions", specifier = "==0.101.0" },
+    { name = "substrait-protobuf", specifier = "==0.101.0" },
 ]
 provides-extras = ["extensions", "sql"]
 
@@ -539,40 +539,40 @@ dev = [
     { name = "pytest", specifier = ">=7.0.0" },
     { name = "pyyaml" },
     { name = "sqloxide" },
-    { name = "substrait-antlr", specifier = "==0.100.0" },
+    { name = "substrait-antlr", specifier = "==0.101.0" },
 ]
 
 [[package]]
 name = "substrait-antlr"
-version = "0.100.0"
+version = "0.101.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "antlr4-python3-runtime" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/b1/a4/7c84cffe530873310a65e1ded97fd0a231d84baf6a6b02a2ed2b3afdd0b9/substrait_antlr-0.100.0.tar.gz", hash = "sha256:739ec296fbdc982ecc7509ce256eb001885eef11c748e4c7368cf202dfa14e0e", size = 69292, upload-time = "2026-08-09T03:29:10.696Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/05/2e/7a2b9585af9ffe00196b75cd9e7a004b125af6731b6df88b1681140e02a8/substrait_antlr-0.101.0.tar.gz", hash = "sha256:22f056f48949849a67c589d0934a07bc3298a78bbdaa4d1b7f35301aab186196", size = 69329, upload-time = "2026-08-16T02:55:53.047Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/ed/0c/b3c4cccfce6bd6f5dc45639733000790ac96347ddb161cab11e468735ba1/substrait_antlr-0.100.0-py3-none-any.whl", hash = "sha256:e3a0056b75f80e30f8b3d2dedadf3332473652033809114c3121c01ce35c0daf", size = 78343, upload-time = "2026-08-09T03:29:11.556Z" },
+    { url = "https://files.pythonhosted.org/packages/c7/60/00fe09b8f19e3633b6af02fc9fecd7eb4d99c52b2e22d22a7cf4c9c2b43a/substrait_antlr-0.101.0-py3-none-any.whl", hash = "sha256:175cbf6bba7c8a74258c78c5696360837064595835be745c30aae50bf57cf0a4", size = 78346, upload-time = "2026-08-16T02:55:52.01Z" },
 ]
 
 [[package]]
 name = "substrait-extensions"
-version = "0.100.0"
+version = "0.101.0"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/bf/d6/3ae8ec6ce4b450f5a2865d31846db912f873091242b3d918455c35c2cca9/substrait_extensions-0.100.0.tar.gz", hash = "sha256:95959bb5e736417874509a4f95bbd98192aa73c02f809e637c4f568292c033f5", size = 59007, upload-time = "2026-08-09T03:29:09.784Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/d8/10/db97c624349e1a2152774926fe5dded6eef42ac0bfc94b9a19b124c5e7ed/substrait_extensions-0.101.0.tar.gz", hash = "sha256:136ae8dcf4be91ea9a2096976321c59508c55463153d5d979ba82ee41c07cc9e", size = 62096, upload-time = "2026-08-16T02:55:48.82Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/59/42/916e56d8fa9b6a9eb342cb478e8dff9c817dea6660b58e57ad6a1b572b52/substrait_extensions-0.100.0-py3-none-any.whl", hash = "sha256:f9a357dbf590c4805cb71438cdea769ffcf27e4422a5757741f727af4ffe814d", size = 117983, upload-time = "2026-08-09T03:29:10.854Z" },
+    { url = "https://files.pythonhosted.org/packages/1d/1c/d1360d6125e43c3a1f28e3743b927c920ad308babde036cbb5216def8dda/substrait_extensions-0.101.0-py3-none-any.whl", hash = "sha256:2a9c1a2a9c47dbd7e0ae7e7bf744af5302667e962195a3e8f0fd53f66948f038", size = 125496, upload-time = "2026-08-16T02:55:49.759Z" },
 ]
 
 [[package]]
 name = "substrait-protobuf"
-version = "0.100.0"
+version = "0.101.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "protobuf" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/ae/43/875d528e3092e5bdc96865c12ca28a1b6dd8d772c74d39506dba128a61eb/substrait_protobuf-0.100.0.tar.gz", hash = "sha256:a1040f8ff6199c2a710367852965febfb60b52fe3353e0334d90dabfdb3e1403", size = 65068, upload-time = "2026-08-09T03:29:08.286Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/a1/44/95d5e070d0a4951a44da600cf6bba7ec2bbb2d8d08dd8318334348122497/substrait_protobuf-0.101.0.tar.gz", hash = "sha256:d15be9f5d2b70d92f25b2a420f05733577e6d8a75c419f544bf8d922e249dc39", size = 65208, upload-time = "2026-08-16T02:56:02.619Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/bd/fa/75270f6d50d94743962c6df3a1c8facfdfe23e82796416e986737a5814ed/substrait_protobuf-0.100.0-py3-none-any.whl", hash = "sha256:733778b7b4e25b1ef836971fe610a4b492ebdda9e91a5c16510e46b82a404732", size = 70958, upload-time = "2026-08-09T03:29:09.287Z" },
+    { url = "https://files.pythonhosted.org/packages/80/14/cf0b60bcf81a18cee9eb6806fefff36d363ed7b5b69baaf6dec6fd26f7e6/substrait_protobuf-0.101.0-py3-none-any.whl", hash = "sha256:54b749cf00446e09f81ca4ca811813c58dacfc09ea9f1740baf516786c624b1c", size = 71100, upload-time = "2026-08-16T02:56:03.408Z" },
 ]
 
 [[package]]

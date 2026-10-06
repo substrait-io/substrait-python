@@ -823,17 +823,31 @@ def test_convert_correlation_above_lateral_join_left_as_steps_out():
 
 
 def test_convert_binding_without_rel_common_raises():
-    # A binding relation that carries no RelCommon at all (an UpdateRel) cannot hold
-    # an anchor. No correlated-subquery shape produces this, but the converter
-    # guards it rather than silently dropping the reference.
+    # A binding relation that carries no RelCommon at all cannot hold an anchor. A
+    # ReferenceRel is unwrapped to its subtree first, so with every other relation
+    # carrying RelCommon only a Rel with no relation set reaches this. No
+    # correlated-subquery shape produces one, but the converter guards it rather
+    # than silently dropping the reference.
+    plan = _plan(_filter(stalg.Rel(), _exists(_filter(_read("i"), _outer(1)))))
+    with pytest.raises(Exception, match="no RelCommon"):
+        to_id_based_outer_references(plan)
+
+
+def test_convert_anchors_update_rel_binding():
+    # UpdateRel carries a RelCommon (since spec v0.101.0), so a correlation into it
+    # is anchored like any other binding.
     update = stalg.Rel(
         update=stalg.UpdateRel(
             named_table=stalg.NamedTable(names=["t"]),
         )
     )
-    plan = _plan(_filter(update, _exists(_filter(_read("i"), _outer(1)))))
-    with pytest.raises(Exception, match="no RelCommon"):
-        to_id_based_outer_references(plan)
+    out = to_id_based_outer_references(
+        _plan(_filter(update, _exists(_filter(_read("i"), _outer(1)))))
+    )
+    top = out.relations[-1].root.input
+    ref = top.filter.condition.subquery.set_predicate.tuples.filter.condition.selection.outer_reference
+    assert ref.WhichOneof("outer_reference_type") == "rel_reference"
+    assert ref.rel_reference == rel_anchor_of(top.filter.input) == 1
 
 
 def test_convert_noncorrelated_plan_unchanged():

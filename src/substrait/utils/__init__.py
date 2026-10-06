@@ -553,8 +553,8 @@ def to_id_based_outer_references(plan: stplan.Plan) -> stplan.Plan:
       therefore cannot be anchored on it and is left offset-based, rather than
       aliasing (and corrupting) the left-row anchor.
 
-    Raises only if a resolvable binding carries no ``RelCommon`` at all (e.g. an
-    ``UpdateRel``), which no correlated-subquery shape produces.
+    Raises only if a resolvable binding carries no ``RelCommon`` at all (e.g. a
+    ``Rel`` with no relation set), which no correlated-subquery shape produces.
     """
     if not _plan_has_steps_out(plan):
         return plan

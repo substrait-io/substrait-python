@@ -702,6 +702,269 @@ def test_infer_expression_type_literal():
     assert result == expected
 
 
+def _lambda_ref(field=0, *, steps_out=0):
+    return stalg.Expression(
+        selection=stalg.Expression.FieldReference(
+            lambda_parameter_reference=stalg.Expression.FieldReference.LambdaParameterReference(
+                steps_out=steps_out
+            ),
+            direct_reference=stalg.Expression.ReferenceSegment(
+                struct_field=stalg.Expression.ReferenceSegment.StructField(field=field)
+            ),
+        )
+    )
+
+
+def _lambda_expression(parameters, body, *, invoke=False, arguments=()):
+    lam = stalg.Expression.Lambda(
+        parameters=stt.Type.Struct(types=parameters, nullability=_REQ), body=body
+    )
+    if invoke:
+        return stalg.Expression(
+            lambda_invocation=stalg.Expression.LambdaInvocation(
+                **{
+                    "lambda": lam,
+                    "arguments": stalg.Expression.Nested.Struct(fields=arguments),
+                }
+            )
+        )
+    return stalg.Expression(**{"lambda": lam})
+
+
+@pytest.mark.parametrize("nullable", [False, True])
+def test_infer_lambda_invocation_literal_body(nullable):
+    body = stalg.Expression(literal=stalg.Expression.Literal(i32=7, nullable=nullable))
+    expr = _lambda_expression([], body, invoke=True)
+
+    assert infer_expression_type(expr, struct) == stt.Type(
+        i32=stt.Type.I32(nullability=_NULL if nullable else _REQ)
+    )
+
+
+@pytest.mark.parametrize("argument_count", [0, 2])
+def test_lambda_invocation_requires_one_argument_per_parameter(argument_count):
+    expr = _lambda_expression(
+        [struct.types[0]],
+        _lambda_ref(),
+        invoke=True,
+        arguments=[_field_reference(0)] * argument_count,
+    )
+    with pytest.raises(Exception, match="one argument per lambda parameter"):
+        infer_expression_type(expr, struct)
+
+
+@pytest.mark.parametrize(
+    "parameter_type, argument_type",
+    [
+        (struct.types[0], struct.types[1]),
+        (struct.types[0], stt.Type(i64=stt.Type.I64(nullability=_NULL))),
+        (
+            stt.Type(decimal=stt.Type.Decimal(precision=10, scale=2, nullability=_REQ)),
+            stt.Type(decimal=stt.Type.Decimal(precision=10, scale=3, nullability=_REQ)),
+        ),
+        (
+            struct.types[0],
+            stt.Type(i64=stt.Type.I64(nullability=_REQ, type_variation_reference=1)),
+        ),
+    ],
+)
+@pytest.mark.parametrize("argument_index", [0, 1])
+@pytest.mark.parametrize("matches", [False, True])
+def test_lambda_invocation_argument_types_must_match_parameters(
+    parameter_type, argument_type, argument_index, matches
+):
+    argument_types = [parameter_type, parameter_type]
+    if not matches:
+        argument_types[argument_index] = argument_type
+    expr = _lambda_expression(
+        [parameter_type, parameter_type],
+        _lambda_ref(),
+        invoke=True,
+        arguments=[_field_reference(0), _field_reference(1)],
+    )
+    row = stt.Type.Struct(types=argument_types, nullability=_REQ)
+    if matches:
+        assert infer_expression_type(expr, row) == parameter_type
+    else:
+        with pytest.raises(Exception, match="argument type must match parameter type"):
+            infer_expression_type(expr, row)
+
+
+@pytest.mark.parametrize("steps_out", [0, 1])
+@pytest.mark.parametrize("argument_index", [0, 1])
+def test_lambda_invocation_arguments_cannot_use_the_invoked_lambda_scope(
+    steps_out, argument_index
+):
+    arguments = [_field_reference(0), _field_reference(0)]
+    arguments[argument_index] = _lambda_ref(steps_out=steps_out)
+    expr = _lambda_expression(
+        [struct.types[0], struct.types[0]],
+        _lambda_ref(),
+        invoke=True,
+        arguments=arguments,
+    )
+    with pytest.raises(Exception, match="outside an enclosing lambda scope"):
+        infer_expression_type(expr, struct)
+
+
+def test_nested_lambda_invocation_argument_uses_the_callers_scope():
+    outer = struct.types[1]
+    inner = _lambda_expression(
+        [outer], _lambda_ref(), invoke=True, arguments=[_lambda_ref()]
+    )
+    expr = _lambda_expression([outer], inner)
+    assert infer_expression_type(expr, struct).func.return_type == outer
+
+
+@pytest.mark.parametrize("invoke", [False, True])
+@pytest.mark.parametrize("reference", ["root", "parameter"])
+def test_infer_lambda_keeps_row_and_parameter_scopes_distinct(invoke, reference):
+    # Same field index, different types: a root reference captures the input row.
+    row_type = stt.Type(string=stt.Type.String(nullability=_NULL))
+    parameter = stt.Type(i64=stt.Type.I64(nullability=_REQ))
+    body = _field_reference(0) if reference == "root" else _lambda_ref()
+    expr = _lambda_expression(
+        [parameter],
+        body,
+        invoke=invoke,
+        arguments=[stalg.Expression(literal=stalg.Expression.Literal(i64=42))],
+    )
+    original = expr.SerializeToString()
+    result = infer_expression_type(
+        expr, stt.Type.Struct(types=[row_type], nullability=_REQ)
+    )
+    expected = row_type if reference == "root" else parameter
+
+    if invoke:
+        assert result == expected
+    else:
+        assert result == stt.Type(
+            func=stt.Type.Func(
+                parameter_types=[parameter], return_type=expected, nullability=_REQ
+            )
+        )
+    assert expr.SerializeToString() == original
+
+
+@pytest.mark.parametrize("steps_out", [0, 1])
+@pytest.mark.parametrize("invoke", [False, True])
+def test_infer_nested_lambda_parameter_scopes(steps_out, invoke):
+    outer = stt.Type(string=stt.Type.String(nullability=_NULL))
+    inner = stt.Type(i64=stt.Type.I64(nullability=_REQ))
+    inner_expr = _lambda_expression(
+        [inner],
+        _lambda_ref(steps_out=steps_out),
+        invoke=invoke,
+        arguments=[stalg.Expression(literal=stalg.Expression.Literal(i64=42))],
+    )
+    expr = _lambda_expression(
+        [outer],
+        inner_expr,
+        invoke=invoke,
+        arguments=[
+            stalg.Expression(
+                literal=stalg.Expression.Literal(string="x", nullable=True)
+            )
+        ],
+    )
+    result = infer_expression_type(expr, struct)
+    expected = inner if steps_out == 0 else outer
+
+    if invoke:
+        assert result == expected
+    else:
+        assert result.func.return_type.func.return_type == expected
+
+
+def test_lambda_parameter_reference_cannot_reach_a_missing_scope():
+    parameter = stt.Type(i32=stt.Type.I32(nullability=_REQ))
+    expr = _lambda_expression([parameter], _lambda_ref(steps_out=1))
+
+    with pytest.raises(Exception, match="outside an enclosing lambda scope"):
+        infer_expression_type(expr, struct)
+
+
+@pytest.mark.parametrize("steps_out", [0, 1])
+def test_standalone_lambda_parameter_reference_cannot_reach_a_missing_scope(steps_out):
+    with pytest.raises(Exception, match="outside an enclosing lambda scope"):
+        infer_expression_type(_lambda_ref(steps_out=steps_out), struct)
+
+
+def test_project_lambda_parameter_reference_requires_a_lambda_scope():
+    rel = stalg.Rel(
+        project=stalg.ProjectRel(
+            input=stalg.Rel(read=stalg.ReadRel(base_schema=named_struct)),
+            expressions=[_lambda_ref()],
+        )
+    )
+    with pytest.raises(Exception, match="outside an enclosing lambda scope"):
+        infer_rel_schema(rel)
+
+
+@pytest.mark.parametrize("fail", [False, True])
+def test_lambda_parameter_scope_does_not_leak(fail):
+    parameter = stt.Type(i32=stt.Type.I32(nullability=_REQ))
+    supplied = stt.Type.Struct(
+        types=[stt.Type(string=stt.Type.String(nullability=_NULL))], nullability=_REQ
+    )
+    body = _field_reference(99) if fail else _lambda_ref()
+    expr = _lambda_expression([parameter], body)
+    if fail:
+        with pytest.raises(IndexError):
+            infer_expression_type(expr, supplied)
+    else:
+        assert infer_expression_type(expr, supplied).func.return_type == parameter
+
+    with pytest.raises(Exception, match="outside an enclosing lambda scope"):
+        infer_expression_type(_lambda_ref(), supplied)
+
+
+def _expand_switching(types, duplicates):
+    inp = stalg.Rel(
+        read=stalg.ReadRel(
+            named_table=stalg.ReadRel.NamedTable(names=["t"]),
+            base_schema=stt.NamedStruct(
+                names=[f"c{i}" for i in range(len(types))],
+                struct=stt.Type.Struct(types=types, nullability=_REQ),
+            ),
+        )
+    )
+    fields = [
+        stalg.ExpandRel.ExpandField(
+            switching_field=stalg.ExpandRel.SwitchingField(duplicates=duplicates)
+        )
+    ] + [
+        stalg.ExpandRel.ExpandField(consistent_field=_field_reference(i))
+        for i in range(1, len(types))
+    ]
+    return stalg.Rel(expand=stalg.ExpandRel(input=inp, fields=fields))
+
+
+@pytest.mark.parametrize("nullable", [False, True])
+def test_expand_switching_field_with_lambda_invocation(nullable):
+    integer = stt.Type(i32=stt.Type.I32(nullability=_REQ))
+    body = stalg.Expression(literal=stalg.Expression.Literal(i32=7, nullable=nullable))
+    rel = _expand_switching([integer], [_lambda_expression([], body, invoke=True)])
+    original = rel.SerializeToString()
+
+    assert infer_rel_schema(rel).types[0] == stt.Type(
+        i32=stt.Type.I32(nullability=_NULL if nullable else _REQ)
+    )
+    assert rel.SerializeToString() == original
+
+
+def test_expand_switching_lambda_captures_input_row():
+    integer = stt.Type(i32=stt.Type.I32(nullability=_REQ))
+    function = stt.Type(func=stt.Type.Func(return_type=integer, nullability=_REQ))
+    rel = _expand_switching(
+        [function, integer], [_lambda_expression([], _field_reference(1))]
+    )
+    original = rel.SerializeToString()
+
+    assert infer_rel_schema(rel).types[0] == function
+    assert rel.SerializeToString() == original
+
+
 def test_infer_expression_type_selection():
     """Test infer_expression_type with a field selection expression."""
     expr = stalg.Expression(

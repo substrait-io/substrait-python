@@ -146,6 +146,28 @@ outer_schemas: contextvars.ContextVar = contextvars.ContextVar(
     "outer_schemas", default=()
 )
 
+# Lambda parameter structs, outermost first. Root references still resolve
+# against the incoming row supplied to infer_expression_type.
+_lambda_schemas: contextvars.ContextVar = contextvars.ContextVar(
+    "lambda_schemas", default=()
+)
+
+
+def lambda_depth() -> int:
+    """Number of lambda scopes enclosing the expression currently being bound."""
+    return len(_lambda_schemas.get())
+
+
+@contextlib.contextmanager
+def lambda_scope(parameters: stt.Type.Struct):
+    """Bind a lambda's parameter struct while building or inferring its body."""
+    token = _lambda_schemas.set((*_lambda_schemas.get(), parameters))
+    try:
+        yield
+    finally:
+        _lambda_schemas.reset(token)
+
+
 # The anchor scope (an ``_AnchorScope``) for the plan / correlated sub-tree
 # currently being inferred, or None outside inference. Set for the duration of a
 # whole-plan inference (``infer_plan_schema``) so a ``rel_reference`` anywhere in
@@ -606,8 +628,16 @@ def infer_expression_type(
                         "outer reference outside an enclosing (correlated) query"
                     )
                 schema = stack[len(stack) - steps].struct
+        elif root_type == "lambda_parameter_reference":
+            stack = _lambda_schemas.get()
+            steps = expression.selection.lambda_parameter_reference.steps_out
+            if steps >= len(stack):
+                raise Exception(
+                    "lambda parameter reference outside an enclosing lambda scope"
+                )
+            schema = stack[len(stack) - steps - 1]
         else:
-            assert root_type in ("root_reference", "lambda_parameter_reference")
+            assert root_type == "root_reference"
             schema = parent_schema
 
         reference_type = expression.selection.WhichOneof("reference_type")
@@ -654,13 +684,28 @@ def infer_expression_type(
         return infer_nested_type(
             expression.nested, parent_schema, registry=registry, subtrees=subtrees
         )
-    elif rex_type == "lambda":
-        # A lambda's type is func<param_types -> body_type>; the body's parameter
-        # references resolve against the lambda's own parameter struct.
-        lam = getattr(expression, "lambda")
-        body_type = infer_expression_type(
-            lam.body, lam.parameters, registry=registry, subtrees=subtrees
-        )
+    elif rex_type in ("lambda", "lambda_invocation"):
+        source = expression if rex_type == "lambda" else expression.lambda_invocation
+        lam = getattr(source, "lambda")
+        with lambda_scope(lam.parameters):
+            body_type = infer_expression_type(
+                lam.body, parent_schema, registry=registry, subtrees=subtrees
+            )
+        if rex_type == "lambda_invocation":
+            arguments = expression.lambda_invocation.arguments.fields
+            if len(arguments) != len(lam.parameters.types):
+                raise Exception(
+                    "lambda invocation needs one argument per lambda parameter"
+                )
+            for parameter_type, argument in zip(lam.parameters.types, arguments):
+                argument_type = infer_expression_type(
+                    argument, parent_schema, registry=registry, subtrees=subtrees
+                )
+                if argument_type != parameter_type:
+                    raise Exception(
+                        "lambda invocation argument type must match parameter type"
+                    )
+            return body_type
         return stt.Type(
             func=stt.Type.Func(
                 parameter_types=list(lam.parameters.types),

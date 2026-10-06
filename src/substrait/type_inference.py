@@ -1163,16 +1163,41 @@ def infer_rel_schema(rel: stalg.Rel, *, registry=None, subtrees=()) -> stt.Type.
                         "expand switching field has no duplicate expressions; its "
                         "output type cannot be inferred"
                     )
-                # All duplicates of a switching field share one type; the first
-                # determines the output column type.
-                field_types.append(
+                # Duplicates share a type class but may differ in nullability.
+                # The output is nullable if any duplicate is nullable.
+                duplicate_types = [
                     infer_expression_type(
-                        duplicates[0],
+                        duplicate,
                         parent_schema,
                         registry=registry,
                         subtrees=subtrees,
                     )
-                )
+                    for duplicate in duplicates
+                ]
+                bound = [
+                    t for t in duplicate_types if t.WhichOneof("kind") != "unbound"
+                ]
+                unbound = [
+                    t for t in duplicate_types if t.WhichOneof("kind") == "unbound"
+                ]
+                if len({t.WhichOneof("kind") for t in bound}) > 1:
+                    raise ValueError(
+                        "expand switching field duplicates must share one type class"
+                    )
+                if any(
+                    _field_nullability(t) == stt.Type.NULLABILITY_NULLABLE
+                    for t in bound
+                ):
+                    # Nullable whatever an unbound placeholder later binds to.
+                    output_type = _with_field_nullability(
+                        bound[0], stt.Type.NULLABILITY_NULLABLE
+                    )
+                elif unbound:
+                    # Otherwise the nullability depends on the placeholder.
+                    output_type = unbound[0]
+                else:
+                    output_type = bound[0]
+                field_types.append(output_type)
         # Expand appends an i32 column with the index of the duplicate the row
         # is derived from.
         field_types.append(

@@ -828,6 +828,14 @@ def test_unpivot_schema_inference_allows_chaining():
     assert plan.relations[-1].root.input.HasField("filter")
 
 
+@pytest.mark.parametrize("columns", [["a", "b"], ["b", "a"]])
+def test_unpivot_rejects_mixed_type_classes(columns):
+    frame = sub.read_named_table("mixed", {"a": sub.i32, "b": sub.string})
+
+    with pytest.raises(ValueError, match="duplicates must share one type class"):
+        frame.unpivot(columns).to_plan()
+
+
 def test_unpivot_requires_on():
     with pytest.raises(ValueError, match="at least one column"):
         _wide_df().unpivot([], index="region")

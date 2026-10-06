@@ -66,7 +66,7 @@ from substrait.builders.extended_expression import (
 from substrait.builders.extended_expression import (
     set_predicate as _set_predicate,
 )
-from substrait.type_inference import infer_extended_expression_schema
+from substrait.type_inference import infer_extended_expression_schema, lambda_scope
 
 # Standard Substrait function-extension URNs used by the operators below.
 FUNCTIONS_COMPARISON = "extension:io.substrait:functions_comparison"
@@ -643,7 +643,6 @@ class Expr:
             param_struct = stp.Type.Struct(
                 types=[element_type], nullability=stp.Type.NULLABILITY_REQUIRED
             )
-            param_ns = stp.NamedStruct(names=["element"], struct=param_struct)
             param_ref = stalg.Expression(
                 selection=stalg.Expression.FieldReference(
                     lambda_parameter_reference=(
@@ -665,10 +664,11 @@ class Expr:
                             expression=param_ref, output_names=["element"]
                         )
                     ],
-                    base_schema=param_ns,
+                    base_schema=base_schema,
                 )
             )
-            body = Expr._coerce(callback(element))._unbound(param_ns, registry)
+            with lambda_scope(param_struct):
+                body = Expr._coerce(callback(element))._unbound(base_schema, registry)
             lambda_expr = stalg.Expression(
                 **{
                     "lambda": stalg.Expression.Lambda(

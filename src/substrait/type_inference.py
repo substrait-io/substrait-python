@@ -152,6 +152,17 @@ _lambda_schemas: contextvars.ContextVar = contextvars.ContextVar(
     "lambda_schemas", default=()
 )
 
+
+@contextlib.contextmanager
+def lambda_scope(parameters: stt.Type.Struct):
+    """Bind a lambda's parameter struct while building or inferring its body."""
+    token = _lambda_schemas.set((*_lambda_schemas.get(), parameters))
+    try:
+        yield
+    finally:
+        _lambda_schemas.reset(token)
+
+
 # The anchor scope (an ``_AnchorScope``) for the plan / correlated sub-tree
 # currently being inferred, or None outside inference. Set for the duration of a
 # whole-plan inference (``infer_plan_schema``) so a ``rel_reference`` anywhere in
@@ -615,20 +626,11 @@ def infer_expression_type(
         elif root_type == "lambda_parameter_reference":
             stack = _lambda_schemas.get()
             steps = expression.selection.lambda_parameter_reference.steps_out
-            if stack:
-                if steps >= len(stack):
-                    raise Exception(
-                        "lambda parameter reference outside an enclosing lambda scope"
-                    )
-                schema = stack[len(stack) - steps - 1]
-            else:
-                # Builders also infer unwrapped parameter expressions with their
-                # parameter struct supplied as parent_schema.
-                if steps != 0:
-                    raise Exception(
-                        "lambda parameter reference outside an enclosing lambda scope"
-                    )
-                schema = parent_schema
+            if steps >= len(stack):
+                raise Exception(
+                    "lambda parameter reference outside an enclosing lambda scope"
+                )
+            schema = stack[len(stack) - steps - 1]
         else:
             assert root_type == "root_reference"
             schema = parent_schema
@@ -680,14 +682,10 @@ def infer_expression_type(
     elif rex_type in ("lambda", "lambda_invocation"):
         source = expression if rex_type == "lambda" else expression.lambda_invocation
         lam = getattr(source, "lambda")
-        stack = _lambda_schemas.get()
-        token = _lambda_schemas.set((*stack, lam.parameters))
-        try:
+        with lambda_scope(lam.parameters):
             body_type = infer_expression_type(
                 lam.body, parent_schema, registry=registry, subtrees=subtrees
             )
-        finally:
-            _lambda_schemas.reset(token)
         if rex_type == "lambda_invocation":
             return body_type
         return stt.Type(

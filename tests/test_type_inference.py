@@ -820,16 +820,26 @@ def test_lambda_parameter_reference_cannot_reach_a_missing_scope():
         infer_expression_type(expr, struct)
 
 
-def test_standalone_lambda_parameter_reference_cannot_reach_a_missing_scope():
+@pytest.mark.parametrize("steps_out", [0, 1])
+def test_standalone_lambda_parameter_reference_cannot_reach_a_missing_scope(steps_out):
     with pytest.raises(Exception, match="outside an enclosing lambda scope"):
-        infer_expression_type(_lambda_ref(steps_out=1), struct)
+        infer_expression_type(_lambda_ref(steps_out=steps_out), struct)
+
+
+def test_project_lambda_parameter_reference_requires_a_lambda_scope():
+    rel = stalg.Rel(
+        project=stalg.ProjectRel(
+            input=stalg.Rel(read=stalg.ReadRel(base_schema=named_struct)),
+            expressions=[_lambda_ref()],
+        )
+    )
+    with pytest.raises(Exception, match="outside an enclosing lambda scope"):
+        infer_rel_schema(rel)
 
 
 @pytest.mark.parametrize("fail", [False, True])
 def test_lambda_parameter_scope_does_not_leak(fail):
     parameter = stt.Type(i32=stt.Type.I32(nullability=_REQ))
-    # The higher-order builders also infer parameter expressions directly,
-    # supplying their parameter struct before wrapping the body in a lambda.
     supplied = stt.Type.Struct(
         types=[stt.Type(string=stt.Type.String(nullability=_NULL))], nullability=_REQ
     )
@@ -841,7 +851,8 @@ def test_lambda_parameter_scope_does_not_leak(fail):
     else:
         assert infer_expression_type(expr, supplied).func.return_type == parameter
 
-    assert infer_expression_type(_lambda_ref(), supplied) == supplied.types[0]
+    with pytest.raises(Exception, match="outside an enclosing lambda scope"):
+        infer_expression_type(_lambda_ref(), supplied)
 
 
 def _expand_switching(types, duplicates):

@@ -26,8 +26,9 @@
       "minimumReleaseAge": null
     },
     {
-      "description": "ruff is declared in both [tool.pixi.dependencies] and .pre-commit-config.yaml, so keep the hook revision in step with the pixi range rather than letting them drift apart in separate PRs. Both are development tooling, so they take the deps-dev scope",
+      "description": "ruff is declared in both [tool.pixi.dependencies] and .pre-commit-config.yaml, so keep the hook revision in step with the pixi range rather than letting them drift apart in separate PRs. Both are development tooling, so they take the deps-dev scope. Lock file maintenance is excluded: the pep621 manager already refreshes pixi.lock in the regular lock file maintenance PR, and a second grouped branch rewriting the same file would conflict with it",
       "matchManagers": ["pixi", "pre-commit"],
+      "matchUpdateTypes": ["!lockFileMaintenance"],
       "groupName": "pixi and pre-commit tooling",
       "semanticCommitScope": "deps-dev"
     },

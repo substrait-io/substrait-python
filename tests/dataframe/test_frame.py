@@ -1050,6 +1050,61 @@ def test_nested_list_transform_resolves_enclosing_parameter():
     assert infer_plan_schema(plan).struct.types[0].list.type.list.type == i64()
 
 
+@pytest.mark.parametrize("capture_outer", [False, True])
+def test_nested_list_transform_captures_callback_element(capture_outer):
+    from substrait.type_inference import infer_plan_schema
+
+    plan = (
+        sub.read_named_table(
+            "t",
+            {"arr": sub.list_(i64(nullable=False)), "inner": sub.list_(fp64())},
+        )
+        .select(
+            sub.col("arr").list_transform(
+                lambda x: sub.col("inner").list_transform(
+                    lambda y: x if capture_outer else y
+                )
+            )
+        )
+        .to_plan()
+    )
+    outer = getattr(
+        plan.relations[-1]
+        .root.input.project.expressions[0]
+        .scalar_function.arguments[1]
+        .value,
+        "lambda",
+    )
+    inner = getattr(outer.body.scalar_function.arguments[1].value, "lambda")
+    assert inner.body.selection.lambda_parameter_reference.steps_out == int(
+        capture_outer
+    )
+    expected = i64(nullable=False) if capture_outer else fp64()
+    assert infer_plan_schema(plan).struct.types[0].list.type.list.type == expected
+
+
+def test_list_transform_captures_parameter_two_scopes_out():
+    from substrait.type_inference import infer_plan_schema
+
+    plan = (
+        sub.read_named_table(
+            "t",
+            {"arr": sub.list_(i64(nullable=False)), "inner": sub.list_(fp64())},
+        )
+        .select(
+            sub.col("arr").list_transform(
+                lambda x: sub.col("inner").list_transform(
+                    lambda _: sub.col("inner").list_transform(lambda _: x)
+                )
+            )
+        )
+        .to_plan()
+    )
+    assert infer_plan_schema(plan).struct.types[0].list.type.list.type.list.type == i64(
+        nullable=False
+    )
+
+
 @pytest.mark.parametrize("fail", [False, True])
 def test_higher_order_lambda_scope_does_not_leak(fail):
     from substrait.type_inference import infer_expression_type

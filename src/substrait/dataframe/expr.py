@@ -66,7 +66,11 @@ from substrait.builders.extended_expression import (
 from substrait.builders.extended_expression import (
     set_predicate as _set_predicate,
 )
-from substrait.type_inference import infer_extended_expression_schema, lambda_scope
+from substrait.type_inference import (
+    infer_extended_expression_schema,
+    lambda_depth,
+    lambda_scope,
+)
 
 # Standard Substrait function-extension URNs used by the operators below.
 FUNCTIONS_COMPARISON = "extension:io.substrait:functions_comparison"
@@ -643,30 +647,33 @@ class Expr:
             param_struct = stp.Type.Struct(
                 types=[element_type], nullability=stp.Type.NULLABILITY_REQUIRED
             )
-            param_ref = stalg.Expression(
-                selection=stalg.Expression.FieldReference(
-                    lambda_parameter_reference=(
-                        stalg.Expression.FieldReference.LambdaParameterReference(
-                            steps_out=0
-                        )
-                    ),
-                    direct_reference=stalg.Expression.ReferenceSegment(
-                        struct_field=stalg.Expression.ReferenceSegment.StructField(
-                            field=0
-                        )
-                    ),
+            depth = lambda_depth() + 1
+
+            def resolve_element(schema, _registry):
+                param_ref = stalg.Expression(
+                    selection=stalg.Expression.FieldReference(
+                        lambda_parameter_reference=(
+                            stalg.Expression.FieldReference.LambdaParameterReference(
+                                steps_out=lambda_depth() - depth
+                            )
+                        ),
+                        direct_reference=stalg.Expression.ReferenceSegment(
+                            struct_field=stalg.Expression.ReferenceSegment.StructField(
+                                field=0
+                            )
+                        ),
+                    )
                 )
-            )
-            element = Expr(
-                lambda _bs, _r: stee.ExtendedExpression(
+                return stee.ExtendedExpression(
                     referred_expr=[
                         stee.ExpressionReference(
                             expression=param_ref, output_names=["element"]
                         )
                     ],
-                    base_schema=base_schema,
+                    base_schema=schema,
                 )
-            )
+
+            element = Expr(resolve_element)
             with lambda_scope(param_struct):
                 body = Expr._coerce(callback(element))._unbound(base_schema, registry)
             lambda_expr = stalg.Expression(

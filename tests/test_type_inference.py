@@ -715,17 +715,6 @@ def _lambda_ref(field=0, *, steps_out=0):
     )
 
 
-def _root_ref(field=0):
-    return stalg.Expression(
-        selection=stalg.Expression.FieldReference(
-            root_reference=stalg.Expression.FieldReference.RootReference(),
-            direct_reference=stalg.Expression.ReferenceSegment(
-                struct_field=stalg.Expression.ReferenceSegment.StructField(field=field)
-            ),
-        )
-    )
-
-
 def _lambda_expression(parameters, body, *, invoke=False, arguments=()):
     lam = stalg.Expression.Lambda(
         parameters=stt.Type.Struct(types=parameters, nullability=_REQ), body=body
@@ -752,13 +741,51 @@ def test_infer_lambda_invocation_literal_body(nullable):
     )
 
 
+@pytest.mark.parametrize("argument_count", [0, 2])
+def test_lambda_invocation_requires_one_argument_per_parameter(argument_count):
+    expr = _lambda_expression(
+        [struct.types[0]],
+        _lambda_ref(),
+        invoke=True,
+        arguments=[_field_reference(0)] * argument_count,
+    )
+    with pytest.raises(Exception, match="one argument per lambda parameter"):
+        infer_expression_type(expr, struct)
+
+
+@pytest.mark.parametrize("steps_out", [0, 1])
+@pytest.mark.parametrize("argument_index", [0, 1])
+def test_lambda_invocation_arguments_cannot_use_the_invoked_lambda_scope(
+    steps_out, argument_index
+):
+    arguments = [_field_reference(0), _field_reference(0)]
+    arguments[argument_index] = _lambda_ref(steps_out=steps_out)
+    expr = _lambda_expression(
+        [struct.types[0], struct.types[0]],
+        _lambda_ref(),
+        invoke=True,
+        arguments=arguments,
+    )
+    with pytest.raises(Exception, match="outside an enclosing lambda scope"):
+        infer_expression_type(expr, struct)
+
+
+def test_nested_lambda_invocation_argument_uses_the_callers_scope():
+    outer = struct.types[1]
+    inner = _lambda_expression(
+        [outer], _lambda_ref(), invoke=True, arguments=[_lambda_ref()]
+    )
+    expr = _lambda_expression([outer], inner)
+    assert infer_expression_type(expr, struct).func.return_type == outer
+
+
 @pytest.mark.parametrize("invoke", [False, True])
 @pytest.mark.parametrize("reference", ["root", "parameter"])
 def test_infer_lambda_keeps_row_and_parameter_scopes_distinct(invoke, reference):
     # Same field index, different types: a root reference captures the input row.
     row_type = stt.Type(string=stt.Type.String(nullability=_NULL))
     parameter = stt.Type(i64=stt.Type.I64(nullability=_REQ))
-    body = _root_ref() if reference == "root" else _lambda_ref()
+    body = _field_reference(0) if reference == "root" else _lambda_ref()
     expr = _lambda_expression(
         [parameter],
         body,
@@ -843,7 +870,7 @@ def test_lambda_parameter_scope_does_not_leak(fail):
     supplied = stt.Type.Struct(
         types=[stt.Type(string=stt.Type.String(nullability=_NULL))], nullability=_REQ
     )
-    body = _root_ref(99) if fail else _lambda_ref()
+    body = _field_reference(99) if fail else _lambda_ref()
     expr = _lambda_expression([parameter], body)
     if fail:
         with pytest.raises(IndexError):
@@ -870,7 +897,7 @@ def _expand_switching(types, duplicates):
             switching_field=stalg.ExpandRel.SwitchingField(duplicates=duplicates)
         )
     ] + [
-        stalg.ExpandRel.ExpandField(consistent_field=_root_ref(i))
+        stalg.ExpandRel.ExpandField(consistent_field=_field_reference(i))
         for i in range(1, len(types))
     ]
     return stalg.Rel(expand=stalg.ExpandRel(input=inp, fields=fields))
@@ -892,7 +919,9 @@ def test_expand_switching_field_with_lambda_invocation(nullable):
 def test_expand_switching_lambda_captures_input_row():
     integer = stt.Type(i32=stt.Type.I32(nullability=_REQ))
     function = stt.Type(func=stt.Type.Func(return_type=integer, nullability=_REQ))
-    rel = _expand_switching([function, integer], [_lambda_expression([], _root_ref(1))])
+    rel = _expand_switching(
+        [function, integer], [_lambda_expression([], _field_reference(1))]
+    )
     original = rel.SerializeToString()
 
     assert infer_rel_schema(rel).types[0] == function

@@ -153,6 +153,11 @@ _lambda_schemas: contextvars.ContextVar = contextvars.ContextVar(
 )
 
 
+def lambda_depth() -> int:
+    """Number of lambda scopes enclosing the expression currently being bound."""
+    return len(_lambda_schemas.get())
+
+
 @contextlib.contextmanager
 def lambda_scope(parameters: stt.Type.Struct):
     """Bind a lambda's parameter struct while building or inferring its body."""
@@ -687,6 +692,15 @@ def infer_expression_type(
                 lam.body, parent_schema, registry=registry, subtrees=subtrees
             )
         if rex_type == "lambda_invocation":
+            arguments = expression.lambda_invocation.arguments.fields
+            if len(arguments) != len(lam.parameters.types):
+                raise Exception(
+                    "lambda invocation needs one argument per lambda parameter"
+                )
+            for argument in arguments:
+                infer_expression_type(
+                    argument, parent_schema, registry=registry, subtrees=subtrees
+                )
             return body_type
         return stt.Type(
             func=stt.Type.Func(

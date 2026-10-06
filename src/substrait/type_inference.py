@@ -1174,16 +1174,29 @@ def infer_rel_schema(rel: stalg.Rel, *, registry=None, subtrees=()) -> stt.Type.
                     )
                     for duplicate in duplicates
                 ]
-                output_type = duplicate_types[0]
-                # Unbound placeholders carry no nullability.
-                if any(
-                    t.WhichOneof("kind") != "unbound"
-                    and _field_nullability(t) == stt.Type.NULLABILITY_NULLABLE
-                    for t in duplicate_types
-                ):
-                    output_type = _with_field_nullability(
-                        output_type, stt.Type.NULLABILITY_NULLABLE
+                bound = [
+                    t for t in duplicate_types if t.WhichOneof("kind") != "unbound"
+                ]
+                unbound = [
+                    t for t in duplicate_types if t.WhichOneof("kind") == "unbound"
+                ]
+                if len({t.WhichOneof("kind") for t in bound}) > 1:
+                    raise ValueError(
+                        "expand switching field duplicates must share one type class"
                     )
+                if any(
+                    _field_nullability(t) == stt.Type.NULLABILITY_NULLABLE
+                    for t in bound
+                ):
+                    # Nullable whatever an unbound placeholder later binds to.
+                    output_type = _with_field_nullability(
+                        bound[0], stt.Type.NULLABILITY_NULLABLE
+                    )
+                elif unbound:
+                    # Otherwise the nullability depends on the placeholder.
+                    output_type = unbound[0]
+                else:
+                    output_type = bound[0]
                 field_types.append(output_type)
         # Expand appends an i32 column with the index of the duplicate the row
         # is derived from.

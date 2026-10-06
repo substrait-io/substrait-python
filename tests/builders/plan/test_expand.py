@@ -145,6 +145,66 @@ def test_expand_switching_field_preserves_unbound_type():
     assert infer_plan_schema(plan).struct.types[0] == unbound
 
 
+def _switching_plan(types):
+    names = [f"value_{i}" for i in range(len(types))]
+    schema = stt.NamedStruct(
+        names=names,
+        struct=stt.Type.Struct(types=types, nullability=stt.Type.NULLABILITY_REQUIRED),
+    )
+    return expand(
+        read_named_table("partial", schema),
+        fields=[("switching", [column(name) for name in names])],
+        names=["value", "idx"],
+    )(None)
+
+
+@pytest.mark.parametrize(
+    "bound_nullabilities, unbound_position",
+    [
+        pytest.param((False,), 0, id="unbound-required"),
+        pytest.param((False,), 1, id="required-unbound"),
+        pytest.param((True,), 0, id="unbound-nullable"),
+        pytest.param((True,), 1, id="nullable-unbound"),
+        pytest.param((False, True), 0, id="unbound-required-nullable"),
+        pytest.param((False, True), 1, id="required-unbound-nullable"),
+        pytest.param((False, True), 2, id="required-nullable-unbound"),
+    ],
+)
+def test_expand_switching_field_combines_unbound_duplicates(
+    bound_nullabilities, unbound_position
+):
+    unbound = stt.Type(unbound=stt.Type.Unbound())
+    types = [fp64(nullable=n) for n in bound_nullabilities]
+    types.insert(unbound_position, unbound)
+    plan = _switching_plan(types)
+    original = plan.SerializeToString()
+
+    result = infer_plan_schema(plan).struct.types[0]
+
+    # A known nullable duplicate fixes nullability regardless of the placeholder.
+    # Otherwise the placeholder may still bind to a nullable type.
+    expected = fp64(nullable=True) if any(bound_nullabilities) else unbound
+    assert result == expected
+    assert plan.SerializeToString() == original
+
+
+@pytest.mark.parametrize("reverse", [False, True])
+@pytest.mark.parametrize("unbound_position", [None, 0, 1, 2])
+def test_expand_switching_field_rejects_mixed_type_classes(reverse, unbound_position):
+    types = [fp64(nullable=False), string(nullable=True)]
+    if reverse:
+        types.reverse()
+    if unbound_position is not None:
+        types.insert(unbound_position, stt.Type(unbound=stt.Type.Unbound()))
+    plan = _switching_plan(types)
+    original = plan.SerializeToString()
+
+    with pytest.raises(ValueError, match="duplicates must share one type class"):
+        infer_plan_schema(plan)
+
+    assert plan.SerializeToString() == original
+
+
 def test_expand_empty_switching_field_raises_clear_error():
     # An empty switching field has no expression to derive a type from; schema
     # inference must raise a clear error rather than an opaque IndexError.

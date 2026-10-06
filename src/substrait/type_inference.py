@@ -697,10 +697,14 @@ def infer_expression_type(
                 raise Exception(
                     "lambda invocation needs one argument per lambda parameter"
                 )
-            for argument in arguments:
-                infer_expression_type(
+            for parameter_type, argument in zip(lam.parameters.types, arguments):
+                argument_type = infer_expression_type(
                     argument, parent_schema, registry=registry, subtrees=subtrees
                 )
+                if argument_type != parameter_type:
+                    raise Exception(
+                        "lambda invocation argument type must match parameter type"
+                    )
             return body_type
         return stt.Type(
             func=stt.Type.Func(

@@ -753,6 +753,43 @@ def test_lambda_invocation_requires_one_argument_per_parameter(argument_count):
         infer_expression_type(expr, struct)
 
 
+@pytest.mark.parametrize(
+    "parameter_type, argument_type",
+    [
+        (struct.types[0], struct.types[1]),
+        (struct.types[0], stt.Type(i64=stt.Type.I64(nullability=_NULL))),
+        (
+            stt.Type(decimal=stt.Type.Decimal(precision=10, scale=2, nullability=_REQ)),
+            stt.Type(decimal=stt.Type.Decimal(precision=10, scale=3, nullability=_REQ)),
+        ),
+        (
+            struct.types[0],
+            stt.Type(i64=stt.Type.I64(nullability=_REQ, type_variation_reference=1)),
+        ),
+    ],
+)
+@pytest.mark.parametrize("argument_index", [0, 1])
+@pytest.mark.parametrize("matches", [False, True])
+def test_lambda_invocation_argument_types_must_match_parameters(
+    parameter_type, argument_type, argument_index, matches
+):
+    argument_types = [parameter_type, parameter_type]
+    if not matches:
+        argument_types[argument_index] = argument_type
+    expr = _lambda_expression(
+        [parameter_type, parameter_type],
+        _lambda_ref(),
+        invoke=True,
+        arguments=[_field_reference(0), _field_reference(1)],
+    )
+    row = stt.Type.Struct(types=argument_types, nullability=_REQ)
+    if matches:
+        assert infer_expression_type(expr, row) == parameter_type
+    else:
+        with pytest.raises(Exception, match="argument type must match parameter type"):
+            infer_expression_type(expr, row)
+
+
 @pytest.mark.parametrize("steps_out", [0, 1])
 @pytest.mark.parametrize("argument_index", [0, 1])
 def test_lambda_invocation_arguments_cannot_use_the_invoked_lambda_scope(

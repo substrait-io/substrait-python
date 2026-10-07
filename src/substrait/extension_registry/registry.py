@@ -2,6 +2,7 @@
 
 import re
 from collections import defaultdict
+from importlib.resources import as_file
 from importlib.resources import files as importlib_files
 from pathlib import Path
 from typing import Optional, Union
@@ -34,10 +35,25 @@ class ExtensionRegistry:
         # extension relation's output schema can be derived during inference.
         self._extension_relations: dict = {}
         if load_default_extensions:
-            for fpath in importlib_files("substrait_extensions.extensions").glob(  # type: ignore
-                "functions*.yaml"
-            ):
-                self.register_extension_yaml(fpath)
+            # NB: iterate + filter instead of ``.glob("functions*.yaml")``.
+            # ``importlib.resources.files`` returns a ``Traversable``, which is
+            # not guaranteed to be a filesystem path: when
+            # ``substrait_extensions.extensions`` resolves as a namespace
+            # package the reader returns a ``MultiplexedPath``, and that type
+            # implements ``iterdir``/``open``/``joinpath`` but not ``glob``
+            # (calling ``.glob`` raises ``AttributeError``). ``iterdir`` is part
+            # of the ``Traversable`` protocol and works across ``Path``,
+            # ``MultiplexedPath``, and zip-based readers alike.
+            #
+            # ``as_file`` turns each entry into a real filesystem path for the
+            # duration of the ``with`` block (a no-op for on-disk resources, an
+            # extraction to a temp file for zip-backed ones). Without it,
+            # ``register_extension_yaml`` -> ``Path(fname)`` would raise
+            # ``TypeError`` on a ``zipfile.Path``.
+            for fpath in importlib_files("substrait_extensions.extensions").iterdir():
+                if fpath.name.startswith("functions") and fpath.name.endswith(".yaml"):
+                    with as_file(fpath) as real_path:
+                        self.register_extension_yaml(real_path)
 
     def register_extension_yaml(
         self,

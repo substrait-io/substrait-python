@@ -2,7 +2,7 @@
 # /// script
 # dependencies = [
 #   "pyarrow==20.0.0",
-#   "duckdb==1.2.1",
+#   "duckdb==1.5.6",
 #   "substrait[extensions] @ file:///${PROJECT_ROOT}/"
 # ]
 # ///
@@ -18,7 +18,7 @@ from substrait.extension_registry import ExtensionRegistry
 
 try:
     duckdb.install_extension("substrait")
-except duckdb.duckdb.HTTPException:
+except duckdb.HTTPException:
     duckdb.install_extension("substrait", repository="community")
 duckdb.load_extension("substrait")
 

@@ -983,6 +983,217 @@ def test_infer_expression_type_selection():
     assert result == expected
 
 
+@pytest.mark.parametrize("root", ["row", "outer_steps", "outer_anchor", "lambda"])
+@pytest.mark.parametrize("depth", [1, 2])
+@pytest.mark.parametrize("nullable", [False, True])
+def test_infer_expression_type_nested_struct_selection(root, depth, nullable):
+    from substrait.type_inference import (
+        _outer_anchor_binding,
+        lambda_scope,
+        outer_schemas,
+    )
+
+    expected = stt.Type(string=stt.Type.String(nullability=_NULL if nullable else _REQ))
+    selected = expected
+    segment = stalg.Expression.ReferenceSegment(
+        struct_field=stalg.Expression.ReferenceSegment.StructField(field=1)
+    )
+    for level in range(depth):
+        selected = stt.Type(
+            struct=stt.Type.Struct(types=[struct.types[0], selected], nullability=_REQ)
+        )
+        segment = stalg.Expression.ReferenceSegment(
+            struct_field=stalg.Expression.ReferenceSegment.StructField(
+                field=0 if level == depth - 1 else 1, child=segment
+            )
+        )
+    row = stt.Type.Struct(types=[selected], nullability=_REQ)
+    ref = stalg.Expression.FieldReference(direct_reference=segment)
+    if root == "row":
+        ref.root_reference.SetInParent()
+        actual = infer_expression_type(stalg.Expression(selection=ref), row)
+    elif root == "lambda":
+        ref.lambda_parameter_reference.steps_out = 0
+        with lambda_scope(row):
+            actual = infer_expression_type(stalg.Expression(selection=ref), struct)
+    elif root == "outer_anchor":
+        ref.outer_reference.rel_reference = 5
+        with _outer_anchor_binding(5, row):
+            actual = infer_expression_type(stalg.Expression(selection=ref), struct)
+    else:
+        ref.outer_reference.steps_out = 1
+        token = outer_schemas.set((stt.NamedStruct(struct=row),))
+        try:
+            actual = infer_expression_type(stalg.Expression(selection=ref), struct)
+        finally:
+            outer_schemas.reset(token)
+    assert actual == expected
+
+
+@pytest.mark.parametrize("index", [-1, 3])
+def test_nested_struct_selection_rejects_out_of_range_field(index):
+    row = stt.Type.Struct(types=[stt.Type(struct=struct)], nullability=_REQ)
+    expr = _field_reference(0)
+    expr.selection.direct_reference.struct_field.child.struct_field.field = index
+    with pytest.raises(IndexError, match="Struct field index .* is out of range"):
+        infer_expression_type(expr, row)
+
+
+def test_nested_struct_selection_rejects_child_on_scalar():
+    expr = _field_reference(0)
+    expr.selection.direct_reference.struct_field.child.struct_field.field = 0
+    with pytest.raises(ValueError, match="Struct field child requires a struct"):
+        infer_expression_type(expr, struct)
+
+
+@pytest.mark.parametrize("kind", ["list_element", "map_key"])
+@pytest.mark.parametrize("nullable", [False, True])
+def test_nested_collection_selection(kind, nullable):
+    expr = _field_reference(0)
+    child = expr.selection.direct_reference.struct_field.child
+    expected = stt.Type(string=stt.Type.String(nullability=_NULL if nullable else _REQ))
+    if kind == "list_element":
+        child.list_element.offset = -1
+        selected = stt.Type(list=stt.Type.List(type=expected, nullability=_REQ))
+    else:
+        child.map_key.map_key.string = "key"
+        selected = stt.Type(
+            map=stt.Type.Map(
+                key=stt.Type(string=stt.Type.String(nullability=_REQ)),
+                value=expected,
+                nullability=_REQ,
+            )
+        )
+    row = stt.Type.Struct(types=[selected], nullability=_REQ)
+    assert infer_expression_type(expr, row) == expected
+
+
+@pytest.mark.parametrize("literal_nullable", [False, True])
+@pytest.mark.parametrize("compatible", [False, True])
+def test_map_key_reference_validates_literal_type(literal_nullable, compatible):
+    expr = _field_reference(0)
+    key = expr.selection.direct_reference.struct_field.child.map_key.map_key
+    key.nullable = literal_nullable
+    if compatible:
+        key.i32 = 7
+    else:
+        key.string = "wrong"
+    expected = stt.Type(string=stt.Type.String(nullability=_NULL))
+    row = stt.Type.Struct(
+        types=[
+            stt.Type(
+                map=stt.Type.Map(
+                    key=stt.Type(i32=stt.Type.I32(nullability=_REQ)),
+                    value=expected,
+                    nullability=_REQ,
+                )
+            )
+        ],
+        nullability=_REQ,
+    )
+    before = row.SerializeToString(), expr.SerializeToString()
+    if compatible:
+        assert infer_expression_type(expr, row) == expected
+    else:
+        with pytest.raises(ValueError, match="Map key literal type"):
+            infer_expression_type(expr, row)
+    assert before == (row.SerializeToString(), expr.SerializeToString())
+
+
+@pytest.mark.parametrize("scale", [2, 3])
+def test_map_key_reference_validates_decimal_parameters(scale):
+    expr = _field_reference(0)
+    key = expr.selection.direct_reference.struct_field.child.map_key.map_key
+    key.decimal.precision = 10
+    key.decimal.scale = scale
+    key.decimal.value = (1000).to_bytes(16, "little", signed=True)
+    row = stt.Type.Struct(
+        types=[
+            stt.Type(
+                map=stt.Type.Map(
+                    key=stt.Type(
+                        decimal=stt.Type.Decimal(
+                            precision=10, scale=2, nullability=_REQ
+                        )
+                    ),
+                    value=stt.Type(i32=stt.Type.I32(nullability=_REQ)),
+                    nullability=_REQ,
+                )
+            )
+        ],
+        nullability=_REQ,
+    )
+    if scale == 2:
+        assert infer_expression_type(expr, row) == row.types[0].map.value
+    else:
+        with pytest.raises(ValueError, match="Map key literal type"):
+            infer_expression_type(expr, row)
+
+
+@pytest.mark.parametrize("variation", [0, 1])
+def test_map_key_reference_validates_type_variation(variation):
+    expr = _field_reference(0)
+    literal = expr.selection.direct_reference.struct_field.child.map_key.map_key
+    literal.i32 = 7
+    literal.type_variation_reference = variation
+    row = stt.Type.Struct(
+        types=[
+            stt.Type(
+                map=stt.Type.Map(
+                    key=stt.Type(
+                        i32=stt.Type.I32(nullability=_REQ, type_variation_reference=1)
+                    ),
+                    value=stt.Type(i32=stt.Type.I32(nullability=_REQ)),
+                    nullability=_REQ,
+                )
+            )
+        ],
+        nullability=_REQ,
+    )
+    if variation == 1:
+        assert infer_expression_type(expr, row) == row.types[0].map.value
+    else:
+        with pytest.raises(ValueError, match="Map key literal type"):
+            infer_expression_type(expr, row)
+
+
+def test_nested_collection_selection_continues_through_struct():
+    expected = stt.Type(string=stt.Type.String(nullability=_NULL))
+    value = stt.Type(struct=stt.Type.Struct(types=[expected], nullability=_REQ))
+    mapping = stt.Type(
+        map=stt.Type.Map(
+            key=stt.Type(string=stt.Type.String(nullability=_REQ)),
+            value=value,
+            nullability=_REQ,
+        )
+    )
+    row = stt.Type.Struct(
+        types=[stt.Type(list=stt.Type.List(type=mapping, nullability=_REQ))],
+        nullability=_REQ,
+    )
+    expr = _field_reference(0)
+    element = expr.selection.direct_reference.struct_field.child.list_element
+    element.offset = 0
+    key = element.child.map_key
+    key.map_key.string = "key"
+    key.child.struct_field.field = 0
+    assert infer_expression_type(expr, row) == expected
+
+
+@pytest.mark.parametrize(
+    "kind, message",
+    [
+        ("list_element", "List element reference requires a list"),
+        ("map_key", "Map key reference requires a map"),
+    ],
+)
+def test_nested_collection_selection_rejects_wrong_container(kind, message):
+    expr = _field_reference(0)
+    getattr(expr.selection.direct_reference.struct_field.child, kind).SetInParent()
+    with pytest.raises(ValueError, match=message):
+        infer_expression_type(expr, struct)
+
+
 def test_infer_expression_type_window_function():
     """Test infer_expression_type with a window function expression."""
     expr = stalg.Expression(

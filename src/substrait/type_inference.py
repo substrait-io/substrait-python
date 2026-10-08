@@ -645,12 +645,49 @@ def infer_expression_type(
         if reference_type == "direct_reference":
             segment = expression.selection.direct_reference
 
-            segment_reference_type = segment.WhichOneof("reference_type")
-
-            if segment_reference_type == "struct_field":
-                return schema.types[segment.struct_field.field]
-            else:
-                raise Exception(f"Unknown reference_type {reference_type}")
+            result = stt.Type(struct=schema)
+            while True:
+                kind = segment.WhichOneof("reference_type")
+                if kind == "struct_field":
+                    if result.WhichOneof("kind") != "struct":
+                        raise ValueError("Struct field child requires a struct")
+                    child = segment.struct_field
+                    if not 0 <= child.field < len(result.struct.types):
+                        raise IndexError(
+                            f"Struct field index {child.field} is out of range"
+                        )
+                    result = result.struct.types[child.field]
+                elif kind == "list_element":
+                    if result.WhichOneof("kind") != "list":
+                        raise ValueError("List element reference requires a list")
+                    child = segment.list_element
+                    result = result.list.type
+                elif kind == "map_key":
+                    if result.WhichOneof("kind") != "map":
+                        raise ValueError("Map key reference requires a map")
+                    child = segment.map_key
+                    key_type = stt.Type()
+                    key_type.CopyFrom(infer_literal_type(child.map_key))
+                    key_kind = key_type.WhichOneof("kind")
+                    if key_kind == result.map.key.WhichOneof("kind"):
+                        detail = getattr(key_type, key_kind)
+                        detail.nullability = getattr(
+                            result.map.key, key_kind
+                        ).nullability
+                        if child.map_key.WhichOneof("literal_type") != "null":
+                            detail.type_variation_reference = (
+                                child.map_key.type_variation_reference
+                            )
+                    if key_type != result.map.key:
+                        raise ValueError(
+                            "Map key literal type does not match map key type"
+                        )
+                    result = result.map.value
+                else:
+                    raise Exception(f"Unknown reference_type {kind}")
+                if not child.HasField("child"):
+                    return result
+                segment = child.child
         else:
             raise Exception(f"Unknown reference_type {reference_type}")
 

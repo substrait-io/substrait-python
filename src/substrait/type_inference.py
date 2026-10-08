@@ -645,12 +645,25 @@ def infer_expression_type(
         if reference_type == "direct_reference":
             segment = expression.selection.direct_reference
 
-            segment_reference_type = segment.WhichOneof("reference_type")
-
-            if segment_reference_type == "struct_field":
-                return schema.types[segment.struct_field.field]
-            else:
-                raise Exception(f"Unknown reference_type {reference_type}")
+            while segment.WhichOneof("reference_type") == "struct_field":
+                field = segment.struct_field
+                if not 0 <= field.field < len(schema.types):
+                    raise IndexError(
+                        f"Struct field index {field.field} is out of range"
+                    )
+                result = schema.types[field.field]
+                if not field.HasField("child"):
+                    return result
+                segment = field.child
+                if (
+                    segment.WhichOneof("reference_type") == "struct_field"
+                    and result.WhichOneof("kind") != "struct"
+                ):
+                    raise ValueError("Struct field child requires a struct")
+                schema = result.struct
+            raise Exception(
+                f"Unknown reference_type {segment.WhichOneof('reference_type')}"
+            )
         else:
             raise Exception(f"Unknown reference_type {reference_type}")
 

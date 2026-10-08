@@ -983,6 +983,80 @@ def test_infer_expression_type_selection():
     assert result == expected
 
 
+@pytest.mark.parametrize("root", ["row", "outer_steps", "outer_anchor", "lambda"])
+@pytest.mark.parametrize("depth", [1, 2])
+@pytest.mark.parametrize("nullable", [False, True])
+def test_infer_expression_type_nested_struct_selection(root, depth, nullable):
+    from substrait.type_inference import (
+        _outer_anchor_binding,
+        lambda_scope,
+        outer_schemas,
+    )
+
+    expected = stt.Type(string=stt.Type.String(nullability=_NULL if nullable else _REQ))
+    selected = expected
+    segment = stalg.Expression.ReferenceSegment(
+        struct_field=stalg.Expression.ReferenceSegment.StructField(field=1)
+    )
+    for level in range(depth):
+        selected = stt.Type(
+            struct=stt.Type.Struct(types=[struct.types[0], selected], nullability=_REQ)
+        )
+        segment = stalg.Expression.ReferenceSegment(
+            struct_field=stalg.Expression.ReferenceSegment.StructField(
+                field=0 if level == depth - 1 else 1, child=segment
+            )
+        )
+    row = stt.Type.Struct(types=[selected], nullability=_REQ)
+    ref = stalg.Expression.FieldReference(direct_reference=segment)
+    if root == "row":
+        ref.root_reference.SetInParent()
+        actual = infer_expression_type(stalg.Expression(selection=ref), row)
+    elif root == "lambda":
+        ref.lambda_parameter_reference.steps_out = 0
+        with lambda_scope(row):
+            actual = infer_expression_type(stalg.Expression(selection=ref), struct)
+    elif root == "outer_anchor":
+        ref.outer_reference.rel_reference = 5
+        with _outer_anchor_binding(5, row):
+            actual = infer_expression_type(stalg.Expression(selection=ref), struct)
+    else:
+        ref.outer_reference.steps_out = 1
+        token = outer_schemas.set((stt.NamedStruct(struct=row),))
+        try:
+            actual = infer_expression_type(stalg.Expression(selection=ref), struct)
+        finally:
+            outer_schemas.reset(token)
+    assert actual == expected
+
+
+@pytest.mark.parametrize("index", [-1, 3])
+def test_nested_struct_selection_rejects_out_of_range_field(index):
+    row = stt.Type.Struct(types=[stt.Type(struct=struct)], nullability=_REQ)
+    expr = _field_reference(0)
+    expr.selection.direct_reference.struct_field.child.struct_field.field = index
+    with pytest.raises(IndexError, match="Struct field index .* is out of range"):
+        infer_expression_type(expr, row)
+
+
+def test_nested_struct_selection_rejects_child_on_scalar():
+    expr = _field_reference(0)
+    expr.selection.direct_reference.struct_field.child.struct_field.field = 0
+    with pytest.raises(ValueError, match="Struct field child requires a struct"):
+        infer_expression_type(expr, struct)
+
+
+def test_nested_struct_selection_rejects_unsupported_child_segment():
+    expr = _field_reference(0)
+    expr.selection.direct_reference.struct_field.child.list_element.offset = 0
+    row = stt.Type.Struct(
+        types=[stt.Type(list=stt.Type.List(type=struct.types[0], nullability=_REQ))],
+        nullability=_REQ,
+    )
+    with pytest.raises(Exception, match="Unknown reference_type list_element"):
+        infer_expression_type(expr, row)
+
+
 def test_infer_expression_type_window_function():
     """Test infer_expression_type with a window function expression."""
     expr = stalg.Expression(

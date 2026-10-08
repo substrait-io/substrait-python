@@ -22,6 +22,20 @@ updates:
           - "substrait-antlr"
           - "substrait-extensions"
 
+  # Keeps the pinned commitlint toolchain in package.json / package-lock.json
+  # current; it is only used to lint PR titles and descriptions.
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+    groups:
+      commitlint:
+        patterns:
+          - "@commitlint/*"
+
   - package-ecosystem: "docker"
     directory: "/.devcontainer"
     schedule:

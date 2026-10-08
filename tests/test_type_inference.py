@@ -1046,15 +1046,55 @@ def test_nested_struct_selection_rejects_child_on_scalar():
         infer_expression_type(expr, struct)
 
 
-def test_nested_struct_selection_rejects_unsupported_child_segment():
+@pytest.mark.parametrize("kind", ["list_element", "map_key"])
+@pytest.mark.parametrize("nullable", [False, True])
+def test_nested_collection_selection(kind, nullable):
     expr = _field_reference(0)
-    expr.selection.direct_reference.struct_field.child.list_element.offset = 0
+    child = expr.selection.direct_reference.struct_field.child
+    expected = stt.Type(string=stt.Type.String(nullability=_NULL if nullable else _REQ))
+    if kind == "list_element":
+        child.list_element.offset = -1
+        selected = stt.Type(list=stt.Type.List(type=expected, nullability=_REQ))
+    else:
+        child.map_key.map_key.string = "key"
+        selected = stt.Type(
+            map=stt.Type.Map(key=struct.types[0], value=expected, nullability=_REQ)
+        )
+    row = stt.Type.Struct(types=[selected], nullability=_REQ)
+    assert infer_expression_type(expr, row) == expected
+
+
+def test_nested_collection_selection_continues_through_struct():
+    expected = stt.Type(string=stt.Type.String(nullability=_NULL))
+    value = stt.Type(struct=stt.Type.Struct(types=[expected], nullability=_REQ))
+    mapping = stt.Type(
+        map=stt.Type.Map(key=struct.types[0], value=value, nullability=_REQ)
+    )
     row = stt.Type.Struct(
-        types=[stt.Type(list=stt.Type.List(type=struct.types[0], nullability=_REQ))],
+        types=[stt.Type(list=stt.Type.List(type=mapping, nullability=_REQ))],
         nullability=_REQ,
     )
-    with pytest.raises(Exception, match="Unknown reference_type list_element"):
-        infer_expression_type(expr, row)
+    expr = _field_reference(0)
+    element = expr.selection.direct_reference.struct_field.child.list_element
+    element.offset = 0
+    key = element.child.map_key
+    key.map_key.string = "key"
+    key.child.struct_field.field = 0
+    assert infer_expression_type(expr, row) == expected
+
+
+@pytest.mark.parametrize(
+    "kind, message",
+    [
+        ("list_element", "List element reference requires a list"),
+        ("map_key", "Map key reference requires a map"),
+    ],
+)
+def test_nested_collection_selection_rejects_wrong_container(kind, message):
+    expr = _field_reference(0)
+    getattr(expr.selection.direct_reference.struct_field.child, kind).SetInParent()
+    with pytest.raises(ValueError, match=message):
+        infer_expression_type(expr, struct)
 
 
 def test_infer_expression_type_window_function():

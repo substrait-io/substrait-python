@@ -79,6 +79,27 @@ def test_filter_select_matches_builder():
     assert fluent.SerializeToString() == raw.SerializeToString()
 
 
+@pytest.mark.parametrize("kind", ["list", "map"])
+def test_filter_collection_access_is_null(kind):
+    from substrait.builders.type import list as list_type
+    from substrait.builders.type import map as map_type
+    from substrait.type_inference import infer_plan_schema
+
+    value_type = string()
+    collection = (
+        list_type(value_type) if kind == "list" else map_type(string(), value_type)
+    )
+    ns = named_struct(
+        names=["values"], struct=struct(types=[collection], nullable=False)
+    )
+    df = sub.read_named_table("t", ns)
+    access = (
+        sub.col("values")[0] if kind == "list" else sub.col("values").map_key("key")
+    )
+    plan = df.filter(access.is_null()).select(access.alias("value")).to_plan()
+    assert infer_plan_schema(plan).struct.types[0] == value_type
+
+
 def test_with_columns_named_appends_projection():
     fluent = people_df().with_columns(bonus=sub.col("age") + 1).to_plan()
     # ProjectRel appends: output has original columns + the new one.

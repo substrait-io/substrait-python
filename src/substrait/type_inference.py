@@ -645,25 +645,33 @@ def infer_expression_type(
         if reference_type == "direct_reference":
             segment = expression.selection.direct_reference
 
-            while segment.WhichOneof("reference_type") == "struct_field":
-                field = segment.struct_field
-                if not 0 <= field.field < len(schema.types):
-                    raise IndexError(
-                        f"Struct field index {field.field} is out of range"
-                    )
-                result = schema.types[field.field]
-                if not field.HasField("child"):
+            result = stt.Type(struct=schema)
+            while True:
+                kind = segment.WhichOneof("reference_type")
+                if kind == "struct_field":
+                    if result.WhichOneof("kind") != "struct":
+                        raise ValueError("Struct field child requires a struct")
+                    child = segment.struct_field
+                    if not 0 <= child.field < len(result.struct.types):
+                        raise IndexError(
+                            f"Struct field index {child.field} is out of range"
+                        )
+                    result = result.struct.types[child.field]
+                elif kind == "list_element":
+                    if result.WhichOneof("kind") != "list":
+                        raise ValueError("List element reference requires a list")
+                    child = segment.list_element
+                    result = result.list.type
+                elif kind == "map_key":
+                    if result.WhichOneof("kind") != "map":
+                        raise ValueError("Map key reference requires a map")
+                    child = segment.map_key
+                    result = result.map.value
+                else:
+                    raise Exception(f"Unknown reference_type {kind}")
+                if not child.HasField("child"):
                     return result
-                segment = field.child
-                if (
-                    segment.WhichOneof("reference_type") == "struct_field"
-                    and result.WhichOneof("kind") != "struct"
-                ):
-                    raise ValueError("Struct field child requires a struct")
-                schema = result.struct
-            raise Exception(
-                f"Unknown reference_type {segment.WhichOneof('reference_type')}"
-            )
+                segment = child.child
         else:
             raise Exception(f"Unknown reference_type {reference_type}")
 

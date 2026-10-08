@@ -666,6 +666,22 @@ def infer_expression_type(
                     if result.WhichOneof("kind") != "map":
                         raise ValueError("Map key reference requires a map")
                     child = segment.map_key
+                    key_type = stt.Type()
+                    key_type.CopyFrom(infer_literal_type(child.map_key))
+                    key_kind = key_type.WhichOneof("kind")
+                    if key_kind == result.map.key.WhichOneof("kind"):
+                        detail = getattr(key_type, key_kind)
+                        detail.nullability = getattr(
+                            result.map.key, key_kind
+                        ).nullability
+                        if child.map_key.WhichOneof("literal_type") != "null":
+                            detail.type_variation_reference = (
+                                child.map_key.type_variation_reference
+                            )
+                    if key_type != result.map.key:
+                        raise ValueError(
+                            "Map key literal type does not match map key type"
+                        )
                     result = result.map.value
                 else:
                     raise Exception(f"Unknown reference_type {kind}")

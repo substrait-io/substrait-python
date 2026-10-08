@@ -1068,6 +1068,95 @@ def test_nested_collection_selection(kind, nullable):
     assert infer_expression_type(expr, row) == expected
 
 
+@pytest.mark.parametrize("literal_nullable", [False, True])
+@pytest.mark.parametrize("compatible", [False, True])
+def test_map_key_reference_validates_literal_type(literal_nullable, compatible):
+    expr = _field_reference(0)
+    key = expr.selection.direct_reference.struct_field.child.map_key.map_key
+    key.nullable = literal_nullable
+    if compatible:
+        key.i32 = 7
+    else:
+        key.string = "wrong"
+    expected = stt.Type(string=stt.Type.String(nullability=_NULL))
+    row = stt.Type.Struct(
+        types=[
+            stt.Type(
+                map=stt.Type.Map(
+                    key=stt.Type(i32=stt.Type.I32(nullability=_REQ)),
+                    value=expected,
+                    nullability=_REQ,
+                )
+            )
+        ],
+        nullability=_REQ,
+    )
+    before = row.SerializeToString(), expr.SerializeToString()
+    if compatible:
+        assert infer_expression_type(expr, row) == expected
+    else:
+        with pytest.raises(ValueError, match="Map key literal type"):
+            infer_expression_type(expr, row)
+    assert before == (row.SerializeToString(), expr.SerializeToString())
+
+
+@pytest.mark.parametrize("scale", [2, 3])
+def test_map_key_reference_validates_decimal_parameters(scale):
+    expr = _field_reference(0)
+    key = expr.selection.direct_reference.struct_field.child.map_key.map_key
+    key.decimal.precision = 10
+    key.decimal.scale = scale
+    key.decimal.value = (1000).to_bytes(16, "little", signed=True)
+    row = stt.Type.Struct(
+        types=[
+            stt.Type(
+                map=stt.Type.Map(
+                    key=stt.Type(
+                        decimal=stt.Type.Decimal(
+                            precision=10, scale=2, nullability=_REQ
+                        )
+                    ),
+                    value=stt.Type(i32=stt.Type.I32(nullability=_REQ)),
+                    nullability=_REQ,
+                )
+            )
+        ],
+        nullability=_REQ,
+    )
+    if scale == 2:
+        assert infer_expression_type(expr, row) == row.types[0].map.value
+    else:
+        with pytest.raises(ValueError, match="Map key literal type"):
+            infer_expression_type(expr, row)
+
+
+@pytest.mark.parametrize("variation", [0, 1])
+def test_map_key_reference_validates_type_variation(variation):
+    expr = _field_reference(0)
+    literal = expr.selection.direct_reference.struct_field.child.map_key.map_key
+    literal.i32 = 7
+    literal.type_variation_reference = variation
+    row = stt.Type.Struct(
+        types=[
+            stt.Type(
+                map=stt.Type.Map(
+                    key=stt.Type(
+                        i32=stt.Type.I32(nullability=_REQ, type_variation_reference=1)
+                    ),
+                    value=stt.Type(i32=stt.Type.I32(nullability=_REQ)),
+                    nullability=_REQ,
+                )
+            )
+        ],
+        nullability=_REQ,
+    )
+    if variation == 1:
+        assert infer_expression_type(expr, row) == row.types[0].map.value
+    else:
+        with pytest.raises(ValueError, match="Map key literal type"):
+            infer_expression_type(expr, row)
+
+
 def test_nested_collection_selection_continues_through_struct():
     expected = stt.Type(string=stt.Type.String(nullability=_NULL))
     value = stt.Type(struct=stt.Type.Struct(types=[expected], nullability=_REQ))

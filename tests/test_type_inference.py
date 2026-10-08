@@ -1058,7 +1058,11 @@ def test_nested_collection_selection(kind, nullable):
     else:
         child.map_key.map_key.string = "key"
         selected = stt.Type(
-            map=stt.Type.Map(key=struct.types[0], value=expected, nullability=_REQ)
+            map=stt.Type.Map(
+                key=stt.Type(string=stt.Type.String(nullability=_REQ)),
+                value=expected,
+                nullability=_REQ,
+            )
         )
     row = stt.Type.Struct(types=[selected], nullability=_REQ)
     assert infer_expression_type(expr, row) == expected
@@ -1068,7 +1072,11 @@ def test_nested_collection_selection_continues_through_struct():
     expected = stt.Type(string=stt.Type.String(nullability=_NULL))
     value = stt.Type(struct=stt.Type.Struct(types=[expected], nullability=_REQ))
     mapping = stt.Type(
-        map=stt.Type.Map(key=struct.types[0], value=value, nullability=_REQ)
+        map=stt.Type.Map(
+            key=stt.Type(string=stt.Type.String(nullability=_REQ)),
+            value=value,
+            nullability=_REQ,
+        )
     )
     row = stt.Type.Struct(
         types=[stt.Type(list=stt.Type.List(type=mapping, nullability=_REQ))],

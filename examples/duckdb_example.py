@@ -2,7 +2,7 @@
 # /// script
 # dependencies = [
 #   "pyarrow==20.0.0",
-#   "duckdb==1.2.1",
+#   "duckdb==1.5.6",
 #   "substrait[extensions] @ file:///${PROJECT_ROOT}/"
 # ]
 # ///

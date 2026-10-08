@@ -99,11 +99,13 @@ def assert_query_duckdb(query: str, ignore_order=True):
         conn = duckdb.connect(db)
 
         def duckdb_schema_resolver(name: str):
-            pa_schema = conn.sql(f"SELECT * FROM {name} LIMIT 0").arrow().schema
+            pa_schema = (
+                conn.sql(f"SELECT * FROM {name} LIMIT 0").to_arrow_table().schema
+            )
             return pa_substrait.serialize_schema(pa_schema).to_pysubstrait().base_schema
 
-        conn.register("stores", data)
-        conn.register("sales", sales_data)
+        conn.execute("CREATE TABLE stores AS SELECT * FROM data")
+        conn.execute("CREATE TABLE sales AS SELECT * FROM sales_data")
 
         plan = convert(query, "duckdb", duckdb_schema_resolver, registry)
 
@@ -115,8 +117,8 @@ def assert_query_duckdb(query: str, ignore_order=True):
 
         sql_out = conn.sql(query)
 
-        substrait_arrow = substrait_out.arrow()
-        sql_arrow = sql_out.arrow()
+        substrait_arrow = substrait_out.to_arrow_table()
+        sql_arrow = sql_out.to_arrow_table()
 
         if ignore_order:
             substrait_arrow = sort_arrow(substrait_arrow)
@@ -283,12 +285,12 @@ def test_order_by(engine: str):
     )
 
 
-@pytest.mark.parametrize("engine", engines_duckdb_xfail)
+@pytest.mark.parametrize("engine", engines)
 def test_select_limit(engine: str):
     assert_query("""SELECT store_id FROM stores ORDER BY store_id LIMIT 2""", engine)
 
 
-@pytest.mark.parametrize("engine", engines_duckdb_xfail)
+@pytest.mark.parametrize("engine", engines)
 def test_select_limit_offset(engine: str):
     assert_query(
         """SELECT store_id FROM stores ORDER BY store_id LIMIT 2 OFFSET 2""", engine

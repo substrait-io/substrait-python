@@ -1,6 +1,28 @@
 Release Notes
 ---
 
+## [0.36.0](https://github.com/substrait-io/substrait-python/compare/v0.35.0...v0.36.0) (2026-10-11)
+
+### ⚠ BREAKING CHANGES
+
+* **type-inference:** Nested struct references now infer the terminal field
+type instead of the outer struct. Invalid field paths are rejected.
+* **type-inference:** Type inference inside lambda bodies now resolves root
+references against the input row and parameter references against the
+selected lambda scope. References to a missing enclosing lambda scope
+raise an error. Consumers relying on the previous parameter-row
+conflation must use the appropriate reference kind and steps_out.
+* **type-inference:** Expand and unpivot switching fields now infer a
+nullable output when any duplicate is nullable. Consumers that assumed a
+required output from the first duplicate must use the combined
+nullability.
+
+### Bug Fixes
+
+* **type-inference:** combine Expand switching field nullability ([#289](https://github.com/substrait-io/substrait-python/issues/289)) ([09fb608](https://github.com/substrait-io/substrait-python/commit/09fb60829642924b466780fcb3880317feeb863c))
+* **type-inference:** follow nested struct field references ([#294](https://github.com/substrait-io/substrait-python/issues/294)) ([3908dac](https://github.com/substrait-io/substrait-python/commit/3908dac735dc03a137dca13131bf13b8d0aad3a6))
+* **type-inference:** resolve lambda scopes and invocation types ([#292](https://github.com/substrait-io/substrait-python/issues/292)) ([35cab19](https://github.com/substrait-io/substrait-python/commit/35cab19e6a2f6fe8663d813c0fd10b00df600527))
+
 ## [0.35.0](https://github.com/substrait-io/substrait-python/compare/v0.34.0...v0.35.0) (2026-10-04)
 
 ### ⚠ BREAKING CHANGES

@@ -66,13 +66,8 @@ def arithmetic_only_registry():
     """
     registry = ExtensionRegistry(load_default_extensions=False)
     registry.register_extension_yaml(
-        next(
-            iter(
-                importlib_resources.files("substrait_extensions.extensions").glob(
-                    "functions_arithmetic.yaml"
-                )
-            )
-        )
+        importlib_resources.files("substrait_extensions.extensions")
+        / "functions_arithmetic.yaml"
     )
     return registry
 

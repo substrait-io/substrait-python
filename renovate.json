@@ -34,7 +34,7 @@
     },
     {
       "description": "Match the deps-dev scope dependabot used for development dependencies",
-      "matchDepTypes": ["dependency-groups", "project.optional-dependencies"],
+      "matchDepTypes": ["dependency-groups"],
       "semanticCommitScope": "deps-dev"
     },
     {

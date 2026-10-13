@@ -19,9 +19,21 @@ def type_num_names(typ: stp.Type):
     elif kind == "list":
         return type_num_names(typ.list.type)
     elif kind == "map":
-        return type_num_names(typ.map.key) + type_num_names(typ.map.value)
+        # The map field's own name, plus any struct field names in its key/value.
+        return type_num_names(typ.map.key) + type_num_names(typ.map.value) - 1
     else:
         return 1
+
+
+def top_level_names(ns: stp.NamedStruct) -> list[str]:
+    """The names of ``ns``'s top-level fields, skipping the nested struct field
+    names that ``ns.names`` interleaves in depth-first order."""
+    names, offset = [], 0
+    for typ in ns.struct.types:
+        if offset < len(ns.names):
+            names.append(ns.names[offset])
+        offset += type_num_names(typ)
+    return names
 
 
 def merge_extension_urns(*extension_urns: Iterable[ste.SimpleExtensionURN]):

@@ -707,6 +707,62 @@ def test_update_table_by_index_no_condition():
     assert not up.HasField("condition")
 
 
+def test_update_table_unknown_column_raises():
+    with pytest.raises(ValueError, match=r"update_table got unknown column 'c'"):
+        sub.update_table("t", {"a": sub.i64, "b": sub.i64}, {"c": sub.lit(5)})
+
+
+_NESTED_SCHEMA = named_struct(
+    names=["a", "s", "x", "y", "b"],
+    struct=struct([i64(), struct([i64(), i64()]), i64()], nullable=False),
+)
+
+
+def test_update_table_targets_top_level_columns():
+    up = (
+        sub.update_table("t", _NESTED_SCHEMA, {"b": sub.lit(5)})
+        .to_plan()
+        .relations[-1]
+        .root.input.update
+    )
+    assert up.transformations[0].column_target == 2
+
+
+@pytest.mark.parametrize("target", ["x", 3, -1, True, 1.0])
+def test_update_table_rejects_nested_and_out_of_range_targets(target):
+    with pytest.raises(ValueError, match=r"update_table got unknown column"):
+        sub.update_table("t", _NESTED_SCHEMA, {target: sub.lit(5)})
+
+
+def test_drop_and_rename_over_a_struct_column():
+    df = sub.read_named_table("t", _NESTED_SCHEMA)
+
+    def fields(frame):
+        project = frame.to_plan().relations[-1].root.input.project
+        return [
+            e.selection.direct_reference.struct_field.field for e in project.expressions
+        ]
+
+    assert fields(df.drop("b")) == [0, 1]
+    assert fields(df.rename({"b": "c"})) == [0, 1, 2]
+    with pytest.raises(ValueError, match=r"drop got unknown columns: \['x'\]"):
+        df.drop("x").to_plan()
+
+
+def test_select_by_name_with_a_short_names_list():
+    # The dict schema form names only the top-level fields of a struct column.
+    df = sub.read_named_table(
+        "t", {"a": sub.i64, "s": struct([i64(), i64()]), "b": sub.i64}
+    ).select(sub.col("a"))
+    assert list(df.to_plan().relations[-1].root.names) == ["a"]
+
+
+def test_select_unknown_column_names_it():
+    df = sub.read_named_table("t", {"a": sub.i64}).select(sub.col("missing"))
+    with pytest.raises(ValueError, match=r"column 'missing' not found"):
+        df.to_plan()
+
+
 def test_update_merges_transformation_extensions():
     plan = sub.update_table(
         "accounts",

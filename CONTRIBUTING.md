@@ -75,7 +75,7 @@ A clean run does not cover everything: the round-trips through DuckDB and DataFu
 
 The [examples](examples) run standalone, e.g. `uv run examples/builder_example.py`. CI runs four of them — `builder`, `duckdb`, `adbc`, `pyarrow` — on every PR ([`example.yml`](.github/workflows/example.yml)); `dataframe_example.py` and `narwhals_example.py` are outside that matrix, so changes to the DataFrame or Narwhals layers need those run by hand. Several examples are [PEP 723](https://peps.python.org/pep-0723/) scripts (a `# /// script` block declaring their own dependencies), which `uv run` executes in a separate environment built from the working tree rather than in your synced `.venv`.
 
-Tests run in CI ([`test.yml`](.github/workflows/test.yml)) as `uv run --frozen pytest` across Python 3.10–3.13 on Linux, macOS and Windows. Because of `--frozen`, a change to dependencies has to land together with a regenerated [`uv.lock`](uv.lock) — and [`pixi.lock`](pixi.lock) when it affects the lint environment — or CI will fail on the stale lock file rather than on your change.
+Tests run in CI ([`test.yml`](.github/workflows/test.yml)) as `uv run --frozen pytest` across Python 3.10–3.14 on Linux, macOS and Windows. Because of `--frozen`, a change to dependencies has to land together with a regenerated [`uv.lock`](uv.lock) — and [`pixi.lock`](pixi.lock) when it affects the lint environment — or CI will fail on the stale lock file rather than on your change.
 
 ### Integration tests
 

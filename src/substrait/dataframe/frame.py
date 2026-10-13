@@ -42,7 +42,7 @@ from substrait.builders.extended_expression import LateralInput, fresh_rel_ancho
 from substrait.dataframe.expr import Expr, Measure, col, lit, sort_direction
 from substrait.extension_registry import ExtensionRegistry, build_scoped
 from substrait.type_inference import infer_plan_schema
-from substrait.utils import to_id_based_outer_references
+from substrait.utils import to_id_based_outer_references, top_level_names
 
 # All 13 JoinRel.JoinType variants (SET_OP_UNSPECIFIED excluded). "single"
 # returns at most one right match per left row (runtime error on multiple);
@@ -249,7 +249,7 @@ class DataFrame:
 
         def resolve(registry: ExtensionRegistry):
             bound = inner(registry)
-            names = list(infer_plan_schema(bound, registry=registry).names)
+            names = top_level_names(infer_plan_schema(bound, registry=registry))
             unknown = set(mapping) - set(names)
             if unknown:
                 raise ValueError(f"rename got unknown columns: {sorted(unknown)}")
@@ -268,7 +268,7 @@ class DataFrame:
 
         def resolve(registry: ExtensionRegistry):
             bound = inner(registry)
-            names = list(infer_plan_schema(bound, registry=registry).names)
+            names = top_level_names(infer_plan_schema(bound, registry=registry))
             unknown = drop_set - set(names)
             if unknown:
                 raise ValueError(f"drop got unknown columns: {sorted(unknown)}")
@@ -1032,10 +1032,22 @@ def update_table(
     """An ``UPDATE`` statement: ``assignments`` maps a column (name or index) to a
     new-value expression, applied where ``where`` holds (all rows if omitted)."""
     ns = _to_named_struct(schema)
-    names_list = list(ns.names)
+    names_list = top_level_names(ns)
     transformations = []
     for target, expr in assignments.items():
-        index = target if isinstance(target, int) else names_list.index(target)
+        if isinstance(target, str) and target in names_list:
+            index = names_list.index(target)
+        elif (
+            isinstance(target, int)
+            and not isinstance(target, bool)
+            and 0 <= target < len(ns.struct.types)
+        ):
+            index = target
+        else:
+            raise ValueError(
+                f"update_table got unknown column {target!r}; "
+                f"available columns: {names_list}"
+            )
         transformations.append((index, _unbound(expr)))
     condition = _unbound(where) if where is not None else None
     return DataFrame(_plan.update(name, ns, transformations, condition), registry)

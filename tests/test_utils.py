@@ -14,6 +14,7 @@ from substrait.utils import (
     rel_anchor_of,
     remap_function_references,
     to_id_based_outer_references,
+    top_level_names,
     type_num_names,
 )
 
@@ -102,6 +103,69 @@ def test_type_num_names_nested_list():
         )
         == 6
     )
+
+
+def test_type_num_names_map():
+    # Only struct fields carry names, so a map of scalars is one name (its own)...
+    scalar_map = stt.Type(
+        map=stt.Type.Map(
+            key=stt.Type(string=stt.Type.String()), value=stt.Type(i64=stt.Type.I64())
+        )
+    )
+    assert type_num_names(scalar_map) == 1
+    # ...plus the struct field names in its key, then its value.
+    struct_value_map = stt.Type(
+        map=stt.Type.Map(
+            key=stt.Type(string=stt.Type.String()),
+            value=stt.Type(
+                struct=stt.Type.Struct(
+                    types=[stt.Type(i64=stt.Type.I64()), stt.Type(fp32=stt.Type.FP32())]
+                )
+            ),
+        )
+    )
+    assert type_num_names(struct_value_map) == 3
+
+
+def test_top_level_names_skips_nested_struct_names():
+    ns = stt.NamedStruct(
+        names=["a", "s", "x", "y", "m", "b"],
+        struct=stt.Type.Struct(
+            types=[
+                stt.Type(i64=stt.Type.I64()),
+                stt.Type(
+                    struct=stt.Type.Struct(
+                        types=[
+                            stt.Type(i64=stt.Type.I64()),
+                            stt.Type(i64=stt.Type.I64()),
+                        ]
+                    )
+                ),
+                stt.Type(
+                    map=stt.Type.Map(
+                        key=stt.Type(string=stt.Type.String()),
+                        value=stt.Type(i64=stt.Type.I64()),
+                    )
+                ),
+                stt.Type(i64=stt.Type.I64()),
+            ]
+        ),
+    )
+    assert top_level_names(ns) == ["a", "s", "m", "b"]
+
+
+def test_top_level_names_tolerates_a_short_names_list():
+    ns = stt.NamedStruct(
+        names=["a", "s"],
+        struct=stt.Type.Struct(
+            types=[
+                stt.Type(i64=stt.Type.I64()),
+                stt.Type(struct=stt.Type.Struct(types=[stt.Type(i64=stt.Type.I64())])),
+                stt.Type(i64=stt.Type.I64()),
+            ]
+        ),
+    )
+    assert top_level_names(ns) == ["a", "s"]
 
 
 def test_merge_extension_urns_deduplicates():

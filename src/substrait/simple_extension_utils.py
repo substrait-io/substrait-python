@@ -170,6 +170,7 @@ def build_type_variation(d: dict) -> se.TypeVariation:
 def build_simple_extensions(d: dict) -> se.SimpleExtensions:
     return se.SimpleExtensions(
         urn=d["urn"],
+        description=d.get("description"),
         metadata=d.get("metadata"),
         dependencies=d.get("dependencies"),
         types=[build_type_model(t) for t in d["types"]] if "types" in d else None,

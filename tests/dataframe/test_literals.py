@@ -73,7 +73,7 @@ def test_every_concrete_type_kind_can_build_a_literal():
         "fixed_char": ("x", t.fixed_char(1)),
         "varchar": ("x", t.var_char(1)),
         "fixed_binary": (b"x", t.fixed_binary(1)),
-        "decimal": (Decimal("1"), t.decimal(0, 10)),
+        "decimal": (Decimal(1), t.decimal(0, 10)),
         "precision_time": (0, t.precision_time(6)),
         "precision_timestamp": (0, t.precision_timestamp(6)),
         "precision_timestamp_tz": (0, t.precision_timestamp_tz(6)),
@@ -230,7 +230,7 @@ def test_lit_decimal_infers_scale_and_precision():
         (Decimal("5E2"), 0, 3),  # unscaled 500
         (Decimal("2E1"), 0, 2),  # unscaled 20
         (Decimal("123.45"), 2, 5),  # unscaled 12345
-        (Decimal("100"), 0, 3),
+        (Decimal(100), 0, 3),
     ],
 )
 def test_lit_decimal_precision_covers_unscaled_value(value, scale, precision):

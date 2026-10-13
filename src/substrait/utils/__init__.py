@@ -2,7 +2,7 @@
 Utility and debugging functions for Substrait.
 """
 
-from typing import Iterable
+from collections.abc import Iterable
 
 import substrait.algebra_pb2 as stalg
 import substrait.extensions.extensions_pb2 as ste
@@ -650,9 +650,12 @@ def to_id_based_outer_references(plan: stplan.Plan) -> stplan.Plan:
             for name, expr in _iter_named_direct_expressions(node):
                 if single_input is not None:
                     binding = single_input
-                elif reshaped_join and name in _JOIN_COMBINED_SCOPED_FIELDS:
-                    binding = None
-                elif projected_read and name in _READ_FILTER_FIELDS:
+                elif (
+                    reshaped_join
+                    and name in _JOIN_COMBINED_SCOPED_FIELDS
+                    or projected_read
+                    and name in _READ_FILTER_FIELDS
+                ):
                     binding = None
                 else:
                     binding = rel

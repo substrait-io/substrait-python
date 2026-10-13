@@ -3,9 +3,10 @@ import contextlib
 import contextvars
 import itertools
 import uuid as uuid_module
+from collections.abc import Callable, Iterable
 from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal
-from typing import Any, Callable, Iterable, Union
+from typing import Any, Union
 
 import substrait.algebra_pb2 as stalg
 import substrait.extended_expression_pb2 as stee
@@ -55,7 +56,7 @@ def fresh_rel_anchors():
 UnboundExtendedExpression = Callable[
     [stp.NamedStruct, ExtensionRegistry], stee.ExtendedExpression
 ]
-ExtendedExpressionOrUnbound = Union[stee.ExtendedExpression, UnboundExtendedExpression]
+ExtendedExpressionOrUnbound = stee.ExtendedExpression | UnboundExtendedExpression
 
 
 class EnumArg:
@@ -83,7 +84,7 @@ class EnumArg:
 
 
 def _alias_or_inferred(
-    alias: Union[Iterable[str], str, None],
+    alias: Iterable[str] | str | None,
     op: str,
     args: Iterable[str],
 ):
@@ -456,7 +457,7 @@ def _make_literal(value: Any, type: stp.Type) -> stalg.Expression.Literal:
 
 
 def literal(
-    value: Any, type: stp.Type, alias: Union[Iterable[str], str, None] = None
+    value: Any, type: stp.Type, alias: Iterable[str] | str | None = None
 ) -> UnboundExtendedExpression:
     """Builds a resolver for ExtendedExpression containing a literal expression.
 
@@ -480,7 +481,7 @@ def literal(
     return build_scoped(resolve)
 
 
-def outer_reference(field: Union[str, int], steps_out: int = 1):
+def outer_reference(field: str | int, steps_out: int = 1):
     """A field reference to an enclosing query's column (a correlated reference).
 
     Only valid inside a subquery; ``steps_out`` counts query-nesting levels
@@ -538,7 +539,7 @@ class LateralInput:
         self._rel_anchor = rel_anchor
         self._schema = schema
 
-    def column(self, field: Union[str, int]):
+    def column(self, field: str | int):
         """A correlated reference to the left row's ``field`` (name or index)."""
         rel_anchor = self._rel_anchor
         schema = self._schema
@@ -570,7 +571,7 @@ class LateralInput:
         return build_scoped(resolve)
 
 
-def column(field: Union[str, int], alias: Union[Iterable[str], str, None] = None):
+def column(field: str | int, alias: Iterable[str] | str | None = None):
     """Builds a resolver for ExtendedExpression containing a FieldReference expression
 
     Accepts either an index or a field name of a desired field.
@@ -628,8 +629,8 @@ def scalar_function(
     urn: str,
     function: str,
     expressions: Iterable[ExtendedExpressionOrUnbound],
-    alias: Union[Iterable[str], str, None] = None,
-    options: Union[dict, None] = None,
+    alias: Iterable[str] | str | None = None,
+    options: dict | None = None,
 ):
     """Builds a resolver for ExtendedExpression containing a ScalarFunction expression.
 
@@ -682,14 +683,14 @@ def aggregate_function(
     urn: str,
     function: str,
     expressions: Iterable[ExtendedExpressionOrUnbound],
-    alias: Union[Iterable[str], str, None] = None,
+    alias: Iterable[str] | str | None = None,
     invocation: Union[
         "stalg.AggregateFunction.AggregationInvocation.ValueType", None
     ] = None,
     sorts: Iterable[
         tuple[ExtendedExpressionOrUnbound, "stalg.SortField.SortDirection.ValueType"]
     ] = (),
-    options: Union[dict, None] = None,
+    options: dict | None = None,
 ):
     """Builds a resolver for ExtendedExpression containing a AggregateFunction measure.
 
@@ -755,8 +756,8 @@ def window_function(
     function: str,
     expressions: Iterable[ExtendedExpressionOrUnbound],
     partitions: Iterable[ExtendedExpressionOrUnbound] = [],
-    alias: Union[Iterable[str], str, None] = None,
-    options: Union[dict, None] = None,
+    alias: Iterable[str] | str | None = None,
+    options: dict | None = None,
 ):
     """Builds a resolver for ExtendedExpression containing a WindowFunction expression"""
 
@@ -811,7 +812,7 @@ def window_function(
 def if_then(
     ifs: Iterable[tuple[ExtendedExpressionOrUnbound, ExtendedExpressionOrUnbound]],
     _else: ExtendedExpressionOrUnbound,
-    alias: Union[Iterable[str], str, None] = None,
+    alias: Iterable[str] | str | None = None,
 ):
     """Builds a resolver for ExtendedExpression containing an IfThen expression"""
 
@@ -994,7 +995,7 @@ def multi_or_list(
 def cast(
     input: ExtendedExpressionOrUnbound,
     type: stp.Type,
-    alias: Union[Iterable[str], str, None] = None,
+    alias: Iterable[str] | str | None = None,
 ):
     """Builds a resolver for ExtendedExpression containing a cast expression"""
 
@@ -1082,7 +1083,7 @@ def _inner_rel(query, registry: ExtensionRegistry, base_schema) -> stalg.Rel:
     return rel
 
 
-def scalar_subquery(query, alias: Union[str, None] = None):
+def scalar_subquery(query, alias: str | None = None):
     """A scalar (one-row, one-column) subquery expression."""
 
     def resolve(base_schema, registry):
@@ -1095,7 +1096,7 @@ def scalar_subquery(query, alias: Union[str, None] = None):
     return build_scoped(resolve)
 
 
-def set_predicate(query, op, alias: Union[str, None] = None):
+def set_predicate(query, op, alias: str | None = None):
     """An EXISTS / UNIQUE subquery predicate."""
 
     def resolve(base_schema, registry):
@@ -1110,7 +1111,7 @@ def set_predicate(query, op, alias: Union[str, None] = None):
     return build_scoped(resolve)
 
 
-def in_predicate(needles, query, alias: Union[str, None] = None):
+def in_predicate(needles, query, alias: str | None = None):
     """A ``needles IN (subquery)`` predicate."""
 
     def resolve(base_schema, registry):

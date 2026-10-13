@@ -46,12 +46,12 @@ def test_keyword_names_are_suffixed_and_raw_reachable():
 
 def test_unknown_function_raises_attributeerror():
     with pytest.raises(AttributeError, match="no Substrait function"):
-        sub.f.definitely_not_a_function
+        _ = sub.f.definitely_not_a_function
 
 
 def test_dunder_access_does_not_trigger_build():
     with pytest.raises(AttributeError):
-        sub.f.__wrapped__
+        _ = sub.f.__wrapped__
 
 
 # ---------------------------------------------------------------------------

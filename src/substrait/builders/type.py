@@ -1,4 +1,4 @@
-from typing import Iterable
+from collections.abc import Iterable
 
 import substrait.type_pb2 as stt
 

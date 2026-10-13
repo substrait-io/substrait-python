@@ -1,5 +1,4 @@
 import operator
-from typing import Optional
 
 from antlr4 import CommonTokenStream, InputStream
 from antlr4.error.ErrorListener import ErrorListener
@@ -77,9 +76,13 @@ def _evaluate(x, values: dict):
         )
     elif isinstance(x, SubstraitTypeParser.LiteralNumberContext):
         return int(x.Number().symbol.text)
-    elif isinstance(x, SubstraitTypeParser.ParameterNameContext):
-        return values[x.Identifier().symbol.text]
-    elif isinstance(x, SubstraitTypeParser.NumericParameterNameContext):
+    elif isinstance(
+        x,
+        (
+            SubstraitTypeParser.ParameterNameContext,
+            SubstraitTypeParser.NumericParameterNameContext,
+        ),
+    ):
         return values[x.Identifier().symbol.text]
     elif isinstance(x, SubstraitTypeParser.ParenExpressionContext):
         return _evaluate(x.expr(), values)
@@ -201,9 +204,7 @@ def _evaluate(x, values: dict):
                     )
                 )
             elif isinstance(parametrized_type, SubstraitTypeParser.StructContext):
-                types = list(
-                    map(lambda x: _evaluate(x, values), parametrized_type.expr())
-                )
+                types = [_evaluate(x, values) for x in parametrized_type.expr()]
                 return Type(
                     struct=Type.Struct(
                         types=types,
@@ -228,11 +229,9 @@ def _evaluate(x, values: dict):
                     )
                 )
             elif isinstance(parametrized_type, SubstraitTypeParser.NStructContext):
-                names = list(map(lambda k: k.getText(), parametrized_type.Identifier()))
+                names = [k.getText() for k in parametrized_type.Identifier()]
                 struct = Type.Struct(
-                    types=list(
-                        map(lambda k: _evaluate(k, values), parametrized_type.expr())
-                    ),
+                    types=[_evaluate(k, values) for k in parametrized_type.expr()],
                     nullability=nullability,
                 )
                 return NamedStruct(
@@ -286,5 +285,5 @@ def _parse(x: str):
     return parser.expr()
 
 
-def evaluate(x: str, values: Optional[dict] = None):
+def evaluate(x: str, values: dict | None = None):
     return _evaluate(_parse(x), values)

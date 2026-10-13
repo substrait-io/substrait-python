@@ -22,7 +22,7 @@ from datetime import date as _date
 from datetime import datetime as _datetime
 from datetime import time as _time
 from decimal import Decimal as _Decimal
-from typing import Any, Union
+from typing import Any
 
 import substrait.algebra_pb2 as stalg
 import substrait.extended_expression_pb2 as stee
@@ -160,7 +160,7 @@ _NUMERIC_BUILDERS = {
 }
 
 
-def _exact_unscaled(value: _Decimal, scale: int) -> Union[int, None]:
+def _exact_unscaled(value: _Decimal, scale: int) -> int | None:
     """The unscaled integer of ``value`` at ``scale``, or ``None`` if representing
     it at ``scale`` would drop nonzero digits (i.e. the value needs a finer scale).
 
@@ -266,14 +266,14 @@ def _resolve_over_urns(
 
 
 def _numeric_binary(
-    self_expr: "Expr",
+    self_expr: Expr,
     other: Any,
-    urns: Union[str, list],
+    urns: str | list,
     fn: str,
     *,
     swap: bool = False,
     decimal_literal: str = "natural",
-) -> "Expr":
+) -> Expr:
     """Build a binary comparison/arithmetic expression with literal coercion.
 
     A bare Python number is typed to match the *other* (column) operand at
@@ -350,7 +350,7 @@ class _SubqueryReduction:
     """A subquery wrapped by :func:`any_` / :func:`all_`, consumed by a
     comparison operator to build a ``left <op> ANY/ALL (subquery)`` expression."""
 
-    __slots__ = ("reduction_op", "plan")
+    __slots__ = ("plan", "reduction_op")
 
     def __init__(self, reduction_op, plan):
         self.reduction_op = reduction_op
@@ -410,17 +410,17 @@ class Expr:
         return self._unbound
 
     @staticmethod
-    def _coerce(value: Union["Expr", Any]) -> "Expr":
+    def _coerce(value: Expr | Any) -> Expr:
         if isinstance(value, Expr):
             return value
         return Expr(literal(value, infer_literal_type(value)))
 
-    def _scalar(self, urn: str, fn: str, *others: Any) -> "Expr":
+    def _scalar(self, urn: str, fn: str, *others: Any) -> Expr:
         args = [self._unbound] + [Expr._coerce(o)._unbound for o in others]
         return Expr(scalar_function(urn, fn, expressions=args))
 
     # -- comparison -------------------------------------------------------
-    def _compare(self, other: Any, fn: str) -> "Expr":
+    def _compare(self, other: Any, fn: str) -> Expr:
         # `col <op> any_(df)/all_(df)` builds a SetComparison subquery instead.
         if isinstance(other, _SubqueryReduction):
             return Expr(
@@ -432,22 +432,22 @@ class Expr:
             self, other, FUNCTIONS_COMPARISON, fn, decimal_literal="peer"
         )
 
-    def __lt__(self, other: Any) -> "Expr":
+    def __lt__(self, other: Any) -> Expr:
         return self._compare(other, "lt")
 
-    def __le__(self, other: Any) -> "Expr":
+    def __le__(self, other: Any) -> Expr:
         return self._compare(other, "lte")
 
-    def __gt__(self, other: Any) -> "Expr":
+    def __gt__(self, other: Any) -> Expr:
         return self._compare(other, "gt")
 
-    def __ge__(self, other: Any) -> "Expr":
+    def __ge__(self, other: Any) -> Expr:
         return self._compare(other, "gte")
 
-    def __eq__(self, other: Any) -> "Expr":  # type: ignore[override]
+    def __eq__(self, other: object) -> Expr:  # type: ignore[override]
         return self._compare(other, "equal")
 
-    def __ne__(self, other: Any) -> "Expr":  # type: ignore[override]
+    def __ne__(self, other: object) -> Expr:  # type: ignore[override]
         return self._compare(other, "not_equal")
 
     # Operator-overloaded ``__eq__`` means an Expr is not a normal value; like
@@ -455,91 +455,91 @@ class Expr:
     __hash__ = None  # type: ignore[assignment]
 
     # -- arithmetic -------------------------------------------------------
-    def __add__(self, other: Any) -> "Expr":
+    def __add__(self, other: Any) -> Expr:
         return _numeric_binary(self, other, _ARITHMETIC_URNS, "add")
 
-    def __sub__(self, other: Any) -> "Expr":
+    def __sub__(self, other: Any) -> Expr:
         return _numeric_binary(self, other, _ARITHMETIC_URNS, "subtract")
 
-    def __mul__(self, other: Any) -> "Expr":
+    def __mul__(self, other: Any) -> Expr:
         return _numeric_binary(self, other, _ARITHMETIC_URNS, "multiply")
 
-    def __truediv__(self, other: Any) -> "Expr":
+    def __truediv__(self, other: Any) -> Expr:
         return _numeric_binary(self, other, _ARITHMETIC_URNS, "divide")
 
-    def __radd__(self, other: Any) -> "Expr":
+    def __radd__(self, other: Any) -> Expr:
         return _numeric_binary(self, other, _ARITHMETIC_URNS, "add", swap=True)
 
-    def __rsub__(self, other: Any) -> "Expr":
+    def __rsub__(self, other: Any) -> Expr:
         return _numeric_binary(self, other, _ARITHMETIC_URNS, "subtract", swap=True)
 
-    def __rmul__(self, other: Any) -> "Expr":
+    def __rmul__(self, other: Any) -> Expr:
         return _numeric_binary(self, other, _ARITHMETIC_URNS, "multiply", swap=True)
 
-    def __rtruediv__(self, other: Any) -> "Expr":
+    def __rtruediv__(self, other: Any) -> Expr:
         return _numeric_binary(self, other, _ARITHMETIC_URNS, "divide", swap=True)
 
-    def __mod__(self, other: Any) -> "Expr":
+    def __mod__(self, other: Any) -> Expr:
         return _numeric_binary(self, other, _ARITHMETIC_URNS, "modulus")
 
-    def __rmod__(self, other: Any) -> "Expr":
+    def __rmod__(self, other: Any) -> Expr:
         return _numeric_binary(self, other, _ARITHMETIC_URNS, "modulus", swap=True)
 
-    def __pow__(self, other: Any) -> "Expr":
+    def __pow__(self, other: Any) -> Expr:
         return _numeric_binary(self, other, _ARITHMETIC_URNS, "power")
 
-    def __rpow__(self, other: Any) -> "Expr":
+    def __rpow__(self, other: Any) -> Expr:
         return _numeric_binary(self, other, _ARITHMETIC_URNS, "power", swap=True)
 
-    def __neg__(self) -> "Expr":
+    def __neg__(self) -> Expr:
         return Expr(
             scalar_function(FUNCTIONS_ARITHMETIC, "negate", expressions=[self._unbound])
         )
 
     # -- boolean logic ----------------------------------------------------
-    def __and__(self, other: Any) -> "Expr":
+    def __and__(self, other: Any) -> Expr:
         return self._scalar(FUNCTIONS_BOOLEAN, "and", other)
 
-    def __or__(self, other: Any) -> "Expr":
+    def __or__(self, other: Any) -> Expr:
         return self._scalar(FUNCTIONS_BOOLEAN, "or", other)
 
-    def __xor__(self, other: Any) -> "Expr":
+    def __xor__(self, other: Any) -> Expr:
         return self._scalar(FUNCTIONS_BOOLEAN, "xor", other)
 
-    def __invert__(self) -> "Expr":
+    def __invert__(self) -> Expr:
         return Expr(
             scalar_function(FUNCTIONS_BOOLEAN, "not", expressions=[self._unbound])
         )
 
     # -- helpers ----------------------------------------------------------
-    def is_null(self) -> "Expr":
+    def is_null(self) -> Expr:
         return Expr(
             scalar_function(
                 FUNCTIONS_COMPARISON, "is_null", expressions=[self._unbound]
             )
         )
 
-    def is_not_null(self) -> "Expr":
+    def is_not_null(self) -> Expr:
         return Expr(
             scalar_function(
                 FUNCTIONS_COMPARISON, "is_not_null", expressions=[self._unbound]
             )
         )
 
-    def is_nan(self) -> "Expr":
+    def is_nan(self) -> Expr:
         return Expr(
             scalar_function(FUNCTIONS_COMPARISON, "is_nan", expressions=[self._unbound])
         )
 
-    def is_distinct_from(self, other: Any) -> "Expr":
+    def is_distinct_from(self, other: Any) -> Expr:
         """Null-safe inequality (``NULL`` distinct from a value / from ``NULL``)."""
         return self._scalar(FUNCTIONS_COMPARISON, "is_distinct_from", other)
 
-    def is_not_distinct_from(self, other: Any) -> "Expr":
+    def is_not_distinct_from(self, other: Any) -> Expr:
         """Null-safe equality (``NULL`` equals ``NULL``)."""
         return self._scalar(FUNCTIONS_COMPARISON, "is_not_distinct_from", other)
 
-    def between(self, low: Any, high: Any) -> "Expr":
+    def between(self, low: Any, high: Any) -> Expr:
         """Inclusive range test, ``low <= self <= high``.
 
         Like the ``f.*`` helpers, the bounds are not coerced to this column's
@@ -547,7 +547,7 @@ class Expr:
         """
         return self._scalar(FUNCTIONS_COMPARISON, "between", low, high)
 
-    def is_in(self, options: Any) -> "Expr":
+    def is_in(self, options: Any) -> Expr:
         """True when this expression equals any value in ``options`` (SQL ``IN``).
 
         ``options`` is a collection of values or expressions, e.g.
@@ -558,7 +558,7 @@ class Expr:
         bound = [Expr._coerce(o)._unbound for o in options]
         return Expr(singular_or_list(self._unbound, bound))
 
-    def in_subquery(self, subquery: Any, alias: Union[str, None] = None) -> "Expr":
+    def in_subquery(self, subquery: Any, alias: str | None = None) -> Expr:
         """True when this expression is among a subquery's rows (``x IN (SELECT ...)``).
 
         ``subquery`` is a DataFrame producing a single output column.
@@ -566,7 +566,7 @@ class Expr:
         return Expr(_in_predicate([self._unbound], _plan_of(subquery), alias=alias))
 
     # -- nested access ----------------------------------------------------
-    def _append_segment(self, make_segment) -> "Expr":
+    def _append_segment(self, make_segment) -> Expr:
         """Append a nested ReferenceSegment child to the deepest segment."""
         inner = self._unbound
 
@@ -589,7 +589,7 @@ class Expr:
 
         return Expr(resolve)
 
-    def struct_field(self, index: int) -> "Expr":
+    def struct_field(self, index: int) -> Expr:
         """Access a nested struct field by position."""
         return self._append_segment(
             lambda _s, _r: stalg.Expression.ReferenceSegment(
@@ -597,7 +597,7 @@ class Expr:
             )
         )
 
-    def list_element(self, offset: int) -> "Expr":
+    def list_element(self, offset: int) -> Expr:
         """Access a list element by offset (also ``expr[offset]``)."""
         return self._append_segment(
             lambda _s, _r: stalg.Expression.ReferenceSegment(
@@ -607,7 +607,7 @@ class Expr:
             )
         )
 
-    def __getitem__(self, offset: int) -> "Expr":
+    def __getitem__(self, offset: int) -> Expr:
         if not isinstance(offset, int) or isinstance(offset, bool):
             raise TypeError(
                 "indexing selects a list element by integer offset; "
@@ -615,7 +615,7 @@ class Expr:
             )
         return self.list_element(offset)
 
-    def map_key(self, key: Any) -> "Expr":
+    def map_key(self, key: Any) -> Expr:
         """Access a map value by key."""
 
         def make(base_schema, registry):
@@ -632,7 +632,7 @@ class Expr:
         return self._append_segment(make)
 
     # -- higher-order list functions --------------------------------------
-    def _higher_order(self, function: str, callback) -> "Expr":
+    def _higher_order(self, function: str, callback) -> Expr:
         """Apply a list higher-order function whose lambda ``callback`` receives
         an :class:`Expr` bound to the current list element."""
         list_unbound = self._unbound
@@ -698,7 +698,7 @@ class Expr:
 
         return Expr(resolve)
 
-    def list_transform(self, fn) -> "Expr":
+    def list_transform(self, fn) -> Expr:
         """Map a function over each element of this list column (``transform``).
 
         ``fn`` receives an ``Expr`` for the current element, e.g.
@@ -706,11 +706,11 @@ class Expr:
         """
         return self._higher_order("transform", fn)
 
-    def list_filter(self, fn) -> "Expr":
+    def list_filter(self, fn) -> Expr:
         """Keep list elements for which ``fn(element)`` is true (``filter``)."""
         return self._higher_order("filter", fn)
 
-    def switch(self, cases: dict, default: Any) -> "Expr":
+    def switch(self, cases: dict, default: Any) -> Expr:
         """Value-match CASE against literal keys::
 
             col("code").switch({1: "one", 2: "two"}, default="other")
@@ -724,7 +724,7 @@ class Expr:
         ]
         return Expr(switch(self._unbound, ifs, Expr._coerce(default)._unbound))
 
-    def distinct(self) -> "Expr":
+    def distinct(self) -> Expr:
         """Make this aggregate operate on distinct inputs (``COUNT(DISTINCT x)``).
 
         Only meaningful on an aggregate measure (e.g. ``f.count(col("x")).distinct()``).
@@ -745,7 +745,7 @@ class Expr:
 
     def order_by(
         self, *keys: Any, descending: bool = False, nulls_last: bool = True
-    ) -> "Expr":
+    ) -> Expr:
         """Order the inputs to this aggregate (``string_agg(x ORDER BY ...)``).
 
         ``keys`` are column names or expressions; ``descending``/``nulls_last``
@@ -778,9 +778,9 @@ class Expr:
         *,
         descending: bool = False,
         nulls_last: bool = True,
-        rows: Union[tuple, None] = None,
-        range: Union[tuple, None] = None,
-    ) -> "Expr":
+        rows: tuple | None = None,
+        range: tuple | None = None,
+    ) -> Expr:
         """Turn a window function into a windowed expression (SQL ``OVER (...)``).
 
         ``partition_by`` / ``order_by`` are a column name/expression or a list of
@@ -832,7 +832,7 @@ class Expr:
 
         return Expr(resolve)
 
-    def filter(self, predicate: Any) -> "Measure":
+    def filter(self, predicate: Any) -> Measure:
         """Restrict this aggregate to rows where ``predicate`` holds
         (SQL ``agg(x) FILTER (WHERE predicate)``).
 
@@ -842,7 +842,7 @@ class Expr:
         """
         return Measure(self, Expr._coerce(predicate))
 
-    def cast(self, type: Any) -> "Expr":
+    def cast(self, type: Any) -> Expr:
         """Cast this expression to ``type`` (a proto.Type or a type builder).
 
         The explicit escape hatch when automatic literal coercion is not enough,
@@ -854,7 +854,7 @@ class Expr:
             type = type()
         return Expr(cast(self._unbound, type))
 
-    def alias(self, name: str) -> "Expr":
+    def alias(self, name: str) -> Expr:
         """Return a copy of this expression with its output name set to ``name``."""
         return Expr(_alias(self._unbound, name))
 
@@ -875,13 +875,13 @@ class Measure:
         self.expr = expr
         self.predicate = predicate
 
-    def alias(self, name: str) -> "Measure":
+    def alias(self, name: str) -> Measure:
         return Measure(self.expr.alias(name), self.predicate)
 
-    def distinct(self) -> "Measure":
+    def distinct(self) -> Measure:
         return Measure(self.expr.distinct(), self.predicate)
 
-    def order_by(self, *keys: Any, **kwargs: Any) -> "Measure":
+    def order_by(self, *keys: Any, **kwargs: Any) -> Measure:
         return Measure(self.expr.order_by(*keys, **kwargs), self.predicate)
 
 
@@ -890,16 +890,16 @@ class When:
 
     __slots__ = ("_clauses", "_pending")
 
-    def __init__(self, clauses: list, pending: Union[Expr, None]):
+    def __init__(self, clauses: list, pending: Expr | None):
         self._clauses = clauses  # list[(cond Expr, value Expr)] completed
         self._pending = pending  # a condition Expr awaiting .then(), or None
 
-    def when(self, condition: Any) -> "When":
+    def when(self, condition: Any) -> When:
         if self._pending is not None:
             raise ValueError("call .then(...) before starting another .when(...)")
         return When(self._clauses, Expr._coerce(condition))
 
-    def then(self, value: Any) -> "When":
+    def then(self, value: Any) -> When:
         if self._pending is None:
             raise ValueError(".then(...) must follow a .when(...)")
         return When(self._clauses + [(self._pending, Expr._coerce(value))], None)
@@ -932,7 +932,7 @@ def coalesce(*exprs: Any) -> Expr:
     return Expr(scalar_function(FUNCTIONS_COMPARISON, "coalesce", expressions=args))
 
 
-def parameter(index: int, type: Any, alias: Union[str, None] = None) -> Expr:
+def parameter(index: int, type: Any, alias: str | None = None) -> Expr:
     """A dynamic (runtime-bound) parameter of the given ``type``.
 
     ``index`` is the 0-based position bound via the plan's parameter bindings;
@@ -943,7 +943,7 @@ def parameter(index: int, type: Any, alias: Union[str, None] = None) -> Expr:
     return Expr(_dynamic_parameter(index, type, alias))
 
 
-def current_timestamp(precision: int = 6, alias: Union[str, None] = None) -> Expr:
+def current_timestamp(precision: int = 6, alias: str | None = None) -> Expr:
     """The query's execution timestamp (``precision_timestamp_tz``)."""
     return Expr(
         _execution_context_variable(
@@ -956,7 +956,7 @@ def current_timestamp(precision: int = 6, alias: Union[str, None] = None) -> Exp
     )
 
 
-def current_date(alias: Union[str, None] = None) -> Expr:
+def current_date(alias: str | None = None) -> Expr:
     """The query's execution date."""
     return Expr(
         _execution_context_variable(
@@ -967,7 +967,7 @@ def current_date(alias: Union[str, None] = None) -> Expr:
     )
 
 
-def current_timezone(alias: Union[str, None] = None) -> Expr:
+def current_timezone(alias: str | None = None) -> Expr:
     """The query's execution timezone (a ``string``)."""
     return Expr(
         _execution_context_variable(
@@ -978,18 +978,18 @@ def current_timezone(alias: Union[str, None] = None) -> Expr:
     )
 
 
-def scalar_subquery(subquery: Any, alias: Union[str, None] = None) -> Expr:
+def scalar_subquery(subquery: Any, alias: str | None = None) -> Expr:
     """The single value of a one-row/one-column subquery (a DataFrame)."""
     return Expr(_scalar_subquery(_plan_of(subquery), alias=alias))
 
 
-def exists(subquery: Any, alias: Union[str, None] = None) -> Expr:
+def exists(subquery: Any, alias: str | None = None) -> Expr:
     """``EXISTS (subquery)`` -- true when the subquery returns any row."""
     op = stalg.Expression.Subquery.SetPredicate.PREDICATE_OP_EXISTS
     return Expr(_set_predicate(_plan_of(subquery), op, alias=alias))
 
 
-def unique(subquery: Any, alias: Union[str, None] = None) -> Expr:
+def unique(subquery: Any, alias: str | None = None) -> Expr:
     """``UNIQUE (subquery)`` -- true when the subquery has no duplicate rows."""
     op = stalg.Expression.Subquery.SetPredicate.PREDICATE_OP_UNIQUE
     return Expr(_set_predicate(_plan_of(subquery), op, alias=alias))
@@ -1007,7 +1007,7 @@ def all_(subquery: Any) -> _SubqueryReduction:
     return _SubqueryReduction(op, _plan_of(subquery))
 
 
-def col(name: Union[str, int]) -> Expr:
+def col(name: str | int) -> Expr:
     """Reference an input column by name or index."""
     return Expr(column(name))
 
@@ -1027,7 +1027,7 @@ def enum(value: str) -> EnumArg:
     return EnumArg(value)
 
 
-def outer(name: Union[str, int], steps_out: int = 1) -> Expr:
+def outer(name: str | int, steps_out: int = 1) -> Expr:
     """Reference a column from an enclosing query (a correlated reference).
 
     Only valid inside a subquery, e.g. a correlated ``exists``::
@@ -1041,7 +1041,7 @@ def outer(name: Union[str, int], steps_out: int = 1) -> Expr:
     return Expr(_outer_reference(name, steps_out))
 
 
-def lit(value: Any, type: Union[stp.Type, None] = None) -> Expr:
+def lit(value: Any, type: stp.Type | None = None) -> Expr:
     """A literal expression. The Substrait type is inferred when omitted.
 
     Pass ``value=None`` to build a typed null; a ``type`` is required in that

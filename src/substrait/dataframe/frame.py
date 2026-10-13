@@ -28,8 +28,9 @@ native frame; the two layers compose rather than compete.
 
 from __future__ import annotations
 
+from collections.abc import Callable, Iterable
 from itertools import combinations
-from typing import Any, Callable, Iterable, Optional, Union
+from typing import Any
 
 import substrait.algebra_pb2 as stalg
 import substrait.plan_pb2 as stplan
@@ -98,7 +99,7 @@ _VARIABLE_EVAL_MODES = {
 }
 
 
-def _per_column(value: Any, n: int, name: str) -> "list[bool]":
+def _per_column(value: Any, n: int, name: str) -> list[bool]:
     """Broadcast a bool, or validate a per-column list of bools, to length ``n``."""
     if isinstance(value, (list, tuple)):
         if len(value) != n:
@@ -110,8 +111,8 @@ def _per_column(value: Any, n: int, name: str) -> "list[bool]":
 
 
 def _normalize_grouping_sets(
-    keys: "tuple[Union[str, Expr], ...]", grouping_sets: Iterable[Iterable[Any]]
-) -> "list[list[int]]":
+    keys: tuple[str | Expr, ...], grouping_sets: Iterable[Iterable[Any]]
+) -> list[list[int]]:
     """Map each grouping set (of key names or positions) to index lists into ``keys``."""
     name_to_index = {k: i for i, k in enumerate(keys) if isinstance(k, str)}
     result = []
@@ -132,14 +133,14 @@ def _normalize_grouping_sets(
     return result
 
 
-def _split_measure(m: Union[Expr, Measure]):
+def _split_measure(m: Expr | Measure):
     """Return ``(unbound_measure, unbound_filter_or_None)`` for an agg input."""
     if isinstance(m, Measure):
         return _unbound(m.expr), _unbound(m.predicate)
     return _unbound(m), None
 
 
-_default_registry: Optional[ExtensionRegistry] = None
+_default_registry: ExtensionRegistry | None = None
 
 
 def default_registry() -> ExtensionRegistry:
@@ -186,11 +187,11 @@ class LateralLeft:
     def __init__(self, handle: LateralInput):
         self._handle = handle
 
-    def col(self, name: Union[str, int]) -> Expr:
+    def col(self, name: str | int) -> Expr:
         """A correlated reference to the left row's column ``name`` (or index)."""
         return Expr(self._handle.column(name))
 
-    def __getitem__(self, name: Union[str, int]) -> Expr:
+    def __getitem__(self, name: str | int) -> Expr:
         return self.col(name)
 
 
@@ -202,11 +203,11 @@ class DataFrame:
     wraps this frame to satisfy the Narwhals backend protocol.
     """
 
-    def __init__(self, plan, registry: Optional[ExtensionRegistry] = None):
+    def __init__(self, plan, registry: ExtensionRegistry | None = None):
         self._plan = plan
         self._registry = registry or default_registry()
 
-    def _next(self, plan) -> "DataFrame":
+    def _next(self, plan) -> DataFrame:
         return DataFrame(plan, self._registry)
 
     @property
@@ -225,22 +226,20 @@ class DataFrame:
             self._functions_ns = cached
         return cached
 
-    def filter(self, predicate: Union[Expr, Any]) -> "DataFrame":
+    def filter(self, predicate: Expr | Any) -> DataFrame:
         return self._next(_plan.filter(self._plan, expression=_unbound(predicate)))
 
-    def select(self, *columns: Union[str, Expr]) -> "DataFrame":
+    def select(self, *columns: str | Expr) -> DataFrame:
         return self._next(
             _plan.select(self._plan, expressions=[_unbound(c) for c in columns])
         )
 
-    def with_columns(
-        self, *exprs: Union[str, Expr], **named: Union[Expr, Any]
-    ) -> "DataFrame":
+    def with_columns(self, *exprs: str | Expr, **named: Expr | Any) -> DataFrame:
         expressions = [_unbound(e) for e in exprs]
         expressions += [Expr._coerce(v).alias(k).unbound for k, v in named.items()]
         return self._next(_plan.project(self._plan, expressions=expressions))
 
-    def rename(self, mapping: dict) -> "DataFrame":
+    def rename(self, mapping: dict) -> DataFrame:
         """Rename columns via a ``{old: new}`` mapping; others pass through.
 
         Implemented as a projection selecting every column, aliasing the renamed
@@ -262,7 +261,7 @@ class DataFrame:
 
         return self._next(build_scoped(resolve))
 
-    def drop(self, *columns: str) -> "DataFrame":
+    def drop(self, *columns: str) -> DataFrame:
         """Drop the named columns, keeping the rest in their original order."""
         drop_set = set(columns)
         inner = self._plan
@@ -282,12 +281,12 @@ class DataFrame:
 
     def unpivot(
         self,
-        on: Union[str, Iterable[str]],
-        index: Union[str, Iterable[str]] = (),
+        on: str | Iterable[str],
+        index: str | Iterable[str] = (),
         *,
         variable_name: str = "variable",
         value_name: str = "value",
-    ) -> "DataFrame":
+    ) -> DataFrame:
         """Unpivot ``on`` columns into ``variable``/``value`` rows (an ExpandRel).
 
         ``index`` columns are repeated on every output row. The ``on`` columns
@@ -309,10 +308,10 @@ class DataFrame:
 
     def sort(
         self,
-        *columns: Union[str, Expr],
-        descending: Union[bool, "list[bool]"] = False,
-        nulls_last: Union[bool, "list[bool]"] = True,
-    ) -> "DataFrame":
+        *columns: str | Expr,
+        descending: bool | list[bool] = False,
+        nulls_last: bool | list[bool] = True,
+    ) -> DataFrame:
         """Order rows by one or more columns.
 
         ``descending`` and ``nulls_last`` are each either a single bool applied
@@ -329,7 +328,7 @@ class DataFrame:
         ]
         return self._next(_plan.sort(self._plan, expressions=expressions))
 
-    def limit(self, n: int, offset: int = 0) -> "DataFrame":
+    def limit(self, n: int, offset: int = 0) -> DataFrame:
         return self._next(
             _plan.fetch(
                 self._plan,
@@ -338,11 +337,11 @@ class DataFrame:
             )
         )
 
-    def head(self, n: int = 5) -> "DataFrame":
+    def head(self, n: int = 5) -> DataFrame:
         """The first ``n`` rows (alias for ``limit(n)``)."""
         return self.limit(n)
 
-    def offset(self, n: int) -> "DataFrame":
+    def offset(self, n: int) -> DataFrame:
         """Skip the first ``n`` rows, keeping all the rest."""
         return self._next(
             _plan.fetch(self._plan, offset=lit(n, _type.i64()).unbound, count=None)
@@ -351,13 +350,13 @@ class DataFrame:
     def top_n(
         self,
         n: int,
-        by: Union[str, Expr, Iterable[Union[str, Expr]]],
+        by: str | Expr | Iterable[str | Expr],
         *,
-        descending: Union[bool, "list[bool]"] = False,
-        nulls_last: Union[bool, "list[bool]"] = True,
+        descending: bool | list[bool] = False,
+        nulls_last: bool | list[bool] = True,
         offset: int = 0,
         with_ties: bool = False,
-    ) -> "DataFrame":
+    ) -> DataFrame:
         """The top ``n`` rows ordered by ``by`` (a fused sort + fetch, TopNRel).
 
         ``descending``/``nulls_last`` follow :meth:`sort`; ``with_ties`` keeps
@@ -382,12 +381,12 @@ class DataFrame:
 
     def join(
         self,
-        other: "DataFrame",
-        on: Union[Expr, Any],
+        other: DataFrame,
+        on: Expr | Any,
         how: str = "inner",
         *,
-        post_filter: Union[Expr, Any, None] = None,
-    ) -> "DataFrame":
+        post_filter: Expr | Any | None = None,
+    ) -> DataFrame:
         """Join with another DataFrame.
 
         ``on`` is an expression evaluated against the concatenation of the left
@@ -419,19 +418,19 @@ class DataFrame:
             )
         )
 
-    def cross_join(self, other: "DataFrame") -> "DataFrame":
+    def cross_join(self, other: DataFrame) -> DataFrame:
         """Cartesian product with ``other`` (every left row paired with every
         right row)."""
         return self._next(_plan.cross(self._plan, other._plan))
 
     def lateral_join(
         self,
-        right: "Callable[[LateralLeft], DataFrame]",
+        right: Callable[[LateralLeft], DataFrame],
         how: str = "inner",
         *,
-        on: Union[Expr, Any, None] = None,
-        post_filter: Union[Expr, Any, None] = None,
-    ) -> "DataFrame":
+        on: Expr | Any | None = None,
+        post_filter: Expr | Any | None = None,
+    ) -> DataFrame:
         """Lateral join: evaluate the right frame once per row of this frame.
 
         ``right`` is a function of a :class:`LateralLeft` handle to this frame;
@@ -472,8 +471,8 @@ class DataFrame:
         )
 
     def nested_loop_join(
-        self, other: "DataFrame", on: Union[Expr, Any], how: str = "inner"
-    ) -> "DataFrame":
+        self, other: DataFrame, on: Expr | Any, how: str = "inner"
+    ) -> DataFrame:
         """Physical nested-loop join: evaluate ``on`` over the Cartesian product.
 
         ``how`` accepts the same values as :meth:`join`.
@@ -530,14 +529,14 @@ class DataFrame:
 
     def hash_join(
         self,
-        other: "DataFrame",
-        left_on: Union[str, int, Iterable[Union[str, int]]],
-        right_on: Union[str, int, Iterable[Union[str, int]], None] = None,
+        other: DataFrame,
+        left_on: str | int | Iterable[str | int],
+        right_on: str | int | Iterable[str | int] | None = None,
         how: str = "inner",
         *,
-        post_filter: Union[Expr, Any, None] = None,
-        residual: Union[Expr, Any, None] = None,
-    ) -> "DataFrame":
+        post_filter: Expr | Any | None = None,
+        residual: Expr | Any | None = None,
+    ) -> DataFrame:
         """Physical hash equi-join on key columns.
 
         ``left_on``/``right_on`` are column names/indices; ``right_on`` defaults
@@ -560,14 +559,14 @@ class DataFrame:
 
     def merge_join(
         self,
-        other: "DataFrame",
-        left_on: Union[str, int, Iterable[Union[str, int]]],
-        right_on: Union[str, int, Iterable[Union[str, int]], None] = None,
+        other: DataFrame,
+        left_on: str | int | Iterable[str | int],
+        right_on: str | int | Iterable[str | int] | None = None,
         how: str = "inner",
         *,
-        post_filter: Union[Expr, Any, None] = None,
-        residual: Union[Expr, Any, None] = None,
-    ) -> "DataFrame":
+        post_filter: Expr | Any | None = None,
+        residual: Expr | Any | None = None,
+    ) -> DataFrame:
         """Physical sort-merge equi-join on key columns (inputs assumed sorted).
 
         ``post_filter`` and ``residual`` behave as in :meth:`hash_join`.
@@ -583,15 +582,15 @@ class DataFrame:
             residual,
         )
 
-    def repartition(self, n: int = 0) -> "DataFrame":
+    def repartition(self, n: int = 0) -> DataFrame:
         """Redistribute rows round-robin into ``n`` partitions (an ExchangeRel)."""
         return self._next(_plan.exchange(self._plan, partition_count=n))
 
-    def broadcast(self) -> "DataFrame":
+    def broadcast(self) -> DataFrame:
         """Broadcast every row to all partitions (an ExchangeRel)."""
         return self._next(_plan.exchange(self._plan, broadcast=True))
 
-    def extension(self, detail: Any) -> "DataFrame":
+    def extension(self, detail: Any) -> DataFrame:
         """Apply a custom single-input relation (ExtensionSingleRel).
 
         ``detail`` is an
@@ -603,9 +602,7 @@ class DataFrame:
         """
         return self._next(_plan.extension_single(self._plan, detail))
 
-    def extension_multi(
-        self, others: Iterable["DataFrame"], detail: Any
-    ) -> "DataFrame":
+    def extension_multi(self, others: Iterable[DataFrame], detail: Any) -> DataFrame:
         """A custom multi-input relation (ExtensionMultiRel) over this frame and
         ``others``; ``detail`` is an
         :class:`~substrait.dataframe.extension_relations.ExtensionMultiDetail`."""
@@ -615,11 +612,11 @@ class DataFrame:
     def hint(
         self,
         *,
-        row_count: Optional[float] = None,
-        record_size: Optional[float] = None,
-        alias: Optional[str] = None,
-        output_names: Optional[Iterable[str]] = None,
-    ) -> "DataFrame":
+        row_count: float | None = None,
+        record_size: float | None = None,
+        alias: str | None = None,
+        output_names: Iterable[str] | None = None,
+    ) -> DataFrame:
         """Attach non-semantic hints to the current relation (``RelCommon.Hint``).
 
         ``row_count`` / ``record_size`` are optimizer statistics; ``alias`` names
@@ -655,7 +652,7 @@ class DataFrame:
 
         return self._next(build_scoped(resolve))
 
-    def cache(self) -> "DataFrame":
+    def cache(self) -> DataFrame:
         """Mark this DataFrame as a reusable common subplan (a CTE).
 
         The returned frame is emitted as a shared subtree (a leading ``rel`` entry
@@ -670,7 +667,7 @@ class DataFrame:
         """
         return self._next(_plan.reference(self._plan))
 
-    def with_execution_behavior(self, variable_eval_mode: str) -> "DataFrame":
+    def with_execution_behavior(self, variable_eval_mode: str) -> DataFrame:
         """Set how often execution context variables are evaluated (plan-level).
 
         ``variable_eval_mode`` is ``"per_plan"`` (evaluate once for the whole
@@ -688,7 +685,7 @@ class DataFrame:
             ) from None
         return self._next(_plan.with_execution_behavior(self._plan, eval_mode))
 
-    def union(self, *others: "DataFrame", distinct: bool = False) -> "DataFrame":
+    def union(self, *others: DataFrame, distinct: bool = False) -> DataFrame:
         """Concatenate rows of this DataFrame with ``others``.
 
         Defaults to keeping duplicates (``UNION ALL``); pass ``distinct=True``
@@ -701,7 +698,7 @@ class DataFrame:
         )
         return self._set(others, op)
 
-    def intersect(self, *others: "DataFrame", distinct: bool = True) -> "DataFrame":
+    def intersect(self, *others: DataFrame, distinct: bool = True) -> DataFrame:
         """Rows present in this DataFrame and in every ``other`` (SQL
         ``INTERSECT``). Pass ``distinct=False`` for ``INTERSECT ALL``."""
         op = (
@@ -711,7 +708,7 @@ class DataFrame:
         )
         return self._set(others, op)
 
-    def except_(self, *others: "DataFrame", distinct: bool = True) -> "DataFrame":
+    def except_(self, *others: DataFrame, distinct: bool = True) -> DataFrame:
         """Rows in this DataFrame excluding any found in ``others`` (SQL
         ``EXCEPT``). Pass ``distinct=False`` for ``EXCEPT ALL``."""
         op = (
@@ -721,9 +718,7 @@ class DataFrame:
         )
         return self._set(others, op)
 
-    def _set(
-        self, others: "tuple[DataFrame, ...]", op: "stalg.SetRel.SetOp"
-    ) -> "DataFrame":
+    def _set(self, others: tuple[DataFrame, ...], op: stalg.SetRel.SetOp) -> DataFrame:
         if not others:
             raise ValueError("a set operation needs at least one other DataFrame")
         inputs = [self._plan, *(o._plan for o in others)]
@@ -731,9 +726,9 @@ class DataFrame:
 
     def group_by(
         self,
-        *keys: Union[str, Expr],
-        grouping_sets: Optional[Iterable[Iterable[Any]]] = None,
-    ) -> "GroupBy":
+        *keys: str | Expr,
+        grouping_sets: Iterable[Iterable[Any]] | None = None,
+    ) -> GroupBy:
         """Begin an aggregation; follow with ``.agg(...)``.
 
         ``grouping_sets`` optionally supplies explicit GROUPING SETS as lists of
@@ -747,13 +742,13 @@ class DataFrame:
         )
         return GroupBy(self, keys, sets)
 
-    def rollup(self, *keys: Union[str, Expr]) -> "GroupBy":
+    def rollup(self, *keys: str | Expr) -> GroupBy:
         """Aggregate over the ROLLUP of ``keys``: the grouping sets
         ``(k0..kn), (k0..kn-1), ..., (k0), ()``."""
         sets = [list(range(i)) for i in range(len(keys), -1, -1)]
         return GroupBy(self, keys, sets)
 
-    def cube(self, *keys: Union[str, Expr]) -> "GroupBy":
+    def cube(self, *keys: str | Expr) -> GroupBy:
         """Aggregate over the CUBE of ``keys``: every subset of the keys."""
         n = len(keys)
         sets = [
@@ -763,17 +758,17 @@ class DataFrame:
 
     def aggregate(
         self,
-        group_by: Union[str, Expr, Iterable[Union[str, Expr]]] = (),
-        *measures: Union[Expr, Measure],
-    ) -> "DataFrame":
+        group_by: str | Expr | Iterable[str | Expr] = (),
+        *measures: Expr | Measure,
+    ) -> DataFrame:
         """One-shot aggregation. See also the fluent ``group_by().agg()``."""
         if isinstance(group_by, (str, Expr)):
             group_by = [group_by]
         return GroupBy(self, tuple(group_by), None).agg(*measures)
 
     def write_named_table(
-        self, name: Union[str, Iterable[str]], *, mode: str = "error", op: str = "ctas"
-    ) -> "DataFrame":
+        self, name: str | Iterable[str], *, mode: str = "error", op: str = "ctas"
+    ) -> DataFrame:
         """Write these rows to a named table (a ``WriteRel`` sink).
 
         ``op`` is the write operation: ``ctas`` (create-table-as-select,
@@ -799,7 +794,7 @@ class DataFrame:
             )
         )
 
-    def _finalize(self, registry: Optional[ExtensionRegistry]) -> stplan.Plan:
+    def _finalize(self, registry: ExtensionRegistry | None) -> stplan.Plan:
         """Build the plan and normalize it for output. The DataFrame layer emits
         correlated (outer) references in the id-based form (``rel_reference``): a
         lateral join's builder assigns them directly, and any offset-based
@@ -815,7 +810,7 @@ class DataFrame:
         return self._finalize(self._registry)
 
     # Kept for parity with the substrait.narwhals (Narwhals) wrapper's API.
-    def to_substrait(self, registry: Optional[ExtensionRegistry] = None) -> stplan.Plan:
+    def to_substrait(self, registry: ExtensionRegistry | None = None) -> stplan.Plan:
         return self._finalize(registry or self._registry)
 
 
@@ -825,14 +820,14 @@ class GroupBy:
     def __init__(
         self,
         df: DataFrame,
-        keys: Iterable[Union[str, Expr]],
-        grouping_sets: Optional["list[list[int]]"] = None,
+        keys: Iterable[str | Expr],
+        grouping_sets: list[list[int]] | None = None,
     ):
         self._df = df
         self._keys = list(keys)
         self._grouping_sets = grouping_sets
 
-    def agg(self, *measures: Union[Expr, Measure]) -> DataFrame:
+    def agg(self, *measures: Expr | Measure) -> DataFrame:
         unbound, filters = (
             zip(*(_split_measure(m) for m in measures)) if measures else ((), ())
         )
@@ -847,9 +842,7 @@ class GroupBy:
         )
 
 
-def extension_leaf(
-    detail: Any, registry: Optional[ExtensionRegistry] = None
-) -> DataFrame:
+def extension_leaf(detail: Any, registry: ExtensionRegistry | None = None) -> DataFrame:
     """Start a DataFrame from a custom leaf relation (ExtensionLeafRel).
 
     ``detail`` is an
@@ -860,9 +853,9 @@ def extension_leaf(
 
 
 def read_named_table(
-    name: Union[str, Iterable[str]],
+    name: str | Iterable[str],
     schema: Any,
-    registry: Optional[ExtensionRegistry] = None,
+    registry: ExtensionRegistry | None = None,
 ) -> DataFrame:
     """Start a DataFrame from a named table and its schema.
 
@@ -876,7 +869,7 @@ def read_named_table(
 def from_records(
     data: Iterable[Any],
     schema: Any,
-    registry: Optional[ExtensionRegistry] = None,
+    registry: ExtensionRegistry | None = None,
 ) -> DataFrame:
     """Start a DataFrame from inline rows (a ``VirtualTable`` / VALUES clause).
 
@@ -901,9 +894,9 @@ def from_records(
 
 
 def _read_local_files(
-    paths: Union[str, Iterable[str]],
+    paths: str | Iterable[str],
     schema: Any,
-    registry: Optional[ExtensionRegistry],
+    registry: ExtensionRegistry | None,
     **file_format: Any,
 ) -> DataFrame:
     ns = _to_named_struct(schema)
@@ -914,9 +907,9 @@ def _read_local_files(
 
 
 def read_parquet(
-    paths: Union[str, Iterable[str]],
+    paths: str | Iterable[str],
     schema: Any,
-    registry: Optional[ExtensionRegistry] = None,
+    registry: ExtensionRegistry | None = None,
 ) -> DataFrame:
     """Read one or more Parquet files into a DataFrame."""
     opts = stalg.ReadRel.LocalFiles.FileOrFiles.ParquetReadOptions()
@@ -924,9 +917,9 @@ def read_parquet(
 
 
 def read_orc(
-    paths: Union[str, Iterable[str]],
+    paths: str | Iterable[str],
     schema: Any,
-    registry: Optional[ExtensionRegistry] = None,
+    registry: ExtensionRegistry | None = None,
 ) -> DataFrame:
     """Read one or more ORC files into a DataFrame."""
     opts = stalg.ReadRel.LocalFiles.FileOrFiles.OrcReadOptions()
@@ -934,9 +927,9 @@ def read_orc(
 
 
 def read_arrow(
-    paths: Union[str, Iterable[str]],
+    paths: str | Iterable[str],
     schema: Any,
-    registry: Optional[ExtensionRegistry] = None,
+    registry: ExtensionRegistry | None = None,
 ) -> DataFrame:
     """Read one or more Arrow IPC files into a DataFrame."""
     opts = stalg.ReadRel.LocalFiles.FileOrFiles.ArrowReadOptions()
@@ -944,12 +937,12 @@ def read_arrow(
 
 
 def read_csv(
-    paths: Union[str, Iterable[str]],
+    paths: str | Iterable[str],
     schema: Any,
     *,
     delimiter: str = ",",
     header_lines_to_skip: int = 1,
-    registry: Optional[ExtensionRegistry] = None,
+    registry: ExtensionRegistry | None = None,
 ) -> DataFrame:
     """Read one or more delimiter-separated text files (CSV/TSV) into a DataFrame."""
     opts = stalg.ReadRel.LocalFiles.FileOrFiles.DelimiterSeparatedTextReadOptions(
@@ -961,18 +954,18 @@ def read_csv(
 def read_extension_table(
     schema: Any,
     detail: Any,
-    registry: Optional[ExtensionRegistry] = None,
+    registry: ExtensionRegistry | None = None,
 ) -> DataFrame:
     """Start a DataFrame from a custom source; ``detail`` is a ``google.protobuf.Any``."""
     return DataFrame(_plan.extension_table(_to_named_struct(schema), detail), registry)
 
 
 def create_table(
-    name: Union[str, Iterable[str]],
+    name: str | Iterable[str],
     schema: Any,
     *,
     replace: bool = False,
-    registry: Optional[ExtensionRegistry] = None,
+    registry: ExtensionRegistry | None = None,
 ) -> DataFrame:
     """A ``CREATE TABLE`` DDL statement (``CREATE OR REPLACE`` when ``replace``)."""
     op = (
@@ -990,11 +983,11 @@ def create_table(
 
 
 def create_view(
-    name: Union[str, Iterable[str]],
+    name: str | Iterable[str],
     query: DataFrame,
     *,
     replace: bool = False,
-    registry: Optional[ExtensionRegistry] = None,
+    registry: ExtensionRegistry | None = None,
 ) -> DataFrame:
     """A ``CREATE VIEW`` DDL statement backed by ``query`` (a DataFrame)."""
     op = (
@@ -1007,10 +1000,10 @@ def create_view(
 
 
 def drop_table(
-    name: Union[str, Iterable[str]],
+    name: str | Iterable[str],
     *,
     if_exists: bool = False,
-    registry: Optional[ExtensionRegistry] = None,
+    registry: ExtensionRegistry | None = None,
 ) -> DataFrame:
     """A ``DROP TABLE`` DDL statement (``DROP TABLE IF EXISTS`` when ``if_exists``)."""
     op = stalg.DdlRel.DDL_OP_DROP_IF_EXIST if if_exists else stalg.DdlRel.DDL_OP_DROP
@@ -1018,10 +1011,10 @@ def drop_table(
 
 
 def drop_view(
-    name: Union[str, Iterable[str]],
+    name: str | Iterable[str],
     *,
     if_exists: bool = False,
-    registry: Optional[ExtensionRegistry] = None,
+    registry: ExtensionRegistry | None = None,
 ) -> DataFrame:
     """A ``DROP VIEW`` DDL statement (``DROP VIEW IF EXISTS`` when ``if_exists``)."""
     op = stalg.DdlRel.DDL_OP_DROP_IF_EXIST if if_exists else stalg.DdlRel.DDL_OP_DROP
@@ -1029,12 +1022,12 @@ def drop_view(
 
 
 def update_table(
-    name: Union[str, Iterable[str]],
+    name: str | Iterable[str],
     schema: Any,
     assignments: dict,
     *,
-    where: Union[Expr, Any, None] = None,
-    registry: Optional[ExtensionRegistry] = None,
+    where: Expr | Any | None = None,
+    registry: ExtensionRegistry | None = None,
 ) -> DataFrame:
     """An ``UPDATE`` statement: ``assignments`` maps a column (name or index) to a
     new-value expression, applied where ``where`` holds (all rows if omitted)."""

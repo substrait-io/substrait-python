@@ -37,7 +37,7 @@ class ExtensionLeafDetail(abc.ABC):
 
     @classmethod
     @abc.abstractmethod
-    def from_any(cls, detail: Any) -> "ExtensionLeafDetail":
+    def from_any(cls, detail: Any) -> ExtensionLeafDetail:
         """Reconstruct a detail from its ``google.protobuf.Any``."""
 
     @abc.abstractmethod
@@ -56,7 +56,7 @@ class ExtensionSingleDetail(abc.ABC):
 
     @classmethod
     @abc.abstractmethod
-    def from_any(cls, detail: Any) -> "ExtensionSingleDetail":
+    def from_any(cls, detail: Any) -> ExtensionSingleDetail:
         """Reconstruct a detail from its ``google.protobuf.Any``."""
 
     @abc.abstractmethod
@@ -75,9 +75,9 @@ class ExtensionMultiDetail(abc.ABC):
 
     @classmethod
     @abc.abstractmethod
-    def from_any(cls, detail: Any) -> "ExtensionMultiDetail":
+    def from_any(cls, detail: Any) -> ExtensionMultiDetail:
         """Reconstruct a detail from its ``google.protobuf.Any``."""
 
     @abc.abstractmethod
-    def derive_schema(self, inputs: "list[stt.Type.Struct]") -> stt.NamedStruct:
+    def derive_schema(self, inputs: list[stt.Type.Struct]) -> stt.NamedStruct:
         """The output schema given the input relations' types."""

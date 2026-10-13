@@ -6,7 +6,7 @@ See `examples/builder_example.py` for usage.
 """
 
 import re
-from typing import Callable, Iterable, Optional, Union
+from collections.abc import Callable, Iterable
 
 import substrait.algebra_pb2 as stalg
 import substrait.extended_expression_pb2 as stee
@@ -43,7 +43,7 @@ from substrait.version import substrait_version
 
 UnboundPlan = Callable[[ExtensionRegistry], stp.Plan]
 
-PlanOrUnbound = Union[stp.Plan, UnboundPlan]
+PlanOrUnbound = stp.Plan | UnboundPlan
 
 
 def _create_default_version():
@@ -120,7 +120,7 @@ def _merge_input_subtrees(bound_inputs):
     carry no subtrees pass their root input through untouched, keeping output for
     the (overwhelmingly common) no-subtree case byte-identical.
     """
-    combined: "list[stalg.Rel]" = []
+    combined: list[stalg.Rel] = []
     key_to_ordinal: dict = {}  # serialized subtree bytes -> ordinal in `combined`
     rebased_root_inputs = []
     for plan in bound_inputs:
@@ -262,9 +262,9 @@ def with_execution_behavior(
 
 
 def read_named_table(
-    names: Union[str, Iterable[str]],
+    names: str | Iterable[str],
     named_struct: stt.NamedStruct,
-    extension: Optional[AdvancedExtension] = None,
+    extension: AdvancedExtension | None = None,
 ) -> UnboundPlan:
     if named_struct.struct.nullability is stt.Type.NULLABILITY_NULLABLE:
         raise Exception("NamedStruct must not contain a nullable struct")
@@ -318,7 +318,7 @@ def _read_plan(named_struct: stt.NamedStruct, read_rel: stalg.ReadRel) -> stp.Pl
 def virtual_table(
     rows: Iterable[Iterable[ExtendedExpressionOrUnbound]],
     named_struct: stt.NamedStruct,
-    extension: Optional[AdvancedExtension] = None,
+    extension: AdvancedExtension | None = None,
 ) -> UnboundPlan:
     """A ReadRel over inline rows (the VALUES clause).
 
@@ -353,7 +353,7 @@ def virtual_table(
 def local_files(
     named_struct: stt.NamedStruct,
     items: Iterable[stalg.ReadRel.LocalFiles.FileOrFiles],
-    extension: Optional[AdvancedExtension] = None,
+    extension: AdvancedExtension | None = None,
 ) -> UnboundPlan:
     """A ReadRel over local/remote files; ``items`` are pre-built FileOrFiles."""
     _require_schema(named_struct)
@@ -373,7 +373,7 @@ def local_files(
 def extension_table(
     named_struct: stt.NamedStruct,
     detail,
-    extension: Optional[AdvancedExtension] = None,
+    extension: AdvancedExtension | None = None,
 ) -> UnboundPlan:
     """A ReadRel over a custom source; ``detail`` is a ``google.protobuf.Any``."""
     _require_schema(named_struct)
@@ -393,7 +393,7 @@ def extension_table(
 def project(
     plan: PlanOrUnbound,
     expressions: Iterable[ExtendedExpressionOrUnbound],
-    extension: Optional[AdvancedExtension] = None,
+    extension: AdvancedExtension | None = None,
 ) -> UnboundPlan:
     """
     Builds an UnboundPlan with ProjectRel as the root node. Expressions are appended to the parent relation fields to produce an output.
@@ -443,7 +443,7 @@ def project(
 def select(
     plan: PlanOrUnbound,
     expressions: Iterable[ExtendedExpressionOrUnbound],
-    extension: Optional[AdvancedExtension] = None,
+    extension: AdvancedExtension | None = None,
 ) -> UnboundPlan:
     """
     Builds an UnboundPlan with ProjectRel as the root node. Expressions make up the fields of an output relation.
@@ -538,7 +538,7 @@ _JOIN_CONDITION_HINT = (
 def filter(
     plan: PlanOrUnbound,
     expression: ExtendedExpressionOrUnbound,
-    extension: Optional[AdvancedExtension] = None,
+    extension: AdvancedExtension | None = None,
 ) -> UnboundPlan:
     def resolve(registry: ExtensionRegistry) -> stp.Plan:
         bound_plan = _bind(plan, registry)
@@ -567,12 +567,10 @@ def filter(
 def sort(
     plan: PlanOrUnbound,
     expressions: Iterable[
-        Union[
-            ExtendedExpressionOrUnbound,
-            tuple[ExtendedExpressionOrUnbound, stalg.SortField.SortDirection.ValueType],
-        ]
+        ExtendedExpressionOrUnbound
+        | tuple[ExtendedExpressionOrUnbound, stalg.SortField.SortDirection.ValueType]
     ],
-    extension: Optional[AdvancedExtension] = None,
+    extension: AdvancedExtension | None = None,
 ) -> UnboundPlan:
     def resolve(registry: ExtensionRegistry) -> stp.Plan:
         bound_plan = _bind(plan, registry)
@@ -667,8 +665,8 @@ def reference(plan: PlanOrUnbound) -> UnboundPlan:
 def fetch(
     plan: PlanOrUnbound,
     offset: ExtendedExpressionOrUnbound,
-    count: Optional[ExtendedExpressionOrUnbound],
-    extension: Optional[AdvancedExtension] = None,
+    count: ExtendedExpressionOrUnbound | None,
+    extension: AdvancedExtension | None = None,
 ) -> UnboundPlan:
     def resolve(registry: ExtensionRegistry) -> stp.Plan:
         bound_plan = _bind(plan, registry)
@@ -707,8 +705,8 @@ def join(
     expression: ExtendedExpressionOrUnbound,
     type: stalg.JoinRel.JoinType,
     *,
-    post_join_filter: Optional[ExtendedExpressionOrUnbound] = None,
-    extension: Optional[AdvancedExtension] = None,
+    post_join_filter: ExtendedExpressionOrUnbound | None = None,
+    extension: AdvancedExtension | None = None,
 ) -> UnboundPlan:
     def resolve(registry: ExtensionRegistry) -> stp.Plan:
         bound_left = _bind(left, registry)
@@ -781,9 +779,9 @@ def lateral_join(
     right: Callable[[LateralInput], PlanOrUnbound],
     type: stalg.JoinRel.JoinType,
     *,
-    expression: Optional[ExtendedExpressionOrUnbound] = None,
-    post_join_filter: Optional[ExtendedExpressionOrUnbound] = None,
-    extension: Optional[AdvancedExtension] = None,
+    expression: ExtendedExpressionOrUnbound | None = None,
+    post_join_filter: ExtendedExpressionOrUnbound | None = None,
+    extension: AdvancedExtension | None = None,
 ) -> UnboundPlan:
     """A LateralJoinRel: the right (dependent) input is evaluated once per left
     row and may reference the current left row.
@@ -883,7 +881,7 @@ def lateral_join(
 def cross(
     left: PlanOrUnbound,
     right: PlanOrUnbound,
-    extension: Optional[AdvancedExtension] = None,
+    extension: AdvancedExtension | None = None,
 ) -> UnboundPlan:
     def resolve(registry: ExtensionRegistry) -> stp.Plan:
         bound_left = _bind(left, registry)
@@ -920,9 +918,9 @@ def aggregate(
     grouping_expressions: Iterable[ExtendedExpressionOrUnbound],
     measures: Iterable[ExtendedExpressionOrUnbound],
     *,
-    grouping_sets: Optional[Iterable[Iterable[int]]] = None,
-    filters: Optional[Iterable[Optional[ExtendedExpressionOrUnbound]]] = None,
-    extension: Optional[AdvancedExtension] = None,
+    grouping_sets: Iterable[Iterable[int]] | None = None,
+    filters: Iterable[ExtendedExpressionOrUnbound | None] | None = None,
+    extension: AdvancedExtension | None = None,
 ) -> UnboundPlan:
     """Build an AggregateRel.
 
@@ -1014,11 +1012,11 @@ def aggregate(
 
 
 def write_named_table(
-    table_names: Union[str, Iterable[str]],
+    table_names: str | Iterable[str],
     input: PlanOrUnbound,
-    create_mode: Union[stalg.WriteRel.CreateMode.ValueType, None] = None,
-    op: Union[stalg.WriteRel.WriteOp.ValueType, None] = None,
-    output_mode: Union[stalg.WriteRel.OutputMode.ValueType, None] = None,
+    create_mode: stalg.WriteRel.CreateMode.ValueType | None = None,
+    op: stalg.WriteRel.WriteOp.ValueType | None = None,
+    output_mode: stalg.WriteRel.OutputMode.ValueType | None = None,
 ) -> UnboundPlan:
     def resolve(registry: ExtensionRegistry) -> stp.Plan:
         bound_input = _bind(input, registry)
@@ -1050,12 +1048,12 @@ def write_named_table(
 
 
 def ddl(
-    names: Union[str, Iterable[str]],
+    names: str | Iterable[str],
     object_type: stalg.DdlRel.DdlObject.ValueType,
     op: stalg.DdlRel.DdlOp.ValueType,
-    table_schema: Optional[stt.NamedStruct] = None,
-    view_definition: Optional[PlanOrUnbound] = None,
-    extension: Optional[AdvancedExtension] = None,
+    table_schema: stt.NamedStruct | None = None,
+    view_definition: PlanOrUnbound | None = None,
+    extension: AdvancedExtension | None = None,
 ) -> UnboundPlan:
     """Build a DdlRel (CREATE / DROP of a TABLE or VIEW).
 
@@ -1096,11 +1094,11 @@ def ddl(
 
 
 def update(
-    table_names: Union[str, Iterable[str]],
+    table_names: str | Iterable[str],
     table_schema: stt.NamedStruct,
     transformations: Iterable[tuple[int, ExtendedExpressionOrUnbound]],
-    condition: Optional[ExtendedExpressionOrUnbound] = None,
-    extension: Optional[AdvancedExtension] = None,
+    condition: ExtendedExpressionOrUnbound | None = None,
+    extension: AdvancedExtension | None = None,
 ) -> UnboundPlan:
     """Build an UpdateRel: set ``(column_index -> expression)`` where ``condition``."""
     _names = [table_names] if isinstance(table_names, str) else list(table_names)
@@ -1155,12 +1153,10 @@ def consistent_partition_window(
     window_functions: Iterable[ExtendedExpressionOrUnbound],
     partition_expressions: Iterable[ExtendedExpressionOrUnbound] = (),
     sorts: Iterable[
-        Union[
-            ExtendedExpressionOrUnbound,
-            tuple[ExtendedExpressionOrUnbound, stalg.SortField.SortDirection.ValueType],
-        ]
+        ExtendedExpressionOrUnbound
+        | tuple[ExtendedExpressionOrUnbound, stalg.SortField.SortDirection.ValueType]
     ] = (),
-    extension: Optional[AdvancedExtension] = None,
+    extension: AdvancedExtension | None = None,
 ) -> UnboundPlan:
     def resolve(registry: ExtensionRegistry) -> stp.Plan:
         bound_plan = _bind(plan, registry)
@@ -1302,7 +1298,7 @@ def nested_loop_join(
     right: PlanOrUnbound,
     expression: ExtendedExpressionOrUnbound,
     type: stalg.NestedLoopJoinRel.JoinType.ValueType,
-    extension: Optional[AdvancedExtension] = None,
+    extension: AdvancedExtension | None = None,
 ) -> UnboundPlan:
     """A NestedLoopJoinRel: join over the Cartesian product using ``expression``."""
 
@@ -1385,13 +1381,13 @@ def _physical_equi_join(rel_name, rel_cls):
     def builder(
         left: PlanOrUnbound,
         right: PlanOrUnbound,
-        left_keys: Iterable[Union[str, int]],
-        right_keys: Iterable[Union[str, int]],
+        left_keys: Iterable[str | int],
+        right_keys: Iterable[str | int],
         type,
         *,
-        post_join_filter: Optional[ExtendedExpressionOrUnbound] = None,
-        residual_expression: Optional[ExtendedExpressionOrUnbound] = None,
-        extension: Optional[AdvancedExtension] = None,
+        post_join_filter: ExtendedExpressionOrUnbound | None = None,
+        residual_expression: ExtendedExpressionOrUnbound | None = None,
+        extension: AdvancedExtension | None = None,
     ) -> UnboundPlan:
         def resolve(registry: ExtensionRegistry) -> stp.Plan:
             bound_left = _bind(left, registry)
@@ -1476,7 +1472,7 @@ def _detail_any(detail):
     return detail.to_any() if hasattr(detail, "to_any") else detail
 
 
-def extension_leaf(detail, names: Optional[Iterable[str]] = None) -> UnboundPlan:
+def extension_leaf(detail, names: Iterable[str] | None = None) -> UnboundPlan:
     """An ExtensionLeafRel (a custom source) from an ExtensionLeafDetail.
 
     Output names come from the detail's ``derive_schema`` (or ``names`` when a
@@ -1593,9 +1589,9 @@ def top_n(
         tuple[ExtendedExpressionOrUnbound, stalg.SortField.SortDirection.ValueType]
     ],
     count: ExtendedExpressionOrUnbound,
-    offset: Optional[ExtendedExpressionOrUnbound] = None,
+    offset: ExtendedExpressionOrUnbound | None = None,
     with_ties: bool = False,
-    extension: Optional[AdvancedExtension] = None,
+    extension: AdvancedExtension | None = None,
 ) -> UnboundPlan:
     """A TopNRel: a fused sort + fetch (ORDER BY ... LIMIT).
 

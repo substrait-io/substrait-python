@@ -14,7 +14,7 @@ Narwhals compliant protocol, to be built out on top of
 :mod:`substrait.dataframe.frame`.
 """
 
-from typing import Iterable, Union
+from collections.abc import Iterable
 
 import substrait.narwhals
 from substrait.builders.plan import select
@@ -47,7 +47,7 @@ class DataFrame:
         return substrait.narwhals
 
     def select(
-        self, *exprs: Union[Expression, Iterable[Expression]], **named_exprs: Expression
+        self, *exprs: Expression | Iterable[Expression], **named_exprs: Expression
     ) -> "DataFrame":
         expressions = [e.expr for e in exprs] + [
             expr.alias(alias).expr for alias, expr in named_exprs.items()

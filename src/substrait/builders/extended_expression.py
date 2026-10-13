@@ -584,8 +584,12 @@ def column(field: Union[str, int], alias: Union[Iterable[str], str, None] = None
         flat_indices = [0] + list(itertools.accumulate(lengths))[:-1]
 
         if isinstance(field, str):
-            column_index = list(base_schema.names).index(field)
-            field_index = flat_indices.index(column_index)
+            top_level = [base_schema.names[i] for i in flat_indices]
+            if field not in top_level:
+                raise ValueError(
+                    f"column {field!r} not found; available columns: {top_level}"
+                )
+            field_index = top_level.index(field)
         else:
             field_index = field
 

@@ -707,6 +707,17 @@ def test_update_table_by_index_no_condition():
     assert not up.HasField("condition")
 
 
+def test_update_table_unknown_column_raises():
+    with pytest.raises(ValueError, match=r"update_table got unknown column 'c'"):
+        sub.update_table("t", {"a": sub.i64, "b": sub.i64}, {"c": sub.lit(5)})
+
+
+def test_select_unknown_column_names_it():
+    df = sub.read_named_table("t", {"a": sub.i64}).select(sub.col("missing"))
+    with pytest.raises(ValueError, match=r"column 'missing' not found"):
+        df.to_plan()
+
+
 def test_update_merges_transformation_extensions():
     plan = sub.update_table(
         "accounts",

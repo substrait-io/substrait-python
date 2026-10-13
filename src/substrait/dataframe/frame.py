@@ -1042,6 +1042,11 @@ def update_table(
     names_list = list(ns.names)
     transformations = []
     for target, expr in assignments.items():
+        if isinstance(target, str) and target not in names_list:
+            raise ValueError(
+                f"update_table got unknown column {target!r}; "
+                f"available columns: {names_list}"
+            )
         index = target if isinstance(target, int) else names_list.index(target)
         transformations.append((index, _unbound(expr)))
     condition = _unbound(where) if where is not None else None

@@ -142,7 +142,7 @@ def test_join_post_join_filter_on_dropped_side_raises():
     # dangling field reference against the combined schema.
     left = read_named_table("l", named_struct)
     right = read_named_table("r", named_struct_2)
-    with pytest.raises(ValueError, match="not in list"):
+    with pytest.raises(ValueError, match="column .id. not found"):
         join(
             left,
             right,

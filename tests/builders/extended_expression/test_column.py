@@ -1,3 +1,4 @@
+import pytest
 import substrait.algebra_pb2 as stalg
 import substrait.extended_expression_pb2 as stee
 import substrait.type_pb2 as stt
@@ -124,3 +125,14 @@ def test_column_by_ordinal_over_a_nested_struct():
         "shop_id",
         "shop_total",
     ]
+
+
+@pytest.mark.parametrize("name", ["missing", "shop_id"])
+def test_column_unknown_name_raises(name):
+    # A name that is absent, or only names a nested field, is not a top-level column.
+    with pytest.raises(
+        ValueError,
+        match=rf"column '{name}' not found; available columns: "
+        r"\['order_id', 'shop_details', 'order_total'\]",
+    ):
+        column(name)(nested_named_struct, None)

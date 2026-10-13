@@ -56,7 +56,10 @@ class PlanPrinter:
     """Concise pretty printer for Substrait plans and expressions"""
 
     def __init__(
-        self, indent_size: int = 2, show_metadata: bool = False, use_colors: bool = None
+        self,
+        indent_size: int = 2,
+        show_metadata: bool = False,
+        use_colors: bool | None = None,
     ):
         self.indent_size = indent_size
         self.show_metadata = show_metadata
@@ -87,10 +90,7 @@ class PlanPrinter:
             return False
 
         # Check if we're in Windows Command Prompt (which has limited color support)
-        if os.name == "nt" and "ANSICON" not in os.environ:
-            return False
-
-        return True
+        return not (os.name == "nt" and "ANSICON" not in os.environ)
 
     def _color(self, text: str, color: str) -> str:
         """Apply color to text if colors are enabled"""
@@ -395,7 +395,7 @@ class PlanPrinter:
                     stream.write(
                         f"{self._get_indent_with_arrow(depth + 2)}<binary_detail>\n"
                     )
-            except Exception:
+            except Exception:  # noqa: BLE001
                 stream.write(
                     f"{self._get_indent_with_arrow(depth + 2)}<unpackable_detail>\n"
                 )
@@ -434,7 +434,7 @@ class PlanPrinter:
                     stream.write(
                         f"{self._get_indent_with_arrow(depth + 2)}<binary_detail>\n"
                     )
-            except Exception:
+            except Exception:  # noqa: BLE001
                 stream.write(
                     f"{self._get_indent_with_arrow(depth + 2)}<unpackable_detail>\n"
                 )

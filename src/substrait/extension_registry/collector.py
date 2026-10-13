@@ -22,7 +22,6 @@ import contextlib
 import contextvars
 import functools
 import itertools
-from typing import Optional, Union
 
 import substrait.extended_expression_pb2 as stee
 import substrait.extensions.extensions_pb2 as ste
@@ -34,9 +33,9 @@ from substrait.type_inference import schema_memo_scope
 # The name is the compound form carried by SimpleExtensionDeclaration (e.g.
 # "add:i64_i64"), which is what makes an identity resolvable without the catalog.
 # The URN is None for a declaration that names no resolvable extension URN.
-FunctionIdentity = tuple[Optional[str], str]
+FunctionIdentity = tuple[str | None, str]
 
-ExtensionCarrier = Union[stplan.Plan, stee.ExtendedExpression]
+ExtensionCarrier = stplan.Plan | stee.ExtendedExpression
 
 
 def _identity_text(identity: FunctionIdentity) -> str:
@@ -189,7 +188,7 @@ class ExtensionCollector:
 _collector: contextvars.ContextVar = contextvars.ContextVar("_collector", default=None)
 
 
-def current_collector() -> Optional[ExtensionCollector]:
+def current_collector() -> ExtensionCollector | None:
     """The collector for the build in progress, or None outside a build."""
     return _collector.get()
 

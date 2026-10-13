@@ -185,11 +185,10 @@ def test_lateral_join_post_join_filter_on_dropped_side_raises():
     # A left-semi lateral join drops the right side from its output, so a
     # post_join_filter on a right column cannot resolve -- it fails fast rather
     # than emitting a dangling reference against the combined inputs.
-    with pytest.raises(ValueError, match="not in list"):
-        with fresh_rel_anchors():
-            lateral_join(
-                _left(),
-                _uncorrelated_right,
-                type=stalg.JoinRel.JOIN_TYPE_LEFT_SEMI,
-                post_join_filter=column("w"),  # right-only, absent from output
-            )(registry)
+    with pytest.raises(ValueError, match="not in list"), fresh_rel_anchors():
+        lateral_join(
+            _left(),
+            _uncorrelated_right,
+            type=stalg.JoinRel.JOIN_TYPE_LEFT_SEMI,
+            post_join_filter=column("w"),  # right-only, absent from output
+        )(registry)

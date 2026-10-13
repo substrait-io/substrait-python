@@ -1,6 +1,6 @@
 import random
 import string
-from typing import Callable
+from collections.abc import Callable
 
 from deepdiff import DeepDiff
 from sqloxide import parse_sql
@@ -58,10 +58,10 @@ def translate_expression(
     registry: ExtensionRegistry,
     measures: list[UnboundExtendedExpression],
     groupings: list[dict],
-    alias: str = None,
+    alias: str | None = None,
 ) -> UnboundExtendedExpression:
     assert len(ast) == 1
-    op = list(ast.keys())[0]
+    op = next(iter(ast))
 
     if groupings:
         # This means we are parsing a projection after a grouping
@@ -173,7 +173,7 @@ def translate_expression(
 
 def translate(ast: dict, schema_resolver: SchemaResolver, registry: ExtensionRegistry):
     assert len(ast) == 1
-    op = list(ast.keys())[0]
+    op = next(iter(ast))
     ast = ast[op]
 
     if op == "Query":
@@ -239,7 +239,7 @@ def translate(ast: dict, schema_resolver: SchemaResolver, registry: ExtensionReg
                     registry=registry,
                 )
 
-                join_type = list(_join["join_operator"].keys())[0]
+                join_type = next(iter(_join["join_operator"]))
 
                 expression = translate_expression(
                     _join["join_operator"][join_type]["On"],
@@ -253,7 +253,7 @@ def translate(ast: dict, schema_resolver: SchemaResolver, registry: ExtensionReg
                     relation, right, expression, join_type_mapping[join_type]
                 )(registry)
 
-        if "selection" in ast and ast["selection"]:
+        if ast.get("selection"):
             where_expression = translate_expression(
                 ast["selection"],
                 schema_resolver=schema_resolver,

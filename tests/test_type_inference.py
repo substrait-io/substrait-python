@@ -1569,7 +1569,7 @@ def test_anchor_index_is_built_only_when_a_rel_reference_needs_it(monkeypatch):
     # call. Plans carrying an id-based OuterReference are the exception, and the
     # builders re-infer their input's schema at every level, so the index is built on
     # demand rather than for every inference.
-    import substrait.type_inference as type_inference
+    from substrait import type_inference
 
     iter_plan_rels = type_inference.iter_plan_rels
     indexed = []

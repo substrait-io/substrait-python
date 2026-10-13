@@ -4,7 +4,6 @@ import re
 from collections import defaultdict
 from importlib.resources import files as importlib_files
 from pathlib import Path
-from typing import Optional, Union
 
 try:  # Python 3.11+
     from importlib.resources.abc import Traversable
@@ -57,7 +56,7 @@ class ExtensionRegistry:
 
     def register_extension_yaml(
         self,
-        fname: Union[str, Path, Traversable],
+        fname: str | Path | Traversable,
     ) -> None:
         """Register extensions from a YAML file.
         Args:
@@ -164,7 +163,7 @@ class ExtensionRegistry:
         urn: str,
         function_name: str,
         signature: tuple[Type] | list[Type],
-    ) -> Optional[tuple[FunctionEntry, Type]]:
+    ) -> tuple[FunctionEntry, Type] | None:
         """Look up a function within a specific URN."""
         matches = self._find_matching_functions(function_name, signature, [urn])
         return matches[0] if matches else None
@@ -190,8 +189,8 @@ class ExtensionRegistry:
         self,
         function_name: str,
         signature: tuple[Type] | list[Type],
-        urns: Optional[list[str]] = None,
-    ) -> Optional[tuple[FunctionEntry, Type]]:
+        urns: list[str] | None = None,
+    ) -> tuple[FunctionEntry, Type] | None:
         """Find the best-matching function for ``function_name`` across ``urns``.
 
         Searches ``urns`` in order (every registered URN when ``None``) and returns

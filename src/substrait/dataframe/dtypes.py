@@ -24,7 +24,7 @@ from substrait.builders import type as _t
 
 
 class DataType:
-    __slots__ = ("_name", "_builder")
+    __slots__ = ("_builder", "_name")
 
     def __init__(self, name: str, builder):
         self._name = name

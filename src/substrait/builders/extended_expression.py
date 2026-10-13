@@ -26,7 +26,7 @@ from substrait.utils import (
     top_level_names,
     type_num_names,
 )
-from substrait.utils.detached_expressions import resolve_detached_expressions
+from substrait.utils.detached import resolve_detached
 
 # Monotonic source of unique RelCommon.rel_anchor values within a single build.
 # Not reset between builds by default; reset at each top-level materialization
@@ -164,12 +164,12 @@ def resolve_expression(
     ``(urn, name)`` identities and the expression is rewritten to match -- the
     expression-level counterpart of ``builders.plan._bind``. Unchanged when the
     numbering already agrees, as it does for anything this build resolved. Its
-    detached expressions are inlined, since their table does not travel with the
+    detached subtrees are inlined, since their tables do not travel with the
     expression into whatever is built from it.
     """
     if not isinstance(expression, stee.ExtendedExpression):
         return expression(base_schema, registry)
-    expression = resolve_detached_expressions(expression)
+    expression = resolve_detached(expression)
     collector = current_collector()
     if collector is None:
         return expression
@@ -1068,6 +1068,9 @@ def _inner_rel(query, registry: ExtensionRegistry, base_schema) -> stalg.Rel:
         plan = query(registry) if callable(query) else query
     finally:
         outer_schemas.reset(token)
+    # Only the Rel travels into the Expression.Subquery; the PlanRel's detached
+    # tables stay behind with the plan, so inline its ordinals first.
+    plan = resolve_detached(plan)
     # Fold the inner plan's extensions into this build before lifting its Rel: only
     # the Rel travels into the Expression.Subquery, so the declarations its function
     # references name stay behind with the plan. A plan built elsewhere therefore

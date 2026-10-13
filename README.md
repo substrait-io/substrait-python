@@ -260,17 +260,16 @@ ordinal.
 
 ```python
 from substrait.proto import Plan
-from substrait.utils.detached_expressions import (
-    detach_expressions,
-    resolve_detached_expressions,
-)
+from substrait.utils.detached import detach, resolve_detached
 
-data = detach_expressions(plan).SerializeToString()  # parses under the default limits
-plan = resolve_detached_expressions(Plan.FromString(data))  # ordinary expression trees again
+data = detach(plan).SerializeToString()  # parses under the default limits
+plan = resolve_detached(Plan.FromString(data))  # ordinary expression trees again
 ```
 
-`detach_expressions` returns a plan already within the limit unchanged. Schema inference, the
-plan printer, and the builders resolve detached expressions on their own.
+`detach` returns a plan already within the limit as is. `infer_plan_schema`,
+`infer_extended_expression_schema`, the plan printer, and the builders resolve detached expressions
+on their own. Functions that take a bare `Rel` or `Expression` cannot, since the table lives on the
+containing message, so resolve the `Plan` or `ExtendedExpression` first.
 
 ## Produce a Substrait Plan with Ibis
 Let's use an existing Substrait producer, [Ibis](https://ibis-project.org), 

@@ -12,7 +12,7 @@ import substrait.plan_pb2 as stp
 import substrait.type_pb2 as stt
 
 from substrait.utils import type_num_names
-from substrait.utils.detached_expressions import resolve_detached_expressions
+from substrait.utils.detached import resolve_detached
 
 
 def _read_output_names(read: stalg.ReadRel) -> list:
@@ -133,7 +133,10 @@ class PlanPrinter:
         """Stringify a Substrait plan"""
         import io
 
-        plan = resolve_detached_expressions(plan)
+        try:
+            plan = resolve_detached(plan)
+        except ValueError:
+            pass  # show a malformed plan as is; its ordinals print as such
 
         stream = io.StringIO()
         self._stream_plan(plan, stream, 0)
@@ -495,6 +498,9 @@ class PlanPrinter:
             self._stream_if_then(expression.if_then, stream, depth)
         elif expression.HasField("window_function"):
             self._stream_window_function(expression.window_function, stream, depth)
+        elif expression.HasField("detached_expression_ordinal"):
+            ordinal = expression.detached_expression_ordinal
+            stream.write(f"{indent}$detached[{ordinal}]\n")
         else:
             stream.write(f"{indent}<unknown_expression>\n")
 

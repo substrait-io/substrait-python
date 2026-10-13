@@ -39,6 +39,7 @@ from substrait.utils import (
     rebase_reference_ordinals,
     remap_function_references,
 )
+from substrait.utils.detached_expressions import resolve_detached_expressions
 from substrait.version import substrait_version
 
 UnboundPlan = Callable[[ExtensionRegistry], stp.Plan]
@@ -72,9 +73,14 @@ def _bind(plan: PlanOrUnbound, registry: ExtensionRegistry) -> stp.Plan:
     resolver writes them).
 
     Every builder binds its inputs through here, so this is the single point at
-    which a foreign plan's anchor space is reconciled with ours.
+    which a foreign plan's anchor space is reconciled with ours. It is also where a
+    foreign plan's detached expressions are inlined: their ordinals index a table
+    on the plan's own ``PlanRel``, which does not survive being built upon.
     """
-    bound = plan if isinstance(plan, stp.Plan) else plan(registry)
+    if isinstance(plan, stp.Plan):
+        bound = resolve_detached_expressions(plan)
+    else:
+        bound = plan(registry)
     collector = current_collector()
     if collector is None:
         return bound

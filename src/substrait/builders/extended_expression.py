@@ -26,6 +26,7 @@ from substrait.utils import (
     top_level_names,
     type_num_names,
 )
+from substrait.utils.detached_expressions import resolve_detached_expressions
 
 # Monotonic source of unique RelCommon.rel_anchor values within a single build.
 # Not reset between builds by default; reset at each top-level materialization
@@ -162,10 +163,13 @@ def resolve_expression(
     whichever build produced it, so the collector re-derives them from the durable
     ``(urn, name)`` identities and the expression is rewritten to match -- the
     expression-level counterpart of ``builders.plan._bind``. Unchanged when the
-    numbering already agrees, as it does for anything this build resolved.
+    numbering already agrees, as it does for anything this build resolved. Its
+    detached expressions are inlined, since their table does not travel with the
+    expression into whatever is built from it.
     """
     if not isinstance(expression, stee.ExtendedExpression):
         return expression(base_schema, registry)
+    expression = resolve_detached_expressions(expression)
     collector = current_collector()
     if collector is None:
         return expression

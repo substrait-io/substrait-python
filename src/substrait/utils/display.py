@@ -12,6 +12,7 @@ import substrait.plan_pb2 as stp
 import substrait.type_pb2 as stt
 
 from substrait.utils import type_num_names
+from substrait.utils.detached_expressions import resolve_detached_expressions
 
 
 def _read_output_names(read: stalg.ReadRel) -> list:
@@ -131,6 +132,8 @@ class PlanPrinter:
     def stringify_plan(self, plan: stp.Plan) -> str:
         """Stringify a Substrait plan"""
         import io
+
+        plan = resolve_detached_expressions(plan)
 
         stream = io.StringIO()
         self._stream_plan(plan, stream, 0)

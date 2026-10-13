@@ -7,6 +7,7 @@ import substrait.plan_pb2 as stp
 import substrait.type_pb2 as stt
 
 from substrait.utils import child_rels, iter_plan_rels, plan_subtrees, rel_anchor_of
+from substrait.utils.detached_expressions import resolve_detached_expressions
 
 
 class _SubtreeScope:
@@ -803,6 +804,7 @@ def infer_expression_type(
 def infer_extended_expression_schema(
     ee: stee.ExtendedExpression, *, registry=None
 ) -> stt.Type.Struct:
+    ee = resolve_detached_expressions(ee)
     exprs = [e for e in ee.referred_expr]
 
     types = [
@@ -1394,6 +1396,7 @@ def infer_rel_schema(rel: stalg.Rel, *, registry=None, subtrees=()) -> stt.Type.
 
 
 def infer_plan_schema(plan: stp.Plan, *, registry=None) -> stt.NamedStruct:
+    plan = resolve_detached_expressions(plan)
     # A Plan carries its shared subtrees in-band as the leading ``rel`` entries of
     # ``relations`` (the query root is the trailing ``root`` entry), so a
     # ReferenceRel anywhere in the tree resolves against them by ordinal. Wrap them

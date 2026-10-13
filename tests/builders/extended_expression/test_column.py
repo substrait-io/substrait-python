@@ -159,3 +159,9 @@ def test_column_alias_list_must_name_every_field(field, alias):
     # give the output schema more or fewer names than it has fields.
     with pytest.raises(ValueError, match="needs"):
         column(field, alias=alias)(nested_named_struct, None)
+
+
+def test_column_empty_alias_keeps_schema_name():
+    aliased = column("order_id", alias="")(named_struct, None)
+
+    assert list(aliased.referred_expr[0].output_names) == ["order_id"]

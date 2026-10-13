@@ -1,8 +1,9 @@
+import pytest
 import substrait.algebra_pb2 as stalg
 import substrait.plan_pb2 as stp
 import substrait.type_pb2 as stt
 
-from substrait.builders.extended_expression import column
+from substrait.builders.extended_expression import cast, column, literal
 from substrait.builders.plan import default_version, project, read_named_table, select
 from substrait.builders.type import boolean, i64
 from substrait.extension_registry import ExtensionRegistry
@@ -136,3 +137,26 @@ def test_project_struct_column():
         "y",
     ]
     assert len(infer_plan_schema(actual).struct.types) == 4
+
+
+@pytest.mark.parametrize("builder", [project, select])
+def test_expression_with_more_names_than_fields_is_rejected(builder):
+    # Every output name lands in the plan root, so a scalar given two names would
+    # leave the root with more names than the output type has fields.
+    table = read_named_table("table", named_struct)
+
+    with pytest.raises(ValueError, match="has 2 names"):
+        builder(table, [literal(1, i64(), alias=["one", "two"])])(registry)
+
+
+def test_select_struct_valued_expression_keeps_full_alias():
+    table = read_named_table("table", nested_named_struct)
+    pair = stt.Type(
+        struct=stt.Type.Struct(
+            types=[i64(), i64()], nullability=stt.Type.NULLABILITY_NULLABLE
+        )
+    )
+
+    actual = select(table, [cast(column("s"), pair, alias=["c", "p", "q"])])(registry)
+
+    assert list(actual.relations[-1].root.names) == ["c", "p", "q"]

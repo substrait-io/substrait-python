@@ -576,7 +576,7 @@ def column(field: str | int, alias: Iterable[str] | str | None = None):
 
     Accepts either an index or a field name of a desired field.
     """
-    alias = [alias] if isinstance(alias, str) else list(alias or [])
+    alias = [alias] if alias and isinstance(alias, str) else list(alias or [])
 
     def resolve(
         base_schema: stp.NamedStruct, registry: ExtensionRegistry

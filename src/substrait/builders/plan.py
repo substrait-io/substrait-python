@@ -38,6 +38,7 @@ from substrait.utils import (
     plan_subtrees,
     rebase_reference_ordinals,
     remap_function_references,
+    type_num_names,
 )
 from substrait.version import substrait_version
 
@@ -390,6 +391,24 @@ def extension_table(
     return build_scoped(resolve)
 
 
+def _expression_output_names(
+    ref: stee.ExpressionReference, ns: stt.NamedStruct, registry: ExtensionRegistry
+) -> list[str]:
+    """An expression's depth-first output names, refusing more than its type has."""
+    names = list(ref.output_names)
+    if len(names) <= 1:
+        return names
+    needed = type_num_names(
+        infer_expression_type(ref.expression, ns.struct, registry=registry)
+    )
+    if len(names) > needed:
+        raise ValueError(
+            f"Expression named {names!r} has {len(names)} names, but its output "
+            f"type has only {needed}."
+        )
+    return names
+
+
 def project(
     plan: PlanOrUnbound,
     expressions: Iterable[ExtendedExpressionOrUnbound],
@@ -422,7 +441,7 @@ def project(
             name
             for ee in bound_expressions
             for e in ee.referred_expr
-            for name in e.output_names
+            for name in _expression_output_names(e, ns, registry)
         ]
 
         return _plan_from(
@@ -474,13 +493,13 @@ def select(
         # Expressions are appended after the input's top-level fields; root.names
         # counts nested names too, so it is not a field count.
         start_index = len(ns.struct.types)
-        expression_count = sum(len(ee.referred_expr) for ee in bound_expressions)
+        exprs = [e.expression for ee in bound_expressions for e in ee.referred_expr]
 
         names = [
             name
             for ee in bound_expressions
             for e in ee.referred_expr
-            for name in e.output_names
+            for name in _expression_output_names(e, ns, registry)
         ]
 
         return _plan_from(
@@ -489,17 +508,11 @@ def select(
                 project=stalg.ProjectRel(
                     common=stalg.RelCommon(
                         emit=stalg.RelCommon.Emit(
-                            output_mapping=[
-                                i + start_index for i in range(expression_count)
-                            ]
+                            output_mapping=[i + start_index for i in range(len(exprs))]
                         )
                     ),
                     input=inp[0],
-                    expressions=[
-                        e.expression
-                        for ee in bound_expressions
-                        for e in ee.referred_expr
-                    ],
+                    expressions=exprs,
                     advanced_extension=extension,
                 )
             ),
@@ -988,7 +1001,7 @@ def aggregate(
         names = [
             name
             for e in bound_grouping_expressions
-            for name in e.referred_expr[0].output_names
+            for name in _expression_output_names(e.referred_expr[0], ns, registry)
         ] + [e.referred_expr[0].output_names[0] for e in bound_measures]
 
         return _plan_from(

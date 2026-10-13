@@ -23,6 +23,7 @@ from substrait.utils import (
     inline_reference_rels,
     plan_subtrees,
     remap_function_references,
+    top_level_names,
     type_num_names,
 )
 
@@ -585,9 +586,18 @@ def column(field: str | int, alias: Iterable[str] | str | None = None):
         flat_indices = [0] + list(itertools.accumulate(lengths))[:-1]
 
         if isinstance(field, str):
-            column_index = list(base_schema.names).index(field)
-            field_index = flat_indices.index(column_index)
+            top_level = top_level_names(base_schema)
+            if field not in top_level:
+                raise ValueError(
+                    f"column {field!r} not found; available columns: {top_level}"
+                )
+            field_index = top_level.index(field)
         else:
+            num_columns = len(base_schema.struct.types)
+            if isinstance(field, bool) or not 0 <= field < num_columns:
+                raise ValueError(
+                    f"column {field!r} out of range; schema has {num_columns} columns"
+                )
             field_index = field
 
         names_start = flat_indices[field_index]

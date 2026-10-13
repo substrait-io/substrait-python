@@ -27,6 +27,20 @@ def test_ternary():
     assert evaluate("var > 3 ? 1 : 0", {"var": 2}) == 0
 
 
+def test_not_binds_tighter_than_and_or():
+    # Parsed as (!(a > 3)) AND (b > 3), not !((a > 3) AND (b > 3)).
+    assert evaluate("!(a > 3) AND b > 3 ? 1 : 0", {"a": 1, "b": 1}) == 0
+    # Parsed as (!(a > 3)) OR (b > 3), not !((a > 3) OR (b > 3)).
+    assert evaluate("!(a > 3) OR b > 3 ? 1 : 0", {"a": 5, "b": 5}) == 1
+
+
+def test_ternary_is_right_associative():
+    # Parsed as a > 3 ? 1 : (b > 3 ? 2 : 3), not (a > 3 ? 1 : b > 3) ? 2 : 3.
+    assert evaluate("a > 3 ? 1 : b > 3 ? 2 : 3", {"a": 5, "b": 1}) == 1
+    assert evaluate("a > 3 ? 1 : b > 3 ? 2 : 3", {"a": 1, "b": 5}) == 2
+    assert evaluate("a > 3 ? 1 : b > 3 ? 2 : 3", {"a": 1, "b": 1}) == 3
+
+
 def test_multiline():
     assert evaluate(
         """temp = min(var, 7) + max(var, 7)

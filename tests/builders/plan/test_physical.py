@@ -177,7 +177,7 @@ def test_equi_join_post_filter_on_dropped_side_raises(builder, rel_cls):
     # A right-semi join drops the left side from its output, so a post_join_filter
     # referencing a left column cannot resolve -- it fails fast rather than emitting
     # a dangling field reference.
-    with pytest.raises(ValueError, match="not in list"):
+    with pytest.raises(ValueError, match="column .x. not found"):
         builder(
             _left(),
             _right(),

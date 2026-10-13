@@ -165,3 +165,50 @@ def test_column_empty_alias_keeps_schema_name():
     aliased = column("order_id", alias="")(named_struct, None)
 
     assert list(aliased.referred_expr[0].output_names) == ["order_id"]
+
+
+@pytest.mark.parametrize("name", ["missing", "shop_id"])
+def test_column_unknown_name_raises(name):
+    # A name that is absent, or only names a nested field, is not a top-level column.
+    with pytest.raises(
+        ValueError,
+        match=rf"column '{name}' not found; available columns: "
+        r"\['order_id', 'shop_details', 'order_total'\]",
+    ):
+        column(name)(nested_named_struct, None)
+
+
+def test_column_unknown_name_on_empty_schema_raises():
+    empty = stt.NamedStruct(names=[], struct=stt.Type.Struct(types=[]))
+    with pytest.raises(ValueError, match=r"column 'x' not found"):
+        column("x")(empty, None)
+
+
+def test_column_by_name_after_a_map_column():
+    map_named_struct = stt.NamedStruct(
+        names=["a", "m", "b"],
+        struct=stt.Type.Struct(
+            types=[
+                stt.Type(i64=stt.Type.I64()),
+                stt.Type(
+                    map=stt.Type.Map(
+                        key=stt.Type(string=stt.Type.String()),
+                        value=stt.Type(i64=stt.Type.I64()),
+                    )
+                ),
+                stt.Type(i64=stt.Type.I64()),
+            ]
+        ),
+    )
+    for index, name in enumerate(["a", "m", "b"]):
+        resolved = column(name)(map_named_struct, None).referred_expr[0]
+        assert (
+            resolved.expression.selection.direct_reference.struct_field.field == index
+        )
+        assert list(resolved.output_names) == [name]
+
+
+@pytest.mark.parametrize("index", [-1, 3, True])
+def test_column_by_ordinal_out_of_range_raises(index):
+    with pytest.raises(ValueError, match=r"out of range; schema has 3 columns"):
+        column(index)(named_struct, None)

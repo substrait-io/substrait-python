@@ -416,8 +416,13 @@ def project(
             resolve_expression(e, ns, registry) for e in expressions
         ]
 
+        # output_names holds an expression's names in depth-first order, so a
+        # struct-valued expression contributes its nested names too.
         names = list(_plan.relations[-1].root.names) + [
-            e.output_names[0] for ee in bound_expressions for e in ee.referred_expr
+            name
+            for ee in bound_expressions
+            for e in ee.referred_expr
+            for name in e.output_names
         ]
 
         return _plan_from(
@@ -466,10 +471,16 @@ def select(
             resolve_expression(e, ns, registry) for e in expressions
         ]
 
-        start_index = len(_plan.relations[-1].root.names)
+        # Expressions are appended after the input's top-level fields; root.names
+        # counts nested names too, so it is not a field count.
+        start_index = len(ns.struct.types)
+        expression_count = sum(len(ee.referred_expr) for ee in bound_expressions)
 
         names = [
-            e.output_names[0] for ee in bound_expressions for e in ee.referred_expr
+            name
+            for ee in bound_expressions
+            for e in ee.referred_expr
+            for name in e.output_names
         ]
 
         return _plan_from(
@@ -478,7 +489,9 @@ def select(
                 project=stalg.ProjectRel(
                     common=stalg.RelCommon(
                         emit=stalg.RelCommon.Emit(
-                            output_mapping=[i + start_index for i in range(len(names))]
+                            output_mapping=[
+                                i + start_index for i in range(expression_count)
+                            ]
                         )
                     ),
                     input=inp[0],
@@ -973,7 +986,9 @@ def aggregate(
         )
 
         names = [
-            e.referred_expr[0].output_names[0] for e in bound_grouping_expressions
+            name
+            for e in bound_grouping_expressions
+            for name in e.referred_expr[0].output_names
         ] + [e.referred_expr[0].output_names[0] for e in bound_measures]
 
         return _plan_from(

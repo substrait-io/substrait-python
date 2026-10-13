@@ -124,3 +124,23 @@ def test_column_by_ordinal_over_a_nested_struct():
         "shop_id",
         "shop_total",
     ]
+
+
+def test_column_alias_over_a_nested_struct_keeps_member_names():
+    # A single alias renames the struct column itself; its members keep their names
+    # so the output still carries one name per field in depth-first order.
+    aliased = column("shop_details", alias="shop")(nested_named_struct, None)
+
+    assert list(aliased.referred_expr[0].output_names) == [
+        "shop",
+        "shop_id",
+        "shop_total",
+    ]
+
+
+def test_column_alias_list_replaces_all_names():
+    aliased = column("shop_details", alias=["shop", "id", "total"])(
+        nested_named_struct, None
+    )
+
+    assert list(aliased.referred_expr[0].output_names) == ["shop", "id", "total"]

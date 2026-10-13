@@ -598,12 +598,19 @@ def column(field: str | int, alias: Iterable[str] | str | None = None):
         )
 
         output_names = list(base_schema.names)[names_start:names_end]
-        if alias:
+        if len(alias) == 1:
             # A single alias renames only the top-level field, keeping a struct
-            # column's nested names; a full list replaces all of them.
-            output_names = (
-                [alias[0], *output_names[1:]] if len(alias) == 1 else list(alias)
-            )
+            # column's nested names.
+            output_names = [alias[0], *output_names[1:]]
+        elif alias:
+            # A full list replaces every name, so it must name each field.
+            if len(alias) != len(output_names):
+                raise ValueError(
+                    f"column() alias {alias!r} has {len(alias)} names, but field "
+                    f"{output_names[0]!r} needs {len(output_names)} "
+                    f"({output_names!r})."
+                )
+            output_names = list(alias)
 
         return stee.ExtendedExpression(
             referred_expr=[

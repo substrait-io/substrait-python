@@ -1,3 +1,4 @@
+import pytest
 import substrait.algebra_pb2 as stalg
 import substrait.extended_expression_pb2 as stee
 import substrait.type_pb2 as stt
@@ -144,3 +145,17 @@ def test_column_alias_list_replaces_all_names():
     )
 
     assert list(aliased.referred_expr[0].output_names) == ["shop", "id", "total"]
+
+
+@pytest.mark.parametrize(
+    "field, alias",
+    [
+        ("order_id", ["x", "y"]),
+        ("shop_details", ["shop", "id"]),
+    ],
+)
+def test_column_alias_list_must_name_every_field(field, alias):
+    # A list alias replaces the depth-first names wholesale, so a wrong length would
+    # give the output schema more or fewer names than it has fields.
+    with pytest.raises(ValueError, match="needs"):
+        column(field, alias=alias)(nested_named_struct, None)

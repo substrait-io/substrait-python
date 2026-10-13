@@ -284,10 +284,9 @@ class TestCollector:
             function_reference(ARITHMETIC, "add:i64_i64")
 
     def test_nested_scope_defers_to_the_owner(self):
-        with build_scope() as (outer, outer_owns):
-            with build_scope() as (inner, inner_owns):
-                assert outer_owns and not inner_owns
-                assert inner is outer
+        with build_scope() as (outer, outer_owns), build_scope() as (inner, inner_owns):
+            assert outer_owns and not inner_owns
+            assert inner is outer
 
 
 class TestPlanLocalAnchors:

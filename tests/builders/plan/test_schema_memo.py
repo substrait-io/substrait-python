@@ -17,7 +17,7 @@ import substrait.algebra_pb2 as stalg
 import substrait.plan_pb2 as stp
 import substrait.type_pb2 as stt
 
-import substrait.type_inference as type_inference
+from substrait import type_inference
 from substrait.builders.extended_expression import column, literal
 from substrait.builders.plan import (
     cross,

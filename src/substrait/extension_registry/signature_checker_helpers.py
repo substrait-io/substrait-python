@@ -1,7 +1,5 @@
 """Helper functions for extension registry."""
 
-from typing import Dict
-
 from substrait.type_pb2 import Type
 from substrait_antlr.substrait_type.SubstraitTypeParser import SubstraitTypeParser
 
@@ -10,7 +8,7 @@ from substrait.derivation_expression import _evaluate
 from .exceptions import UnhandledParameterizedTypeError, UnrecognizedSubstraitTypeError
 
 # Type aliases
-TypeParameterMapping = Dict[str, object]
+TypeParameterMapping = dict[str, object]
 
 
 # mapping from argument types to shortened signature names: https://substrait.io/extensions/#function-signature-compound-names

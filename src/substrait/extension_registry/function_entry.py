@@ -1,7 +1,6 @@
 """Function entry class for extension registry."""
 
 from enum import Enum
-from typing import Optional, Union
 
 from substrait.type_pb2 import Type
 from substrait_extensions.extensions import simple_extensions as se
@@ -22,7 +21,7 @@ class FunctionEntry:
         self,
         urn: str,
         name: str,
-        impl: Union[se.Impl, se.Impl1, se.Impl2],
+        impl: se.Impl | se.Impl1 | se.Impl2,
         function_type: FunctionType = FunctionType.SCALAR,
     ) -> None:
         self.name = name
@@ -48,7 +47,7 @@ class FunctionEntry:
     def __repr__(self) -> str:
         return f"{self.name}:{'_'.join(self.normalized_inputs)}"
 
-    def satisfies_signature(self, signature: tuple | list) -> Optional[Type]:
+    def satisfies_signature(self, signature: tuple | list) -> Type | None:
         """Match ``signature`` against this overload, returning its output type.
 
         ``signature`` interleaves value-operand ``Type``\\ s with enumeration
@@ -86,18 +85,16 @@ class FunctionEntry:
                     return None
         try:
             output_type = evaluate(self.impl.return_, parameters)
-        except Exception:
+        except Exception:  # noqa: BLE001
             return None  # return type cannot be derived for these arguments
         if self.nullability == se.NullabilityHandling.MIRROR and isinstance(
             output_type, Type
         ):
             sig_contains_nullable = any(
-                [
-                    p.__getattribute__(p.WhichOneof("kind")).nullability
-                    == Type.NULLABILITY_NULLABLE
-                    for p in signature
-                    if isinstance(p, Type)
-                ]
+                p.__getattribute__(p.WhichOneof("kind")).nullability
+                == Type.NULLABILITY_NULLABLE
+                for p in signature
+                if isinstance(p, Type)
             )
             kind = output_type.WhichOneof("kind")
             if kind is not None:

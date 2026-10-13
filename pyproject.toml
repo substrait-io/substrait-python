@@ -53,6 +53,15 @@ respect-gitignore = true
 # should target minimum supported version
 target-version = "py310"
 lint.extend-select = ["I"]
+# The public API raises plain `Exception`; switching to typed exceptions is a separate,
+# user-visible change.
+lint.extend-ignore = ["TRY002", "TRY004"]
+
+[tool.ruff.lint.per-file-ignores]
+# Naive datetimes are deliberate: they model Substrait's timezone-less timestamp literals.
+"tests/**" = ["DTZ001"]
+# Re-exports the generated protobuf modules wholesale.
+"src/substrait/proto/__init__.py" = ["F401", "F403"]
 
 
 [tool.pixi.workspace]
@@ -70,4 +79,4 @@ lint = "ruff check"
 lint_fix = "ruff check --fix"
 
 [tool.pixi.dependencies]
-ruff = ">=0.14.10,<0.15"
+ruff = ">=0.16.9,<0.17"

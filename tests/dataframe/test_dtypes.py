@@ -237,7 +237,7 @@ def test_two_column_mismatch_still_raises_without_cast():
         struct=struct(types=[i32(nullable=False), i64(nullable=False)], nullable=False),
     )
     # Coercion only applies to literals, not between two columns.
-    with pytest.raises(Exception):
+    with pytest.raises(Exception, match="No matching overload"):
         _project_expr(ns, col("a") + col("b"))
 
 
@@ -339,7 +339,7 @@ def test_decimal_compared_to_decimal_literal_coerces_to_column_type():
 
 def test_decimal_plus_float_literal_still_raises():
     # A float against a decimal peer stays fp and does not resolve; pass a Decimal.
-    with pytest.raises(Exception):
+    with pytest.raises(Exception, match="No matching overload"):
         _project_expr(_dec_ns(DEC), col("a") + 1.5)
 
 

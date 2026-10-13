@@ -35,22 +35,21 @@ def read_adbc_named_table(name: str, conn):
     return read_named_table(name, substrait_schema)
 
 
-with adbc_driver_duckdb.dbapi.connect(":memory:") as conn:
-    with conn.cursor() as cur:
-        cur.adbc_ingest("AnswerToEverything", data)
+with adbc_driver_duckdb.dbapi.connect(":memory:") as conn, conn.cursor() as cur:
+    cur.adbc_ingest("AnswerToEverything", data)
 
-        cur.executescript("INSTALL substrait;")
-        cur.executescript("LOAD substrait;")
+    cur.executescript("INSTALL substrait;")
+    cur.executescript("LOAD substrait;")
 
-        table = read_adbc_named_table("AnswerToEverything", conn)
-        table = filter(
-            table,
-            expression=scalar_function(
-                "extension:io.substrait:functions_comparison",
-                "gte",
-                expressions=[column("ints"), literal(3, i64())],
-            ),
-        )
+    table = read_adbc_named_table("AnswerToEverything", conn)
+    table = filter(
+        table,
+        expression=scalar_function(
+            "extension:io.substrait:functions_comparison",
+            "gte",
+            expressions=[column("ints"), literal(3, i64())],
+        ),
+    )
 
-        cur.execute(table(registry).SerializeToString())
-        print(cur.fetch_arrow_table())
+    cur.execute(table(registry).SerializeToString())
+    print(cur.fetch_arrow_table())

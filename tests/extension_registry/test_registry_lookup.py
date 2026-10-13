@@ -1,6 +1,6 @@
 from substrait.type_pb2 import Type
 
-from substrait.builders.type import decimal, i8, i16
+from substrait.builders.type import boolean, decimal, i8, i16
 
 
 def test_non_existing_urn(registry):
@@ -48,7 +48,7 @@ def test_wildcard_match(registry):
     assert registry.lookup_function(
         urn="extension:test:functions",
         function_name="add",
-        signature=[i8(nullable=False), i8(nullable=False), bool()],
+        signature=[i8(nullable=False), i8(nullable=False), boolean(nullable=False)],
     )[1] == Type(i16=Type.I16(nullability=Type.NULLABILITY_REQUIRED))
 
 

@@ -1,6 +1,5 @@
 import contextlib
 import contextvars
-from typing import Optional
 
 import substrait.algebra_pb2 as stalg
 import substrait.extended_expression_pb2 as stee
@@ -23,7 +22,7 @@ class _SubtreeScope:
     callers that pass a plain list of subtrees still work unchanged.
     """
 
-    __slots__ = ("_rels", "_schemas", "_resolving")
+    __slots__ = ("_rels", "_resolving", "_schemas")
 
     def __init__(self, rels):
         self._rels = list(rels)
@@ -82,14 +81,14 @@ class _AnchorScope:
     largest cost of assembling a long pipeline.
     """
 
-    __slots__ = ("_rels", "_index", "_subtrees", "_schemas", "_resolving", "_parent")
+    __slots__ = ("_index", "_parent", "_rels", "_resolving", "_schemas", "_subtrees")
 
     def __init__(self, index, subtrees, *, parent=None):
         # ``index`` is always a factory, never the index itself: a caller with an
         # already-built dict passes ``dict`` or a lambda, which keeps this from having
         # to tell the two apart -- a test that got it wrong would report the mistake as
         # an uncallable-object TypeError from deep inside a later lookup.
-        self._rels: Optional[dict] = None
+        self._rels: dict | None = None
         self._index = index
         self._subtrees = subtrees
         self._schemas: dict = {}
@@ -227,7 +226,7 @@ class _SchemaMemo:
     results wholesale would not have that property.
     """
 
-    __slots__ = ("_structs", "_pending", "_resolving")
+    __slots__ = ("_pending", "_resolving", "_structs")
 
     def __init__(self) -> None:
         # id(Rel) -> (Rel, struct) resolved, and id(Rel) -> (Rel, Plan) not yet. The
@@ -306,7 +305,7 @@ class _SchemaMemo:
                 if unresolved is not None:
                     unswept.append((unresolved[1], False))
 
-    def struct_of(self, rel: stalg.Rel, registry) -> Optional[stt.Type.Struct]:
+    def struct_of(self, rel: stalg.Rel, registry) -> stt.Type.Struct | None:
         """``rel``'s remembered output struct, or None if nothing was recorded."""
         key = id(rel)
         known = self._structs.get(key)

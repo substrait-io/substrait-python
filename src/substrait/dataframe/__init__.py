@@ -109,7 +109,7 @@ from substrait.dataframe.frame import (
 from substrait.dataframe.functions import f, functions_for
 from substrait.extension_registry import ExtensionRegistry
 
-__all__ = [
+__all__ = [  # noqa: RUF022 -- grouped by topic
     # entry points
     "read_named_table",
     "from_records",

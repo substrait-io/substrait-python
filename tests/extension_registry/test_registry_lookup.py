@@ -1,6 +1,7 @@
 from substrait.type_pb2 import Type
 
-from substrait.builders.type import boolean, decimal, i8, i16
+from substrait.builders.type import boolean, decimal, fp64, i8, i16, i64
+from substrait.builders.type import list as list_
 
 
 def test_non_existing_urn(registry):
@@ -215,3 +216,12 @@ def test_find_function_searches_all_urns_when_unspecified(registry):
     match = registry.find_function("add", signature)
     assert match is not None
     assert match == registry.list_functions_across_urns("add", signature)[0]
+
+
+def test_quantile_binds_return_type_to_distribution(registry):
+    # Since spec v0.103.1 ``quantile`` returns ``LIST?<any1>``, bound to the
+    # ``distribution`` argument, instead of an unbound ``LIST?<any>``.
+    signature = ["NEITHER", "EXACT", i64(nullable=False), fp64(nullable=False)]
+    match = registry.lookup_function(_ARITHMETIC, "quantile", signature)
+    assert match is not None
+    assert match[1] == list_(fp64(nullable=False), nullable=True)

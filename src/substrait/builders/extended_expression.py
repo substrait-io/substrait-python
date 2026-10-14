@@ -617,7 +617,7 @@ def column(field: str | int, alias: Iterable[str] | str | None = None):
             if len(alias) != len(output_names):
                 raise ValueError(
                     f"column() alias {alias!r} has {len(alias)} names, but field "
-                    f"{output_names[0]!r} needs {len(output_names)} "
+                    f"{field!r} needs {len(output_names)} "
                     f"({output_names!r})."
                 )
             output_names = list(alias)

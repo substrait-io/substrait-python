@@ -394,17 +394,20 @@ def extension_table(
 def _expression_output_names(
     ref: stee.ExpressionReference, ns: stt.NamedStruct, registry: ExtensionRegistry
 ) -> list[str]:
-    """An expression's depth-first output names, refusing more than its type has."""
+    """An expression's depth-first output names, checked against its output type."""
     names = list(ref.output_names)
-    if len(names) <= 1:
+    if not names:
+        raise ValueError("Expression has no output names; give it an alias.")
+    if len(names) == 1:
+        # Struct-valued expressions other than column() still emit one name (#312).
         return names
     needed = type_num_names(
         infer_expression_type(ref.expression, ns.struct, registry=registry)
     )
-    if len(names) > needed:
+    if len(names) != needed:
         raise ValueError(
             f"Expression named {names!r} has {len(names)} names, but its output "
-            f"type has only {needed}."
+            f"type needs {needed}."
         )
     return names
 

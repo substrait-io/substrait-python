@@ -160,3 +160,28 @@ def test_select_struct_valued_expression_keeps_full_alias():
     actual = select(table, [cast(column("s"), pair, alias=["c", "p", "q"])])(registry)
 
     assert list(actual.relations[-1].root.names) == ["c", "p", "q"]
+
+
+def test_select_struct_valued_expression_with_partial_alias_is_rejected():
+    # Too few names would shift every later column's name onto the wrong field.
+    table = read_named_table("table", nested_named_struct)
+    pair = stt.Type(
+        struct=stt.Type.Struct(
+            types=[i64(), i64()], nullability=stt.Type.NULLABILITY_NULLABLE
+        )
+    )
+
+    with pytest.raises(ValueError, match="has 2 names, but its output type needs 3"):
+        select(table, [cast(column("s"), pair, alias=["c", "p"]), column("a")])(
+            registry
+        )
+
+
+@pytest.mark.parametrize("builder", [project, select])
+def test_expression_without_output_names_is_rejected(builder):
+    table = read_named_table("table", named_struct)
+    unnamed = column("id")(named_struct, registry)
+    del unnamed.referred_expr[0].output_names[:]
+
+    with pytest.raises(ValueError, match="no output names"):
+        builder(table, [unnamed])(registry)

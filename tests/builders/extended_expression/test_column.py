@@ -212,3 +212,11 @@ def test_column_by_name_after_a_map_column():
 def test_column_by_ordinal_out_of_range_raises(index):
     with pytest.raises(ValueError, match=r"out of range; schema has 3 columns"):
         column(index)(named_struct, None)
+
+
+def test_column_alias_list_on_a_field_without_names_raises_value_error():
+    # A schema can carry fewer names than fields; the error must still be reported.
+    unnamed = stt.NamedStruct(names=["order_id"], struct=struct)
+
+    with pytest.raises(ValueError, match="2 needs 0"):
+        column(2, alias=["g", "h"])(unnamed, None)

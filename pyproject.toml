@@ -79,8 +79,10 @@ exclude-newer-package = { substrait-protobuf = false, substrait-extensions = fal
 [tool.pixi.workspace]
 channels = ["conda-forge"]
 platforms = ["win-64", "linux-64", "osx-64", "osx-arm64", "linux-aarch64"]
-# The same 14-day cutoff for the conda and PyPI packages pixi solves.
+# The same 14-day cutoff for the conda and PyPI packages pixi solves. 0.67.0 is
+# the first release that accepts a relative cutoff and the per-package tables.
 exclude-newer = "14d"
+requires-pixi = ">=0.67.0"
 
 [tool.pixi.pypi-exclude-newer]
 substrait-protobuf = "0d"

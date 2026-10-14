@@ -64,9 +64,28 @@ lint.extend-ignore = ["TRY002", "TRY004"]
 "src/substrait/proto/__init__.py" = ["F401", "F403"]
 
 
+[tool.uv]
+# 0.11.8 is the first release that writes a relative exclude-newer into uv.lock
+# without a solve timestamp, so the lock does not change on every re-lock.
+required-version = ">=0.11.8"
+# Ignore PyPI packages published in the last 14 days when locking, so a
+# compromised or broken upload has time to be noticed before it can reach a
+# build. See CONTRIBUTING.md for how to bypass this for an urgent security fix.
+exclude-newer = "14 days"
+# We publish these ourselves, so there is no third-party release to let the
+# ecosystem vet. Matches their minimumReleaseAge exemption in renovate.json.
+exclude-newer-package = { substrait-protobuf = false, substrait-extensions = false, substrait-antlr = false }
+
 [tool.pixi.workspace]
 channels = ["conda-forge"]
 platforms = ["win-64", "linux-64", "osx-64", "osx-arm64", "linux-aarch64"]
+# The same 14-day cutoff for the conda and PyPI packages pixi solves.
+exclude-newer = "14d"
+
+[tool.pixi.pypi-exclude-newer]
+substrait-protobuf = "0d"
+substrait-extensions = "0d"
+substrait-antlr = "0d"
 
 [tool.pixi.environments]
 dev = { features = ["dev"], solve-group = "default" }

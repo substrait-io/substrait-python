@@ -52,6 +52,11 @@
       "matchManagers": ["pep621"],
       "matchDepTypes": ["project.dependencies", "project.optional-dependencies"],
       "rangeStrategy": "widen"
+    },
+    {
+      "description": "exclude-newer in pyproject.toml already applies the release-age cooldown to every package uv lock and pixi lock pick. Lock file maintenance has no release date for Renovate to check, so its own gate would never pass",
+      "matchUpdateTypes": ["lockFileMaintenance"],
+      "minimumReleaseAge": null
     }
   ]
 }

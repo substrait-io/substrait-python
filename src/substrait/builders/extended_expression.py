@@ -577,7 +577,7 @@ def column(field: str | int, alias: Iterable[str] | str | None = None):
 
     Accepts either an index or a field name of a desired field.
     """
-    alias = [alias] if alias and isinstance(alias, str) else alias
+    alias = [alias] if alias and isinstance(alias, str) else list(alias or [])
 
     def resolve(
         base_schema: stp.NamedStruct, registry: ExtensionRegistry
@@ -607,6 +607,21 @@ def column(field: str | int, alias: Iterable[str] | str | None = None):
             else None
         )
 
+        output_names = list(base_schema.names)[names_start:names_end]
+        if len(alias) == 1:
+            # A single alias renames only the top-level field, keeping a struct
+            # column's nested names.
+            output_names = [alias[0], *output_names[1:]]
+        elif alias:
+            # A full list replaces every name, so it must name each field.
+            if len(alias) != len(output_names):
+                raise ValueError(
+                    f"column() alias {alias!r} has {len(alias)} names, but field "
+                    f"{field!r} needs {len(output_names)} "
+                    f"({output_names!r})."
+                )
+            output_names = list(alias)
+
         return stee.ExtendedExpression(
             referred_expr=[
                 stee.ExpressionReference(
@@ -620,9 +635,7 @@ def column(field: str | int, alias: Iterable[str] | str | None = None):
                             ),
                         )
                     ),
-                    output_names=list(base_schema.names)[names_start:names_end]
-                    if not alias
-                    else alias,
+                    output_names=output_names,
                 )
             ],
             base_schema=base_schema,

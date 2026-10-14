@@ -38,6 +38,7 @@ from substrait.utils import (
     plan_subtrees,
     rebase_reference_ordinals,
     remap_function_references,
+    type_num_names,
 )
 from substrait.version import substrait_version
 
@@ -390,6 +391,27 @@ def extension_table(
     return build_scoped(resolve)
 
 
+def _expression_output_names(
+    ref: stee.ExpressionReference, ns: stt.NamedStruct, registry: ExtensionRegistry
+) -> list[str]:
+    """An expression's depth-first output names, checked against its output type."""
+    names = list(ref.output_names)
+    if not names:
+        raise ValueError("Expression has no output names; give it an alias.")
+    if len(names) == 1:
+        # Struct-valued expressions other than column() still emit one name (#312).
+        return names
+    needed = type_num_names(
+        infer_expression_type(ref.expression, ns.struct, registry=registry)
+    )
+    if len(names) != needed:
+        raise ValueError(
+            f"Expression named {names!r} has {len(names)} names, but its output "
+            f"type needs {needed}."
+        )
+    return names
+
+
 def project(
     plan: PlanOrUnbound,
     expressions: Iterable[ExtendedExpressionOrUnbound],
@@ -416,8 +438,13 @@ def project(
             resolve_expression(e, ns, registry) for e in expressions
         ]
 
+        # output_names holds an expression's names in depth-first order, so a
+        # struct-valued expression contributes its nested names too.
         names = list(_plan.relations[-1].root.names) + [
-            e.output_names[0] for ee in bound_expressions for e in ee.referred_expr
+            name
+            for ee in bound_expressions
+            for e in ee.referred_expr
+            for name in _expression_output_names(e, ns, registry)
         ]
 
         return _plan_from(
@@ -466,10 +493,16 @@ def select(
             resolve_expression(e, ns, registry) for e in expressions
         ]
 
-        start_index = len(_plan.relations[-1].root.names)
+        # Expressions are appended after the input's top-level fields; root.names
+        # counts nested names too, so it is not a field count.
+        start_index = len(ns.struct.types)
+        exprs = [e.expression for ee in bound_expressions for e in ee.referred_expr]
 
         names = [
-            e.output_names[0] for ee in bound_expressions for e in ee.referred_expr
+            name
+            for ee in bound_expressions
+            for e in ee.referred_expr
+            for name in _expression_output_names(e, ns, registry)
         ]
 
         return _plan_from(
@@ -478,15 +511,11 @@ def select(
                 project=stalg.ProjectRel(
                     common=stalg.RelCommon(
                         emit=stalg.RelCommon.Emit(
-                            output_mapping=[i + start_index for i in range(len(names))]
+                            output_mapping=[i + start_index for i in range(len(exprs))]
                         )
                     ),
                     input=inp[0],
-                    expressions=[
-                        e.expression
-                        for ee in bound_expressions
-                        for e in ee.referred_expr
-                    ],
+                    expressions=exprs,
                     advanced_extension=extension,
                 )
             ),
@@ -973,7 +1002,9 @@ def aggregate(
         )
 
         names = [
-            e.referred_expr[0].output_names[0] for e in bound_grouping_expressions
+            name
+            for e in bound_grouping_expressions
+            for name in _expression_output_names(e.referred_expr[0], ns, registry)
         ] + [e.referred_expr[0].output_names[0] for e in bound_measures]
 
         return _plan_from(

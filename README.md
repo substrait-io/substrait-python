@@ -251,6 +251,30 @@ relations {
 }
 ```
 
+## Deeply nested expressions
+Protobuf parsers, including the one in the Python `protobuf` library, reject messages nested more
+than 100 levels deep, and each expression level takes several message levels. Substrait works
+around this with [detached expressions](https://substrait.io/serialization/binary_serialization/#bounded-expression-nesting):
+deep subtrees are moved to a table on the `PlanRel` or `ExtendedExpression` and referenced by
+ordinal.
+
+```python
+from substrait.proto import Plan
+from substrait.utils.detached import detach, resolve_detached
+
+data = detach(plan).SerializeToString()  # parses under the default limits
+plan = resolve_detached(Plan.FromString(data))  # ordinary expression trees again
+```
+
+`detach` returns a plan with nothing to detach as is. `infer_plan_schema`,
+`infer_extended_expression_schema`, the plan printer, and the builders resolve detached expressions
+on their own. Functions that take a bare `Rel` or `Expression` cannot, since the table lives on the
+containing message, so resolve the `Plan` or `ExtendedExpression` first.
+
+The builders work on the inlined tree, and the `protobuf` library copies messages passed to a
+constructor through its parser, so building on a detached plan works only while the plan still fits
+the limit once inlined. Detach the finished plan instead, just before serializing it.
+
 ## Produce a Substrait Plan with Ibis
 Let's use an existing Substrait producer, [Ibis](https://ibis-project.org), 
 to provide an example using Python Substrait as the consumer.

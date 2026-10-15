@@ -7,6 +7,7 @@ import substrait.plan_pb2 as stp
 import substrait.type_pb2 as stt
 
 from substrait.utils import child_rels, iter_plan_rels, plan_subtrees, rel_anchor_of
+from substrait.utils.detached import resolve_present_tables
 
 
 class _SubtreeScope:
@@ -796,6 +797,13 @@ def infer_expression_type(
             return stt.Type(string=ecv.current_timezone)
         else:
             raise Exception(f"Unknown execution context variable {variable}")
+    elif rex_type == "detached_expression_ordinal":
+        raise ValueError(
+            f"detached expression ordinal {expression.detached_expression_ordinal} "
+            "can only be resolved against its containing PlanRel or "
+            "ExtendedExpression; call substrait.utils.detached.resolve_detached "
+            "on that message first"
+        )
     else:
         raise Exception(f"Unknown rex_type {rex_type}")
 
@@ -803,6 +811,7 @@ def infer_expression_type(
 def infer_extended_expression_schema(
     ee: stee.ExtendedExpression, *, registry=None
 ) -> stt.Type.Struct:
+    ee = resolve_present_tables(ee)
     exprs = [e for e in ee.referred_expr]
 
     types = [
@@ -1394,6 +1403,7 @@ def infer_rel_schema(rel: stalg.Rel, *, registry=None, subtrees=()) -> stt.Type.
 
 
 def infer_plan_schema(plan: stp.Plan, *, registry=None) -> stt.NamedStruct:
+    plan = resolve_present_tables(plan)
     # A Plan carries its shared subtrees in-band as the leading ``rel`` entries of
     # ``relations`` (the query root is the trailing ``root`` entry), so a
     # ReferenceRel anywhere in the tree resolves against them by ordinal. Wrap them

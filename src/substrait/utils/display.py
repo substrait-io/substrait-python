@@ -12,6 +12,7 @@ import substrait.plan_pb2 as stp
 import substrait.type_pb2 as stt
 
 from substrait.utils import type_num_names
+from substrait.utils.detached import resolve_detached
 
 
 def _read_output_names(read: stalg.ReadRel) -> list:
@@ -156,11 +157,24 @@ class PlanPrinter:
 
     def _stream_relation(self, rel: stp.PlanRel, stream, depth: int):
         """Print a plan relation concisely"""
+        try:
+            rel = resolve_detached(rel)
+            malformed = False
+        except ValueError:
+            # Show a malformed relation as is: its ordinals print as such, and its
+            # detached table follows the tree.
+            malformed = True
 
         if rel.HasField("root"):
             self._stream_rel_root(rel.root, stream, depth)
         elif rel.HasField("rel"):
             self._stream_rel(rel.rel, stream, depth)
+
+        if malformed:
+            indent = " " * (depth * self.indent_size)
+            for i, entry in enumerate(rel.detached_expressions):
+                stream.write(f"{indent}$detached[{i}]:\n")
+                self._stream_expression(entry, stream, depth + 1)
 
     def _stream_rel_root(self, root: stalg.RelRoot, stream, depth: int):
         """Print a relation root concisely"""
@@ -492,6 +506,9 @@ class PlanPrinter:
             self._stream_if_then(expression.if_then, stream, depth)
         elif expression.HasField("window_function"):
             self._stream_window_function(expression.window_function, stream, depth)
+        elif expression.HasField("detached_expression_ordinal"):
+            ordinal = expression.detached_expression_ordinal
+            stream.write(f"{indent}$detached[{ordinal}]\n")
         else:
             stream.write(f"{indent}<unknown_expression>\n")
 
@@ -682,6 +699,8 @@ class PlanPrinter:
                 # For nested scalar functions, we'll handle them specially in the main printing
                 # Return a placeholder that indicates it needs recursive expansion
                 return "<nested_scalar_function>"
+            elif arg.value.HasField("detached_expression_ordinal"):
+                return f"$detached[{arg.value.detached_expression_ordinal}]"
             else:
                 return "<unknown_function_argument_value>"
         elif arg.HasField("enum"):
@@ -733,6 +752,9 @@ class PlanPrinter:
                     stream.write(f"{indent}field: root\n")
             elif arg.value.HasField("scalar_function"):
                 self._stream_scalar_function(arg.value.scalar_function, stream, depth)
+            elif arg.value.HasField("detached_expression_ordinal"):
+                ordinal = arg.value.detached_expression_ordinal
+                stream.write(f"{indent}$detached[{ordinal}]\n")
             else:
                 stream.write(f"{indent}<unknown_function_argument_value>\n")
         elif arg.HasField("enum"):

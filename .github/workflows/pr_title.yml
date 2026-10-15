@@ -95,9 +95,23 @@ jobs:
       # infrastructure failure: only outcome == 'failure' means the title or
       # description is genuinely malformed, and only that should be commented on.
       # --no-install so this can only run the pinned local CLI, never fetch one.
+      #
+      # commitlint echoes the PR text to the log, one unindented line per body
+      # line, and the runner reads any line starting with "::" as a workflow
+      # command. A body line such as "::add-mask::success" would otherwise mask
+      # a value and make the runner drop the job outputs containing it, so the
+      # comment job would skip or return early. Suspend command processing with
+      # an unguessable token while commitlint runs; dropping --verbose is not
+      # enough, since commitlint prints its input on failure regardless.
       - id: commitlint
         continue-on-error: true
-        run: npx --no-install commitlint --verbose < "$RUNNER_TEMP/commit-msg.txt"
+        run: |
+          token="$(openssl rand -hex 16)"
+          echo "::stop-commands::$token"
+          status=0
+          npx --no-install commitlint --verbose < "$RUNNER_TEMP/commit-msg.txt" || status=$?
+          echo "::$token::"
+          exit "$status"
       # Fail this job, rather than the comment job, so that the check which goes
       # red is the one whose name describes what is wrong.
       - if: steps.commitlint.outcome == 'failure'

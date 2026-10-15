@@ -15,7 +15,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Install uv with python
-        uses: astral-sh/setup-uv@v7
+        uses: astral-sh/setup-uv@v10.2.0
 
       - name: Verify substrait-* versions
         run: ./check_substrait_package_versions.sh

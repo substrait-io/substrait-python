@@ -33,6 +33,7 @@ from dataclasses import dataclass
 import substrait.algebra_pb2 as stalg
 import substrait.extended_expression_pb2 as stee
 import substrait.plan_pb2 as stplan
+import substrait.type_pb2 as stt
 from google.protobuf.message import Message
 
 # The default parse recursion limit of protobuf-java, C++ and upb: the deepest
@@ -83,6 +84,18 @@ _TABLE_BY_MESSAGE = {table.full_name: table for table in _TABLES}
 _TABLE_FIELDS = frozenset(table.field for table in _TABLES)
 _TAGS = tuple(table.tag for table in _TABLES)
 
+# Stands in for a resolved entry that has to keep its position. Nothing can
+# validly reference it, so its content only has to be a valid expression.
+_PLACEHOLDER = stalg.Expression(
+    literal=stalg.Expression.Literal(
+        null=stt.Type(bool=stt.Type.Boolean(nullability=stt.Type.NULLABILITY_NULLABLE))
+    )
+)
+
+
+def _declaration_index(item) -> int:
+    return item[0].index
+
 
 def _children(msg: Message, *, skip_tables: bool = False):
     """Yield ``(child, levels)`` for each set submessage of ``msg``.
@@ -91,16 +104,21 @@ def _children(msg: Message, *, skip_tables: bool = False):
     wire: 1, or 2 for a map value (the map entry is a message of its own).
     ``google.protobuf.Any`` payloads are opaque and not descended into, and
     ``skip_tables`` leaves out a container's own detached tables.
+
+    Fields come in declaration order, not field-number order (which
+    ``ListFields`` uses), so the cuts :func:`detach` makes are numbered the way
+    substrait-java numbers them.
     """
     if msg.DESCRIPTOR.full_name == _ANY:
         return
-    for field, value in msg.ListFields():
+    for field, value in sorted(msg.ListFields(), key=_declaration_index):
         if field.message_type is None or (skip_tables and field.name in _TABLE_FIELDS):
             continue
         if isinstance(value, Message):
             yield value, 1
-        elif field.message_type.GetOptions().map_entry:
-            # A map whose values are messages; scalar-valued maps hold none.
+        elif hasattr(value, "values"):
+            # A map (repeated fields have no .values()); only message-valued maps
+            # hold submessages.
             for item in value.values():
                 if isinstance(item, Message):
                     yield item, 2
@@ -187,9 +205,10 @@ def resolve_detached(msg):
     ``google.protobuf.Any`` payload. An extension payload may reference entries
     the relation tree does not, and since it is opaque here its references
     cannot be followed, so those entries keep their ordinals, as the spec
-    requires. Only the trailing run of entries resolved here is dropped: each
-    entry is referenced at most once, so no payload can validly refer to one of
-    them, and dropping them from the end renumbers nothing.
+    requires. The entries resolved here are a different matter: each entry is
+    referenced at most once, so no payload can validly refer to one of them. The
+    trailing run of them is dropped, which renumbers nothing, and any left in
+    place are replaced by a null literal, so none still points into that run.
 
     ``msg`` itself is returned when it holds no ordinals, which is the common
     case, so callers need not check first. Otherwise the result is a copy.
@@ -199,6 +218,44 @@ def resolve_detached(msg):
     out = _copy(msg)
     for container, _ in _containers(out):
         _resolve_in_place(container)
+    return out
+
+
+def _has_entries(msg) -> bool:
+    return any(
+        getattr(container, table.field)
+        for container, _ in _containers(msg)
+        for table in _TABLES
+    )
+
+
+def resolve_present_tables(msg):
+    """:func:`resolve_detached`, skipped when ``msg`` has no detached entries.
+
+    For this library's own hot paths: the builders and schema inference run it
+    on every step, on messages that almost never carry a table. Skipping the
+    check there leaves an ordinal with no table unvalidated, but nothing can
+    consume one: schema inference rejects it.
+    """
+    return resolve_detached(msg) if _has_entries(msg) else msg
+
+
+def resolve_for_building(msg):
+    """:func:`resolve_present_tables`, for a message a builder is about to build on.
+
+    A builder lifts the relation tree or the expression into a new container,
+    and the tables do not travel with it. Entries that outlive resolution -- kept
+    for a ``google.protobuf.Any`` payload that may reference them -- would be
+    lost, leaving the payload's ordinals pointing at nothing or, inside a
+    subquery, at the enclosing container's entries, so that raises
+    ``ValueError`` instead.
+    """
+    out = resolve_present_tables(msg)
+    if _has_entries(out):
+        raise ValueError(
+            "cannot build on a message whose detached entries an extension "
+            "payload may still reference: they would not travel with it"
+        )
     return out
 
 
@@ -252,17 +309,9 @@ def _resolve_in_place(container) -> None:
             continue
         while entries and len(entries) - 1 in used[table]:
             del entries[-1]
-
-
-def _exceeds(msg: Message, max_depth: int) -> bool:
-    """Whether a submessage of ``msg`` sits more than ``max_depth`` levels below it."""
-    stack = [(msg, 0)]
-    while stack:
-        node, depth = stack.pop()
-        if depth > max_depth:
-            return True
-        stack.extend((child, depth + levels) for child, levels in _children(node))
-    return False
+        for i in used[table]:
+            if i < len(entries):
+                entries[i].CopyFrom(_PLACEHOLDER)
 
 
 def detach(msg, *, max_depth: int = DEFAULT_MAX_DEPTH):
@@ -270,19 +319,22 @@ def detach(msg, *, max_depth: int = DEFAULT_MAX_DEPTH):
 
     ``msg`` is a ``Plan``, ``PlanRel`` or ``ExtendedExpression``; depth is counted
     in protobuf message levels below ``msg`` itself, the way parsers count it, and
-    the default matches their default limit. A message already within budget is
+    the default matches their default limit. A message with nothing to detach is
     returned itself, so its serialization is unchanged; otherwise the result is a
     copy.
 
-    The walk goes top-down. An expression whose subtree would end below
-    ``max_depth``, and which itself sits deeper than half the budget (and than the
-    container's entries), is moved to the end of its container's
-    ``detached_expressions`` and replaced by its ordinal; the moved entry is then
-    processed from its new position, right under the container. Cutting at half
-    the budget leaves chunks about half the budget deep rather than one entry per
-    level past the limit. Entries come out in pre-order, so a child's ordinal is
-    larger than its parent's. Entries already in the table keep their positions,
-    so existing ordinals still find their targets.
+    The walk goes top-down, through the existing entries first and then the
+    relation or referred expressions, each in field declaration order -- the
+    order substrait-java uses, so both produce the same encoding. An expression
+    whose subtree would end below ``max_depth``, and which itself sits deeper than
+    half the budget (and than the container's entries), is moved to the end of
+    its container's ``detached_expressions`` and replaced by its ordinal; the
+    moved entry is then processed from its new position, right under the
+    container. Cutting at half the budget leaves chunks about half the budget
+    deep rather than one entry per level past the limit. Entries come out in
+    pre-order, so a child's ordinal is larger than its parent's. Entries already
+    in the table keep their positions, so existing ordinals still find their
+    targets.
 
     Only expressions are detached. Nesting inside literals, types, field
     reference paths, masks or relation trees (see ``ReferenceRel``), and inside
@@ -293,25 +345,26 @@ def detach(msg, *, max_depth: int = DEFAULT_MAX_DEPTH):
     ``max_depth=0`` detaches every expression that can be, which is handy for
     testing a consumer against the detached form.
     """
-    _containers(msg)  # reject an unsupported message even when it fits
-    if not _exceeds(msg, max_depth):
-        return msg
+    # Cutting works on a copy. Copying is native and cheap next to the walk, and
+    # this way the walk runs only once.
     out = _copy(msg)
+    cut = False
     for container, base in _containers(out):
-        _detach_in_place(container, base, max_depth)
-    return out
+        cut = _detach_in_place(container, base, max_depth) or cut
+    return out if cut else msg
 
 
-def _detach_in_place(container, base: int, max_depth: int) -> None:
-    table = getattr(container, _EXPRESSIONS.field)
+def _detach_in_place(container, base: int, max_depth: int) -> bool:
+    """Cut ``container``'s over-deep subtrees; whether anything was cut."""
+    tables = {table: getattr(container, table.field) for table in _TABLES}
     entry_depth = base + 1
-    # Only expressions below the entry roots are cut, so an entry root is never
+    # Only subtrees below the entry roots are cut, so an entry root is never
     # detached again however small the budget.
     threshold = max(max_depth // 2, entry_depth)
 
     # Index the tree once: ``nodes[i]`` is a submessage and ``children[i]`` its
     # ``(index, levels)`` pairs. Holding every wrapper keeps the tree stable while
-    # it is rewritten. The relation tree comes first, then the existing entries.
+    # it is rewritten. The existing entries come first, then the relation tree.
     nodes, children = [], []
 
     def add(msg):
@@ -320,10 +373,12 @@ def _detach_in_place(container, base: int, max_depth: int) -> None:
         return len(nodes) - 1
 
     roots = [
+        (add(entry), entry_depth) for entries in tables.values() for entry in entries
+    ]
+    roots += [
         (add(child), base + levels)
         for child, levels in _children(container, skip_tables=True)
     ]
-    roots += [(add(entry), entry_depth) for entry in table]
     stack = [i for i, _ in roots]
     while stack:
         i = stack.pop()
@@ -339,34 +394,38 @@ def _detach_in_place(container, base: int, max_depth: int) -> None:
 
     # Choose the cuts top-down. A cut only changes depths below it, so every
     # choice can be made against the subtree heights of the uncut tree. Each cut's
-    # subtree is walked straight after it is chosen, which numbers them in
-    # pre-order.
+    # subtree is walked straight after it is chosen, so ``cuts`` is in pre-order
+    # and each table's ordinals are handed out in that order.
     cuts = []
+    next_ordinal = {table: len(entries) for table, entries in tables.items()}
     stack = [(i, depth, True) for i, depth in reversed(roots)]
     while stack:
         i, depth, is_root = stack.pop()
         node = nodes[i]
+        table = _TABLE_BY_MESSAGE.get(node.DESCRIPTOR.full_name)
         if (
-            not is_root
-            and node.DESCRIPTOR.full_name == _EXPRESSIONS.full_name
+            table is not None
+            and not is_root
             and depth > threshold
-            # An ordinal is already as shallow as an expression gets; detaching it
+            # An ordinal is already as shallow as a subtree gets; detaching it
             # would make an entry that is itself an ordinal.
             and _ordinal_table(node) is None
         ):
             if depth + height[i] <= max_depth:
                 continue
-            cuts.append(i)
+            cuts.append((i, table, next_ordinal[table]))
+            next_ordinal[table] += 1
             depth = entry_depth
         stack.extend((j, depth + levels, False) for j, levels in reversed(children[i]))
 
-    # Materialize the deepest cuts first, so each entry copies only its own chunk:
-    # the cuts below it are already ordinals.
-    first = len(table)
-    for _ in cuts:
-        table.add()
-    for k in reversed(range(len(cuts))):
-        node = nodes[cuts[k]]
-        table[first + k].CopyFrom(node)
+    # Materialize the deepest cuts first, across tables, so each entry copies only
+    # its own chunk: the cuts below it are already ordinals.
+    for table, entries in tables.items():
+        for _ in range(next_ordinal[table] - len(entries)):
+            entries.add()
+    for i, table, ordinal in reversed(cuts):
+        node = nodes[i]
+        tables[table][ordinal].CopyFrom(node)
         node.Clear()
-        setattr(node, _EXPRESSIONS.ordinal, first + k)
+        setattr(node, table.ordinal, ordinal)
+    return bool(cuts)

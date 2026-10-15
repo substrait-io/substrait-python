@@ -266,10 +266,14 @@ data = detach(plan).SerializeToString()  # parses under the default limits
 plan = resolve_detached(Plan.FromString(data))  # ordinary expression trees again
 ```
 
-`detach` returns a plan already within the limit as is. `infer_plan_schema`,
+`detach` returns a plan with nothing to detach as is. `infer_plan_schema`,
 `infer_extended_expression_schema`, the plan printer, and the builders resolve detached expressions
 on their own. Functions that take a bare `Rel` or `Expression` cannot, since the table lives on the
 containing message, so resolve the `Plan` or `ExtendedExpression` first.
+
+The builders work on the inlined tree, and the `protobuf` library copies messages passed to a
+constructor through its parser, so building on a detached plan works only while the plan still fits
+the limit once inlined. Detach the finished plan instead, just before serializing it.
 
 ## Produce a Substrait Plan with Ibis
 Let's use an existing Substrait producer, [Ibis](https://ibis-project.org), 

@@ -104,11 +104,14 @@ def _deep_plan(levels: int) -> stp.Plan:
 
 
 def _submessages(msg):
+    """Yield ``(child, levels)``: a map value sits two levels down, under its entry."""
     for field, value in msg.ListFields():
         if isinstance(value, Message):
-            yield value
+            yield value, 1
+        elif hasattr(value, "values"):
+            yield from ((v, 2) for v in value.values() if isinstance(v, Message))
         elif field.message_type is not None:
-            yield from value
+            yield from ((v, 1) for v in value)
 
 
 def _height(msg) -> int:
@@ -117,7 +120,7 @@ def _height(msg) -> int:
     while stack:
         node, depth = stack.pop()
         deepest = max(deepest, depth)
-        stack.extend((child, depth + 1) for child in _submessages(node))
+        stack.extend((child, depth + levels) for child, levels in _submessages(node))
     return deepest
 
 
@@ -130,7 +133,7 @@ def _ordinals(msg):
             node.WhichOneof("rex_type") == "detached_expression_ordinal"
         ):
             found.append(node.detached_expression_ordinal)
-        stack.extend(_submessages(node))
+        stack.extend(child for child, _ in _submessages(node))
     return found
 
 
@@ -436,3 +439,110 @@ def test_display_shows_a_malformed_detached_plan_as_is():
         )
     )
     assert "$detached[5]" in PlanPrinter().stringify_plan(plan)
+
+
+def test_resolve_blanks_resolved_entries_kept_in_place():
+    # Entry 0 (resolved) holds ordinal 2 (resolved, trailing, dropped); entry 1 is
+    # unreached and kept for the payload. Entry 0 must not keep pointing at 2.
+    plan_rel = _with_any_payload(
+        _plan_rel(
+            SPEC_PLAN_REL.replace(
+                "detached_expressions { literal { i64: 42 } }",
+                "detached_expressions {"
+                " nested { struct { fields { detached_expression_ordinal: 2 } } } }"
+                "detached_expressions { literal { i64: 7 } }"
+                "detached_expressions { literal { i64: 42 } }",
+            )
+        )
+    )
+    resolved = resolve_detached(plan_rel)
+    table = resolved.detached_expressions
+    assert len(table) == 2
+    assert _ordinals(table[0]) == []
+    assert table[1].literal.i64 == 7
+
+
+def test_detach_walks_fields_in_declaration_order():
+    # SwitchExpression declares ``match`` (field 3) before ``ifs`` (1) and
+    # ``else`` (2); substrait-java numbers cuts in declaration order.
+    plan = _deep_plan(0)
+    expr = plan.relations[0].root.input.project.expressions[0]
+    expr.Clear()
+    switch = expr.switch_expression
+    switch.match.literal.i64 = 1
+    clause = switch.ifs.add()
+    clause.then.literal.i64 = 2
+    getattr(switch, "else").literal.i64 = 3
+    clause.SetInParent()
+    getattr(clause, "if").i64 = 1
+
+    table = detach(plan, max_depth=0).relations[0].detached_expressions
+    assert [e.literal.i64 for e in table[1:]] == [1, 2, 3]
+
+
+def test_detach_processes_existing_entries_first():
+    plan = _plan(
+        SPEC_PLAN_REL.replace(
+            "detached_expressions { literal { i64: 42 } }",
+            "detached_expressions { nested { struct { fields { literal { i64: 42 } } } } }",
+        )
+    )
+    project = plan.relations[0].root.input.project
+    project.expressions.add().nested.struct.fields.add().literal.i64 = 7
+
+    table = detach(plan, max_depth=0).relations[0].detached_expressions
+    # Entry 0 existed; its child is cut first, then the relation tree's.
+    assert table[1].literal.i64 == 42
+    assert [e.literal.i64 for e in table[2:] if e.HasField("literal")] == [7]
+
+
+def test_detach_with_nothing_to_cut_returns_input():
+    plan = _deep_plan(200)
+    plan.relations[0].root.input.project.ClearField("expressions")
+    assert detach(plan, max_depth=10) is plan
+
+
+def test_builders_inline_a_detached_plan_from_a_callable():
+    plan = _dataframe_plans()[1]
+    detached = detach(plan, max_depth=0)
+    built = select(lambda registry: detached, expressions=[column("x")])(registry)
+    assert _ordinals(built) == []
+    assert built == select(plan, expressions=[column("x")])(registry)
+
+
+def test_builders_refuse_entries_a_payload_may_reference():
+    plan = _plan(SPEC_PLAN_REL + "detached_expressions { literal { i64: 7 } }")
+    _with_any_payload(plan.relations[0])
+    with pytest.raises(ValueError, match="would not travel with it"):
+        select(plan, expressions=[column("value")])(registry)
+
+
+def test_builders_reject_an_ordinal_without_a_table():
+    plan = _plan(SPEC_PLAN_REL)
+    plan.relations[0].ClearField("detached_expressions")
+    with pytest.raises(ValueError, match="resolve_detached"):
+        select(plan, expressions=[column("value")])(registry)
+
+
+def test_display_shows_ordinal_function_arguments():
+    plan = _dataframe_plans()[1]
+    detached = detach(plan, max_depth=0)
+    # Corrupt the table so the printer shows the plan unresolved.
+    detached.relations[0].detached_expressions.add().detached_expression_ordinal = 0
+    detached.relations[
+        0
+    ].root.input.project.expressions.add().detached_expression_ordinal = 99
+    output = PlanPrinter().stringify_plan(detached)
+    assert "<unknown_function_argument_value>" not in output
+    assert "$detached[0]:" in output
+
+
+def test_display_resolves_each_plan_rel_on_its_own():
+    plan = _plan(SPEC_PLAN_REL)
+    malformed = plan.relations.add()
+    malformed.CopyFrom(plan.relations[0])
+    malformed.root.input.project.expressions[0].detached_expression_ordinal = 5
+    output = PlanPrinter().stringify_plan(plan)
+    # The first PlanRel resolves; only the second prints its ordinal and table.
+    assert "$detached[5]" in output
+    assert output.count("$detached[0]:") == 1

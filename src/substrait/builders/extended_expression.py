@@ -26,7 +26,7 @@ from substrait.utils import (
     top_level_names,
     type_num_names,
 )
-from substrait.utils.detached import resolve_detached
+from substrait.utils.detached import resolve_for_building
 
 # Monotonic source of unique RelCommon.rel_anchor values within a single build.
 # Not reset between builds by default; reset at each top-level materialization
@@ -168,8 +168,8 @@ def resolve_expression(
     expression into whatever is built from it.
     """
     if not isinstance(expression, stee.ExtendedExpression):
-        return expression(base_schema, registry)
-    expression = resolve_detached(expression)
+        return resolve_for_building(expression(base_schema, registry))
+    expression = resolve_for_building(expression)
     collector = current_collector()
     if collector is None:
         return expression
@@ -1083,7 +1083,7 @@ def _inner_rel(query, registry: ExtensionRegistry, base_schema) -> stalg.Rel:
         outer_schemas.reset(token)
     # Only the Rel travels into the Expression.Subquery; the PlanRel's detached
     # tables stay behind with the plan, so inline its ordinals first.
-    plan = resolve_detached(plan)
+    plan = resolve_for_building(plan)
     # Fold the inner plan's extensions into this build before lifting its Rel: only
     # the Rel travels into the Expression.Subquery, so the declarations its function
     # references name stay behind with the plan. A plan built elsewhere therefore

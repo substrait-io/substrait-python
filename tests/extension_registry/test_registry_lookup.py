@@ -225,3 +225,15 @@ def test_quantile_binds_return_type_to_distribution(registry):
     match = registry.lookup_function(_ARITHMETIC, "quantile", signature)
     assert match is not None
     assert match[1] == list_(fp64(nullable=False), nullable=True)
+
+
+def test_decimal_avg_returns_nullable_decimal(registry):
+    # Since spec v0.105.0 ``avg`` over a decimal returns ``DECIMAL?<38,S>``: the
+    # average of an empty group is null even when the input is required.
+    match = registry.lookup_function(
+        "extension:io.substrait:functions_arithmetic_decimal",
+        "avg",
+        [decimal(2, 10, nullable=False)],
+    )
+    assert match is not None
+    assert match[1] == decimal(2, 38, nullable=True)

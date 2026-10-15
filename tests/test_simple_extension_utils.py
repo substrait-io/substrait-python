@@ -49,3 +49,18 @@ def test_metadata_defaults_to_none_when_absent():
     extensions = build_simple_extensions({"urn": "extension:test:no-metadata"})
 
     assert extensions.metadata is None
+
+
+def test_file_level_description_is_exposed():
+    """Extension files can carry a top-level description (spec v0.105.0)."""
+    extensions = build_simple_extensions(
+        {"urn": "extension:test:described", "description": "Test functions.\n"}
+    )
+
+    assert extensions.description == "Test functions.\n"
+
+
+def test_file_level_description_defaults_to_none_when_absent():
+    extensions = build_simple_extensions({"urn": "extension:test:undescribed"})
+
+    assert extensions.description is None

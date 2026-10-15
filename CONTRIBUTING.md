@@ -50,6 +50,24 @@ The two extras exist for consumers of the published package rather than for deve
 * **`extensions`** — `substrait-antlr` and `pyyaml`, needed for the extension registry to resolve function overloads against the standard Substrait extensions.
 * **`sql`** — `sqloxide` and `deepdiff`, needed by the `substrait.sql` front end.
 
+### Dependency cooldown
+
+`[tool.uv]` in `pyproject.toml` sets `exclude-newer = "14 days"` and `[tool.pixi.workspace]` sets `exclude-newer = "14d"`, so `uv lock` and `pixi lock` ignore packages published in the last 14 days. A compromised or broken upload therefore has two weeks to be noticed before it can reach `uv.lock` or `pixi.lock` — see [Pixi's security guide](https://pixi.prefix.dev/latest/security/) for the reasoning. Both cutoffs are relative durations evaluated at solve time, so the window slides on its own and needs no maintenance. The uv cutoff needs uv 0.11.8 or later and the pixi one pixi 0.67.0 or later, which `required-version` and `requires-pixi` enforce. `substrait-protobuf`, `substrait-extensions` and `substrait-antlr` are exempt: we publish them ourselves, so a new specification release can be picked up straight away.
+
+Keep these windows in step with `minimumReleaseAge` in `renovate.json`. If Renovate proposes a version newer than the cutoff, the lock step in its own pull request cannot resolve that version.
+
+To take a security fix that is younger than the window, add an entry for that package to both per-package tables rather than lowering the cutoff, then run `uv lock --upgrade-package urllib3` and `pixi update urllib3` to pull it into the lock files:
+
+```toml
+[tool.uv]
+exclude-newer-package = { substrait-protobuf = false, substrait-extensions = false, substrait-antlr = false, urllib3 = "0 days" }
+
+[tool.pixi.pypi-exclude-newer]
+urllib3 = "0d"
+```
+
+Drop the override again once the fix has aged past the window.
+
 ## Lint & format
 
 Run the following pixi tasks to lint and format with ruff.

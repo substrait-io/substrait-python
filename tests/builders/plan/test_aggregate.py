@@ -117,3 +117,38 @@ def test_aggregate_rejects_a_non_aggregate_measure():
         aggregate(table, grouping_expressions=[column("id")], measures=[column("id")])(
             registry
         )
+
+
+def test_aggregate_group_by_struct_column():
+    # Grouping by a struct column keeps its nested names, one per field depth-first.
+    nested = stt.NamedStruct(
+        names=["s", "x", "y", "b"],
+        struct=stt.Type.Struct(
+            types=[
+                stt.Type(
+                    struct=stt.Type.Struct(
+                        types=[i64(nullable=False), i64(nullable=False)],
+                        nullability=stt.Type.NULLABILITY_REQUIRED,
+                    )
+                ),
+                boolean(),
+            ],
+            nullability=stt.Type.NULLABILITY_REQUIRED,
+        ),
+    )
+    table = read_named_table("table", nested)
+    measure_expr = aggregate_function(
+        "extension:test:urn", "count", expressions=[column("b")], alias=["count"]
+    )
+
+    actual = aggregate(
+        table, grouping_expressions=[column("s")], measures=[measure_expr]
+    )(registry)
+
+    assert list(actual.relations[-1].root.names) == ["s", "x", "y", "count"]
+    assert list(infer_plan_schema(actual, registry=registry).names) == [
+        "s",
+        "x",
+        "y",
+        "count",
+    ]

@@ -1,6 +1,44 @@
 Release Notes
 ---
 
+## [0.37.0](https://github.com/substrait-io/substrait-python/compare/v0.36.0...v0.37.0) (2026-10-18)
+
+### ⚠ BREAKING CHANGES
+
+* following spec v0.105.0, `avg` over a decimal derives a
+nullable `DECIMAL?<38,S>` result. Following spec v0.106.0, the `date`
+and `precision_time` `round_calendar` overloads no longer take a
+trailing origin argument; plans must use the signatures without it.
+* `project`, `select` and `aggregate` grouping
+expressions now raise `ValueError` for an expression with two or more
+output names that do not match its output type, nested fields included,
+and for an expression with no output names; previously only the first
+name was kept. `column()` raises when an alias list has two or more
+names but not exactly one per field, and a single alias on a struct
+column now keeps its nested names (`column("s", alias="z")` gives `["z",
+"x", "y"]` instead of `["z"]`). Rename a column with a single alias, or
+pass a list that names every field in depth-first order.
+* **deps:** return type derivation expressions now bind `!` tighter
+than `AND` and `OR` and group chained `? :` conditionals to the right,
+following spec v0.104.0. User-defined extension YAMLs that relied on the
+previous grouping derive different return types.
+
+### Features
+
+* read and write detached expression subtrees ([#317](https://github.com/substrait-io/substrait-python/issues/317)) ([c946391](https://github.com/substrait-io/substrait-python/commit/c946391714ba1353c33d862b290ce63333cc5178))
+* read file-level extension descriptions ([#316](https://github.com/substrait-io/substrait-python/issues/316)) ([f850593](https://github.com/substrait-io/substrait-python/commit/f85059303db11eea100ad64a8b69738d0b6f224f))
+
+### Bug Fixes
+
+* carry struct columns' full names through select, project and aggregate ([#313](https://github.com/substrait-io/substrait-python/issues/313)) ([6905dd9](https://github.com/substrait-io/substrait-python/commit/6905dd90e3a0c9eb82ebb8efb45e3994b7c140db))
+* **extension_registry:** load default extensions via iterdir() ([#285](https://github.com/substrait-io/substrait-python/issues/285)) ([6dc4111](https://github.com/substrait-io/substrait-python/commit/6dc4111d9920e8e6a205daa18a0dd58d94f58972))
+* name the missing column in column-not-found errors and test on Python 3.14 ([#306](https://github.com/substrait-io/substrait-python/issues/306)) ([b60e8b4](https://github.com/substrait-io/substrait-python/commit/b60e8b48295560ae530bacc35234c592addb94fd))
+* update ruff to 0.16 and address its lint findings ([#305](https://github.com/substrait-io/substrait-python/issues/305)) ([8277940](https://github.com/substrait-io/substrait-python/commit/82779404124943f0bb257eb7cd65334d9825a32e))
+
+### Miscellaneous Chores
+
+* **deps:** bump substrait packages to 0.104.0 ([#309](https://github.com/substrait-io/substrait-python/issues/309)) ([46d10f6](https://github.com/substrait-io/substrait-python/commit/46d10f623913663eaad3fb58d286628b7ba9523b))
+
 ## [0.36.0](https://github.com/substrait-io/substrait-python/compare/v0.35.0...v0.36.0) (2026-10-11)
 
 ### ⚠ BREAKING CHANGES

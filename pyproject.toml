@@ -100,4 +100,4 @@ lint = "ruff check"
 lint_fix = "ruff check --fix"
 
 [tool.pixi.dependencies]
-ruff = ">=0.16.9,<0.17"
+ruff = ">=0.17.1,<0.18"

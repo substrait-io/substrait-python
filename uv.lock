@@ -524,7 +524,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "deepdiff", marker = "extra == 'sql'" },
-    { name = "protobuf", specifier = ">=5,<7" },
+    { name = "protobuf", specifier = ">=5,<8" },
     { name = "pyyaml", marker = "extra == 'extensions'" },
     { name = "sqloxide", marker = "extra == 'sql'" },
     { name = "substrait-antlr", marker = "extra == 'extensions'", specifier = "==0.106.0" },

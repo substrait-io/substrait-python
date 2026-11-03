@@ -70,8 +70,8 @@ The examples below construct plans with the raw `substrait.proto` and
 The ``substrait.proto`` module provides access to the classes
 that represent a substrait Plan, thus allowing to create new plans.
 
-Here is an example plan equivalent to ``SELECT first_name FROM person``
-where ``people`` table has ``first_name`` and ``surname`` columns of type ``String``
+Here is an example plan equivalent to ``SELECT first_name, surname FROM people``
+where the ``people`` table has ``first_name`` and ``surname`` columns of type ``String``
 
 ```
 >>> from substrait import proto

@@ -1,6 +1,12 @@
 Release Notes
 ---
 
+## [0.37.1](https://github.com/substrait-io/substrait-python/compare/v0.37.0...v0.37.1) (2026-11-03)
+
+### Bug Fixes
+
+* **docs:** correct the low-level example query ([#333](https://github.com/substrait-io/substrait-python/issues/333)) ([685d575](https://github.com/substrait-io/substrait-python/commit/685d5753a15f39c1e56e0e6efc58b68c6b71a6b4))
+
 ## [0.37.0](https://github.com/substrait-io/substrait-python/compare/v0.36.0...v0.37.0) (2026-10-18)
 
 ### ⚠ BREAKING CHANGES

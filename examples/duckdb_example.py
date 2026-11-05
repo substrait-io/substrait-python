@@ -2,7 +2,7 @@
 # /// script
 # dependencies = [
 #   "pyarrow==20.0.0",
-#   "duckdb==1.2.1",
+#   "duckdb==1.5.6",
 #   "substrait[extensions] @ file:///${PROJECT_ROOT}/"
 # ]
 # ///
@@ -18,7 +18,7 @@ from substrait.extension_registry import ExtensionRegistry
 
 try:
     duckdb.install_extension("substrait")
-except duckdb.duckdb.HTTPException:
+except duckdb.HTTPException:
     duckdb.install_extension("substrait", repository="community")
 duckdb.load_extension("substrait")
 
@@ -31,7 +31,7 @@ registry = ExtensionRegistry(load_default_extensions=True)
 
 
 def read_duckdb_named_table(name: str, conn):
-    pa_schema = conn.sql(f"SELECT * FROM {name} LIMIT 0").arrow().schema
+    pa_schema = conn.sql(f"SELECT * FROM {name} LIMIT 0").to_arrow_table().schema
     substrait_schema = (
         pa_substrait.serialize_schema(pa_schema).to_pysubstrait().base_schema
     )

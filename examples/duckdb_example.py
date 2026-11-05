@@ -31,7 +31,7 @@ registry = ExtensionRegistry(load_default_extensions=True)
 
 
 def read_duckdb_named_table(name: str, conn):
-    pa_schema = conn.sql(f"SELECT * FROM {name} LIMIT 0").arrow().schema
+    pa_schema = conn.sql(f"SELECT * FROM {name} LIMIT 0").to_arrow_table().schema
     substrait_schema = (
         pa_substrait.serialize_schema(pa_schema).to_pysubstrait().base_schema
     )

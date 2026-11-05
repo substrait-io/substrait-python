@@ -104,8 +104,8 @@ def assert_query_duckdb(query: str, ignore_order=True):
             )
             return pa_substrait.serialize_schema(pa_schema).to_pysubstrait().base_schema
 
-        conn.execute("CREATE TABLE stores AS SELECT * FROM data")
-        conn.execute("CREATE TABLE sales AS SELECT * FROM sales_data")
+        conn.from_arrow(data).create("stores")
+        conn.from_arrow(sales_data).create("sales")
 
         plan = convert(query, "duckdb", duckdb_schema_resolver, registry)
 

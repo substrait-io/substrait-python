@@ -1,4 +1,4 @@
-"""Tests for detached expression subtrees (spec v0.105.0, bounded expression nesting)."""
+"""Tests for detached relations and expressions (spec v0.108.0)."""
 
 import pytest
 import substrait.algebra_pb2 as stalg
@@ -16,6 +16,7 @@ from substrait.builders.extended_expression import (
     set_comparison,
     set_predicate,
 )
+from substrait.builders.plan import filter as filter_plan
 from substrait.builders.plan import project, read_named_table, select
 from substrait.builders.type import fp64, named_struct, struct
 from substrait.extension_registry import ExtensionRegistry
@@ -203,6 +204,90 @@ def test_resolve_rejects_invalid_references(table, message):
         resolve_detached(plan_rel)
 
 
+@pytest.mark.parametrize(
+    "text, error",
+    [
+        ("rel { detached_rel_ordinal: 0 }", "relation ordinal 0 is out of range"),
+        ("rel { detached_rel_ordinal: 0 } detached_rels {}", "relation 0 .*rel_type"),
+        (SPEC_PLAN_REL.replace("literal { i64: 42 }", ""), "expression 0 .*rex_type"),
+        (
+            "rel { detached_rel_ordinal: 0 } detached_rels { detached_rel_ordinal: 1 }",
+            "relation 0 is itself an ordinal",
+        ),
+        (
+            (
+                "rel { detached_rel_ordinal: 0 } "
+                "detached_rels { read { filter { detached_expression_ordinal: 0 } } } "
+                "detached_expressions { subquery { scalar { input { detached_rel_ordinal: 0 } } } }"
+            ),
+            "relation 0 is referenced more than once, or by a cycle",
+        ),
+        (
+            (
+                "rel { filter { input { detached_rel_ordinal: 0 } "
+                "condition { detached_expression_ordinal: 0 } } } "
+                "detached_expressions { subquery { scalar { input { detached_rel_ordinal: 0 } } } } "
+                "detached_rels { read {} }"
+            ),
+            "relation 0 is referenced more than once",
+        ),
+    ],
+    ids=[
+        "missing-relation",
+        "empty-relation",
+        "empty-expression",
+        "ordinal-target",
+        "cross-table-cycle",
+        "cross-table-reuse",
+    ],
+)
+def test_reachable_targets_must_be_valid(text, error):
+    with pytest.raises(ValueError, match=error):
+        resolve_detached(_plan_rel(text))
+
+
+def test_build_ignores_unreachable_relations():
+    plan = sub.read_named_table("example", {"value": sub.i64}).to_plan()
+    expected = select(plan, expressions=[column("value")])(registry)
+    unused = plan.relations[0].detached_rels.add().extension_single
+    unused.detail.Pack(stalg.Rel(detached_rel_ordinal=0))
+    unused.input.detached_rel_ordinal = 99
+    assert not resolve_detached(plan).relations[0].detached_rels
+    assert select(plan, expressions=[column("value")])(registry) == expected
+
+
+def test_dataframe_hints_the_relation_behind_an_ordinal():
+    plan = _plan("root { input { detached_rel_ordinal: 0 } } detached_rels { read {} }")
+    built = sub.DataFrame(lambda _: plan).hint(alias="source").to_plan()
+    assert built.relations[0].root.input.read.common.hint.alias == "source"
+    assert not plan.relations[0].detached_rels[0].read.HasField("common")
+
+
+def test_exists_filter_rebuild_resolves_both_tables():
+    outer = sub.read_named_table("outer", {"value": sub.i64}).to_plan()
+    inner = sub.read_named_table("inner", {"value": sub.i64}).to_plan()
+    predicate = set_predicate(
+        inner, stalg.Expression.Subquery.SetPredicate.PREDICATE_OP_EXISTS
+    )(infer_plan_schema(outer), registry)
+    expected = filter_plan(outer, predicate)(registry)
+    tuples = predicate.referred_expr[0].expression.subquery.set_predicate.tuples
+    predicate.detached_rels.add().CopyFrom(tuples)
+    tuples.detached_rel_ordinal = 0
+    built = filter_plan(outer, predicate)(registry)
+    assert built == expected
+
+    plan_rel = built.relations[0]
+    plan_rel.detached_expressions.add().CopyFrom(predicate.referred_expr[0].expression)
+    plan_rel.detached_rels.extend(predicate.detached_rels)
+    plan_rel.root.input.filter.condition.detached_expression_ordinal = 0
+    assert select(built, expressions=[column("value")])(registry) == select(
+        expected, expressions=[column("value")]
+    )(registry)
+    plan_rel.ClearField("detached_rels")
+    with pytest.raises(ValueError, match="relation ordinal 0 is out of range"):
+        select(built, expressions=[column("value")])(registry)
+
+
 def test_resolve_rejects_reused_entry():
     plan_rel = _plan_rel(SPEC_PLAN_REL)
     project = plan_rel.root.input.project
@@ -248,6 +333,32 @@ def test_resolve_keeps_entries_an_any_payload_may_reference():
 def test_resolve_with_any_payload_drops_entries_it_resolved():
     resolved = resolve_detached(_with_any_payload(_plan_rel(SPEC_PLAN_REL)))
     assert len(resolved.detached_expressions) == 0
+
+
+def test_opaque_payload_keeps_its_relation_ordinal():
+    plan = _plan(SPEC_PLAN_REL)
+    plan_rel = plan.relations[0]
+    project = plan_rel.root.input.project
+    project.common.advanced_extension.enhancement.Pack(
+        stalg.Rel(detached_rel_ordinal=1)
+    )
+    plan_rel.detached_rels.add().CopyFrom(plan_rel.root.input)
+    plan_rel.detached_rels.add().CopyFrom(project.input)
+    plan_rel.root.input.detached_rel_ordinal = 0
+
+    resolved = resolve_detached(plan).relations[0]
+    payload_ref = stalg.Rel()
+    payload = resolved.root.input.project.common.advanced_extension.enhancement
+    assert payload.Unpack(payload_ref)
+    retained = resolved.detached_rels[payload_ref.detached_rel_ordinal]
+    assert retained == plan_rel.detached_rels[1]
+    assert not resolved.detached_expressions
+    slot = resolved.detached_rels[0]
+    assert slot.read.HasField("virtual_table")
+    assert slot.read.base_schema.struct.nullability == stt.Type.NULLABILITY_REQUIRED
+    assert resolve_detached(stp.PlanRel(rel=slot)).rel == slot
+    with pytest.raises(ValueError, match="would not travel with it"):
+        select(plan, expressions=[column("value")])(registry)
 
 
 def test_round_trips_with_any_payload_do_not_grow_the_table():
@@ -502,6 +613,11 @@ def test_detach_with_nothing_to_cut_returns_input():
     assert detach(plan, max_depth=10) is plan
 
 
+def test_producer_does_not_detach_relations_or_empty_expressions():
+    plan_rel = _plan_rel("rel { filter { input { read {} } condition {} } }")
+    assert detach(plan_rel, max_depth=0) is plan_rel
+
+
 def test_builders_inline_a_detached_plan_from_a_callable():
     plan = _dataframe_plans()[1]
     detached = detach(plan, max_depth=0)
@@ -546,3 +662,14 @@ def test_display_resolves_each_plan_rel_on_its_own():
     # The first PlanRel resolves; only the second prints its ordinal and table.
     assert "$detached[5]" in output
     assert output.count("$detached[0]:") == 1
+
+
+def test_display_shows_a_malformed_detached_relation():
+    plan = _plan(
+        "root { input { detached_rel_ordinal: 3 } } "
+        'detached_rels { read { named_table { names: "example" } } }'
+    )
+    output = PlanPrinter().stringify_plan(plan)
+    assert "$detached_rel[3]" in output
+    assert "$detached_rel[0]:" in output
+    assert "read: example" in output

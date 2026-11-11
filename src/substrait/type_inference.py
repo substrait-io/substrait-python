@@ -1,18 +1,40 @@
 import contextlib
 import contextvars
+from graphlib import CycleError, TopologicalSorter
+from typing import NamedTuple
 
 import substrait.algebra_pb2 as stalg
 import substrait.extended_expression_pb2 as stee
 import substrait.plan_pb2 as stp
 import substrait.type_pb2 as stt
 
-from substrait.utils import child_rels, iter_plan_rels, plan_subtrees, rel_anchor_of
+from substrait.utils import (
+    _iter_direct_subexpressions,
+    _iter_subquery_rels,
+    child_rels,
+    iter_plan_rels,
+    iter_proto_messages,
+    named_lambda_bindings,
+    plan_subtrees,
+    rel_anchor_of,
+)
 from substrait.utils.detached import resolve_present_tables
 
 
-class _SubtreeScope:
-    """The shared-subtree list a ``ReferenceRel`` resolves against, with per-ordinal
-    schema memoization and cycle detection.
+class _SubtreeDependency(NamedTuple):
+    ordinal: int
+
+
+def _check_subtree_ordinal(ordinal, subtrees):
+    if not 0 <= ordinal < len(subtrees):
+        raise Exception(
+            f"ReferenceRel subtree_ordinal {ordinal} is out of range "
+            f"({len(subtrees)} shared subtree(s) in scope)"
+        )
+
+
+class _PlanScope:
+    """The plan's named lambda signatures and shared subtree schemas.
 
     A ``ReferenceRel``'s schema is that of ``subtrees[subtree_ordinal]``, and a
     subtree may itself reference an earlier one, so resolution recurses. Memoizing
@@ -23,12 +45,53 @@ class _SubtreeScope:
     callers that pass a plain list of subtrees still work unchanged.
     """
 
-    __slots__ = ("_rels", "_resolving", "_schemas")
+    __slots__ = ("_rels", "_resolving", "_schemas", "lambda_signatures")
 
-    def __init__(self, rels):
-        self._rels = list(rels)
+    def __init__(self, plan, *, registry=None):
+        self._rels = plan_subtrees(plan)
         self._schemas: dict = {}
         self._resolving: set = set()
+        self.lambda_signatures: dict = {}
+        if plan.named_lambdas:
+            contextvars.copy_context().run(self._bind_named_lambdas, plan, registry)
+
+    def _bind_named_lambdas(self, plan, registry):
+        """Infer each signature once in a context isolated from the caller's row and parameters."""
+        bindings = named_lambda_bindings(plan)
+        dependencies = {}
+        pending = list(bindings)
+        while pending:
+            node = pending.pop()
+            if node in dependencies:
+                continue
+            if isinstance(node, _SubtreeDependency):
+                _check_subtree_ordinal(node.ordinal, self)
+                refs = _relation_lambda_dependencies(self[node.ordinal])
+            elif node in bindings:
+                refs = _named_lambda_dependencies(
+                    getattr(bindings[node], "lambda").body
+                )
+            else:
+                raise ValueError(f"unknown lambda_anchor {node} in Plan.named_lambdas")
+            dependencies[node] = set(refs)
+            pending.extend(dependencies[node])
+
+        try:
+            order = tuple(TopologicalSorter(dependencies).static_order())
+        except CycleError as error:
+            raise ValueError(
+                f"named lambda dependency cycle: {error.args[1]}"
+            ) from error
+        _lambda_schemas.set(())
+        outer_schemas.set(())
+        anchor_scope.set(None)
+        empty_row = stt.Type.Struct()
+        for anchor in order:
+            if isinstance(anchor, _SubtreeDependency):
+                continue
+            self.lambda_signatures[anchor] = _lambda_signature(
+                getattr(bindings[anchor], "lambda"), empty_row, registry, self
+            )
 
     def __len__(self):
         return len(self._rels)
@@ -66,7 +129,7 @@ class _AnchorScope:
     schema. Resolution is lazy (only referenced anchors are inferred) and memoized;
     an in-progress set turns a malformed cyclic reference into a clear error rather
     than a ``RecursionError``. Anchored relations are inferred with the plan's
-    ``_SubtreeScope`` in scope so an anchor on a shared subtree still resolves.
+    ``_PlanScope`` in scope so an anchor on a shared subtree still resolves.
 
     ``register`` pre-binds an anchor to an already-known schema, for a correlated
     sub-tree whose anchoring relation is not yet assembled (a lateral join's right
@@ -166,6 +229,62 @@ def lambda_scope(parameters: stt.Type.Struct):
         yield
     finally:
         _lambda_schemas.reset(token)
+
+
+def _relation_lambda_dependencies(rel):
+    """Yield lambda anchors and shared subtree ordinals in a subquery's relation tree."""
+    for node in iter_proto_messages(rel):
+        if isinstance(node, stalg.Expression.NamedLambdaReference):
+            yield node.lambda_reference
+        elif isinstance(node, stalg.ReferenceRel):
+            yield _SubtreeDependency(node.subtree_ordinal)
+
+
+def _named_lambda_dependencies(expr, depth=1):
+    """Check closure and find dependencies even in branches not needed for type inference."""
+    kind = expr.WhichOneof("rex_type")
+    if kind == "named_lambda_reference":
+        yield expr.named_lambda_reference.lambda_reference
+        return
+    if kind == "lambda":
+        yield from _named_lambda_dependencies(getattr(expr, "lambda").body, depth + 1)
+        return
+    if kind == "lambda_invocation":
+        invocation = expr.lambda_invocation
+        if invocation.HasField("named_lambda"):
+            yield invocation.named_lambda.lambda_reference
+        elif invocation.HasField("lambda"):
+            yield from _named_lambda_dependencies(
+                getattr(invocation, "lambda").body, depth + 1
+            )
+        for argument in invocation.arguments.fields:
+            yield from _named_lambda_dependencies(argument, depth)
+        return
+    if kind == "selection":
+        selection = expr.selection
+        root = selection.WhichOneof("root_type")
+        if root in ("root_reference", "outer_reference"):
+            raise ValueError(f"a named lambda cannot capture a {root}")
+        if (
+            root == "lambda_parameter_reference"
+            and selection.lambda_parameter_reference.steps_out >= depth
+        ):
+            raise ValueError(
+                "a named lambda cannot capture a caller's lambda parameter"
+            )
+    if kind == "subquery":
+        for rel in _iter_subquery_rels(expr):
+            yield from _relation_lambda_dependencies(rel)
+    if kind != "literal":
+        for child in _iter_direct_subexpressions(expr):
+            yield from _named_lambda_dependencies(child, depth)
+
+
+def _lambda_signature(lam, parent_schema, registry, subtrees):
+    with lambda_scope(lam.parameters):
+        return lam.parameters.types, infer_expression_type(
+            lam.body, parent_schema, registry=registry, subtrees=subtrees
+        )
 
 
 # The anchor scope (an ``_AnchorScope``) for the plan / correlated sub-tree
@@ -721,20 +840,36 @@ def infer_expression_type(
         return infer_nested_type(
             expression.nested, parent_schema, registry=registry, subtrees=subtrees
         )
-    elif rex_type in ("lambda", "lambda_invocation"):
-        source = expression if rex_type == "lambda" else expression.lambda_invocation
-        lam = getattr(source, "lambda")
-        with lambda_scope(lam.parameters):
-            body_type = infer_expression_type(
-                lam.body, parent_schema, registry=registry, subtrees=subtrees
+    elif rex_type in ("lambda", "lambda_invocation", "named_lambda_reference"):
+        source = expression
+        kind = rex_type
+        if rex_type == "lambda_invocation":
+            source = expression.lambda_invocation
+            kind = source.WhichOneof("lambda_type")
+        if kind == "lambda":
+            parameters, body_type = _lambda_signature(
+                getattr(source, "lambda"), parent_schema, registry, subtrees
             )
+        elif kind in ("named_lambda", "named_lambda_reference"):
+            anchor = getattr(source, kind).lambda_reference
+            if not isinstance(subtrees, _PlanScope):
+                raise ValueError(
+                    "a named lambda requires Plan.named_lambdas; use infer_plan_schema"
+                )
+            if anchor not in subtrees.lambda_signatures:
+                raise ValueError(
+                    f"unknown lambda_anchor {anchor} in Plan.named_lambdas"
+                )
+            parameters, body_type = subtrees.lambda_signatures[anchor]
+        else:
+            raise ValueError("lambda invocation must specify an inline or named lambda")
         if rex_type == "lambda_invocation":
             arguments = expression.lambda_invocation.arguments.fields
-            if len(arguments) != len(lam.parameters.types):
+            if len(arguments) != len(parameters):
                 raise Exception(
                     "lambda invocation needs one argument per lambda parameter"
                 )
-            for parameter_type, argument in zip(lam.parameters.types, arguments):
+            for parameter_type, argument in zip(parameters, arguments):
                 argument_type = infer_expression_type(
                     argument, parent_schema, registry=registry, subtrees=subtrees
                 )
@@ -745,7 +880,7 @@ def infer_expression_type(
             return body_type
         return stt.Type(
             func=stt.Type.Func(
-                parameter_types=list(lam.parameters.types),
+                parameter_types=parameters,
                 return_type=body_type,
                 nullability=stt.Type.NULLABILITY_REQUIRED,
             )
@@ -1341,17 +1476,13 @@ def infer_rel_schema(rel: stalg.Rel, *, registry=None, subtrees=()) -> stt.Type.
         )
     elif rel_type == "reference":
         # A ReferenceRel has no RelCommon/emit; its schema is that of the shared
-        # subtree its subtree_ordinal indexes into. A _SubtreeScope memoizes that
+        # subtree its subtree_ordinal indexes into. A _PlanScope memoizes that
         # resolution and guards against reference cycles; a plain sequence (direct
         # callers/tests) is resolved inline against the full subtree list so a
         # subtree may itself reference an earlier one.
         ordinal = rel.reference.subtree_ordinal
-        if not 0 <= ordinal < len(subtrees):
-            raise Exception(
-                f"ReferenceRel subtree_ordinal {ordinal} is out of range "
-                f"({len(subtrees)} shared subtree(s) in scope)"
-            )
-        if isinstance(subtrees, _SubtreeScope):
+        _check_subtree_ordinal(ordinal, subtrees)
+        if isinstance(subtrees, _PlanScope):
             return subtrees.schema_of(ordinal, registry)
         return infer_rel_schema(subtrees[ordinal], registry=registry, subtrees=subtrees)
     elif rel_type == "extension_leaf":
@@ -1407,8 +1538,8 @@ def infer_plan_schema(plan: stp.Plan, *, registry=None) -> stt.NamedStruct:
     # A Plan carries its shared subtrees in-band as the leading ``rel`` entries of
     # ``relations`` (the query root is the trailing ``root`` entry), so a
     # ReferenceRel anywhere in the tree resolves against them by ordinal. Wrap them
-    # in a _SubtreeScope so repeated references are memoized and cycles are caught.
-    subtrees = _SubtreeScope(plan_subtrees(plan))
+    # in a _PlanScope so repeated references are memoized and cycles are caught.
+    subtrees = _PlanScope(plan, registry=registry)
 
     # Index every RelCommon.rel_anchor in the plan (across subtrees, the root, and
     # subquery-embedded relations) so an id-based OuterReference (rel_reference)

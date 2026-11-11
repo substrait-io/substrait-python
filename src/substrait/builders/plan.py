@@ -12,6 +12,7 @@ import substrait.algebra_pb2 as stalg
 import substrait.extended_expression_pb2 as stee
 import substrait.plan_pb2 as stp
 import substrait.type_pb2 as stt
+from google.protobuf.any_pb2 import Any as ProtoAny
 from substrait.extensions.extensions_pb2 import AdvancedExtension
 
 from substrait.builders.extended_expression import (
@@ -35,10 +36,13 @@ from substrait.type_inference import (
 )
 from substrait.utils import (
     child_rels,
+    iter_proto_messages,
+    named_lambda_bindings,
     plan_subtrees,
     rebase_reference_ordinals,
     remap_function_references,
     type_num_names,
+    validate_named_lambda_references,
 )
 from substrait.utils.detached import resolve_for_building
 from substrait.version import substrait_version
@@ -82,7 +86,56 @@ def _bind(plan: PlanOrUnbound, registry: ExtensionRegistry) -> stp.Plan:
     collector = current_collector()
     if collector is None:
         return bound
-    return remap_function_references(bound, collector.adopt(bound))
+    remap = collector.adopt(bound)
+    if (
+        bound.named_lambdas
+        and remap
+        and any(isinstance(msg, ProtoAny) for _, msg in _named_lambda_messages(bound))
+    ):
+        raise ValueError("cannot remap function anchors inside an opaque named lambda")
+    return remap_function_references(bound, remap)
+
+
+def _named_lambda_messages(plan):
+    """Walk definitions and the shared subtrees they reference, visiting each subtree once."""
+    subtrees = dict(enumerate(plan_subtrees(plan)))
+    pending = [
+        (definition.lambda_anchor, definition) for definition in plan.named_lambdas
+    ]
+    while pending:
+        anchor, root = pending.pop()
+        for msg in iter_proto_messages(root):
+            yield anchor, msg
+            if isinstance(msg, stalg.ReferenceRel):
+                subtree = subtrees.pop(msg.subtree_ordinal, None)
+                if subtree is not None:
+                    pending.append((anchor, subtree))
+
+
+def _check_lambda_metadata(plan):
+    """Reject definitions that could depend on metadata a new Plan does not copy."""
+    if not plan.type_aliases and not plan.parameter_bindings:
+        return
+    bound_parameters = {binding.parameter_anchor for binding in plan.parameter_bindings}
+    for anchor, msg in _named_lambda_messages(plan):
+        if isinstance(msg, ProtoAny):
+            field = "type_aliases or parameter_bindings"
+        elif isinstance(msg, stt.Type.TypeAliasReference) or (
+            isinstance(msg, stalg.Expression.Literal.UserDefined)
+            and msg.HasField("type_alias_reference")
+        ):
+            field = "type_aliases"
+        elif (
+            isinstance(msg, stalg.DynamicParameter)
+            and msg.parameter_reference in bound_parameters
+        ):
+            field = "parameter_bindings"
+        else:
+            continue
+        raise ValueError(
+            f"cannot preserve named lambda {anchor}: "
+            f"the builder does not copy {field} that it may reference"
+        )
 
 
 def _merge_plan_metadata(*objs):
@@ -98,12 +151,37 @@ def _merge_plan_metadata(*objs):
     Extension URNs and declarations are *not* merged here: they belong to the
     build's ``ExtensionCollector``, which writes them onto the outermost plan once
     (see ``build_scoped``), rather than being re-merged at every level.
+
+    Named lambda anchors keep their original numbers. Two inputs can share an
+    anchor if it denotes the same lambda after extension function remapping.
+    In that case, keep the first diagnostic name. When an input gains bindings,
+    check its original scope first so another input cannot satisfy a missing reference.
     """
     metadata = {}
-    for b in objs:
-        if isinstance(b, stp.Plan) and b.HasField("execution_behavior"):
-            metadata["execution_behavior"] = b.execution_behavior
-            break
+    bindings = {}
+    for source in objs:
+        if not isinstance(source, stp.Plan):
+            continue
+        if source.HasField("execution_behavior"):
+            metadata.setdefault("execution_behavior", source.execution_behavior)
+        if source.named_lambdas:
+            _check_lambda_metadata(source)
+            for anchor, definition in named_lambda_bindings(source).items():
+                previous = bindings.setdefault(anchor, definition)
+                if previous is not definition and getattr(
+                    previous, "lambda"
+                ) != getattr(definition, "lambda"):
+                    raise ValueError(
+                        f"conflicting definitions for named lambda anchor {anchor}"
+                    )
+    if bindings:
+        for source in objs:
+            if source is not None and (
+                not isinstance(source, stp.Plan)
+                or len(source.named_lambdas) < len(bindings)
+            ):
+                validate_named_lambda_references(source)
+        metadata["named_lambdas"] = list(bindings.values())
     return metadata
 
 
@@ -144,6 +222,20 @@ def _merge_input_subtrees(bound_inputs):
                 key_to_ordinal[key] = new_ordinal
                 combined.append(rebased)
             remap[old_ordinal] = new_ordinal
+        if (
+            plan.named_lambdas
+            and not _is_identity(remap)
+            and any(
+                isinstance(msg, ProtoAny)
+                or isinstance(msg, stalg.ReferenceRel)
+                and remap.get(msg.subtree_ordinal, msg.subtree_ordinal)
+                != msg.subtree_ordinal
+                for _, msg in _named_lambda_messages(plan)
+            )
+        ):
+            raise ValueError(
+                "cannot rebase shared subtree references inside a named lambda"
+            )
         root_input = plan.relations[-1].root.input
         rebased_root_inputs.append(
             root_input

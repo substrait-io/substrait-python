@@ -175,6 +175,9 @@ class PlanPrinter:
             for i, entry in enumerate(rel.detached_expressions):
                 stream.write(f"{indent}$detached[{i}]:\n")
                 self._stream_expression(entry, stream, depth + 1)
+            for i, entry in enumerate(rel.detached_rels):
+                stream.write(f"{indent}$detached_rel[{i}]:\n")
+                self._stream_rel(entry, stream, depth + 1)
 
     def _stream_rel_root(self, root: stalg.RelRoot, stream, depth: int):
         """Print a relation root concisely"""
@@ -215,6 +218,8 @@ class PlanPrinter:
             self._stream_extension_multi_rel(rel.extension_multi, stream, depth)
         elif rel.HasField("window"):
             self._stream_window_rel(rel.window, stream, depth)
+        elif rel.HasField("detached_rel_ordinal"):
+            stream.write(f"{indent}$detached_rel[{rel.detached_rel_ordinal}]\n")
         else:
             stream.write(f"{indent}<unknown_relation>\n")
 

@@ -590,6 +590,19 @@ def _outer_refs(plan: stplan.Plan):
     ]
 
 
+def test_outer_reference_conversion_with_a_detached_root():
+    plan = _plan(stalg.Rel(detached_rel_ordinal=0))
+    detached = plan.relations[0].detached_rels.add()
+    detached.CopyFrom(_read("outer"))
+    assert to_id_based_outer_references(plan) is plan
+
+    inner = _filter(_read("inner"), _outer(1))
+    detached.read.filter.CopyFrom(_exists(inner))
+    expected = to_id_based_outer_references(_plan(detached))
+    assert to_id_based_outer_references(plan) == expected
+    assert plan.relations[0].root.input.WhichOneof("rel_type") == "detached_rel_ordinal"
+
+
 @pytest.mark.parametrize("filter_field", ["filter", "best_effort_filter"])
 @pytest.mark.parametrize("reshaped", [None, "no_select", "projection", "emit"])
 def test_convert_read_filter_uses_unprojected_scope(filter_field, reshaped):

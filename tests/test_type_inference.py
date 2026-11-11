@@ -715,10 +715,14 @@ def _lambda_ref(field=0, *, steps_out=0):
     )
 
 
-def _lambda_expression(parameters, body, *, invoke=False, arguments=()):
-    lam = stalg.Expression.Lambda(
+def _lambda(parameters, body):
+    return stalg.Expression.Lambda(
         parameters=stt.Type.Struct(types=parameters, nullability=_REQ), body=body
     )
+
+
+def _lambda_expression(parameters, body, *, invoke=False, arguments=()):
+    lam = _lambda(parameters, body)
     if invoke:
         return stalg.Expression(
             lambda_invocation=stalg.Expression.LambdaInvocation(
@@ -729,6 +733,141 @@ def _lambda_expression(parameters, body, *, invoke=False, arguments=()):
             )
         )
     return stalg.Expression(**{"lambda": lam})
+
+
+def _named_lambda(anchor, parameters, body):
+    return stp.NamedLambda(
+        lambda_anchor=anchor, **{"lambda": _lambda(parameters, body)}
+    )
+
+
+def _named_ref(anchor, arguments=None):
+    reference = stalg.Expression.NamedLambdaReference(lambda_reference=anchor)
+    if arguments is None:
+        return stalg.Expression(named_lambda_reference=reference)
+    return stalg.Expression(
+        lambda_invocation=stalg.Expression.LambdaInvocation(
+            named_lambda=reference,
+            arguments=stalg.Expression.Nested.Struct(fields=arguments),
+        )
+    )
+
+
+def _project_named(expr, *definitions):
+    root = stalg.RelRoot(
+        input=stalg.Rel(project=stalg.ProjectRel(input=read_rel, expressions=[expr])),
+        names=[*named_struct.names, "result"],
+    )
+    return stp.Plan(relations=[stp.PlanRel(root=root)], named_lambdas=definitions)
+
+
+@pytest.mark.parametrize("invoke", [True, False])
+def test_named_lambda_identity_and_forward_reference(invoke):
+    parameter = struct.types[1]
+    forward = _named_lambda(7, [parameter], _named_ref(0, [_lambda_ref()]))
+    identity = _named_lambda(0, [parameter], _lambda_ref())
+    expr = _named_ref(7, [_field_reference(1)] if invoke else None)
+    function = stt.Type(
+        func=stt.Type.Func(
+            parameter_types=[parameter], return_type=parameter, nullability=_REQ
+        )
+    )
+
+    result = infer_plan_schema(_project_named(expr, forward, identity)).struct.types[-1]
+    assert result == (parameter if invoke else function)
+
+
+@pytest.mark.parametrize(
+    ("arguments", "error"),
+    [
+        ([], "one argument per lambda parameter"),
+        ([_field_reference(1)], "argument type must match"),
+    ],
+)
+def test_named_lambda_invocation_checks_arguments(arguments, error):
+    identity = _named_lambda(0, [struct.types[0]], _lambda_ref())
+    with pytest.raises(Exception, match=error):
+        infer_plan_schema(_project_named(_named_ref(0, arguments), identity))
+
+
+def test_named_lambda_anchors_are_unique_and_plan_local():
+    identity = _named_lambda(0, [struct.types[0]], _lambda_ref())
+    with pytest.raises(ValueError, match="duplicate.*lambda_anchor 0"):
+        infer_plan_schema(_project_named(_named_ref(0), identity, identity))
+    with pytest.raises(ValueError, match="unknown.*lambda_anchor 7"):
+        infer_plan_schema(_project_named(_named_ref(7), identity))
+    with pytest.raises(ValueError, match="Plan.named_lambdas"):
+        infer_expression_type(_named_ref(0), struct)
+
+
+def test_named_lambda_rejects_cycle_through_higher_order_argument():
+    body = stalg.Expression(
+        scalar_function=stalg.Expression.ScalarFunction(
+            arguments=[stalg.FunctionArgument(value=_named_ref(2))],
+            output_type=struct.types[0],
+        )
+    )
+    first = _named_lambda(1, [], body)
+    second = _named_lambda(2, [], _named_ref(1, []))
+    with pytest.raises(ValueError, match="cycle"):
+        infer_plan_schema(_project_named(_named_ref(1), first, second))
+
+
+@pytest.mark.parametrize(
+    "capture",
+    [_field_reference(0), _outer_rel_reference(7, 0), _lambda_ref(steps_out=1)],
+)
+def test_named_lambda_cannot_capture_caller(capture):
+    hidden = stalg.Expression(
+        cast=stalg.Expression.Cast(input=capture, type=struct.types[0])
+    )
+    definition = _named_lambda(0, [], hidden)
+    caller = _lambda_expression([struct.types[0]], _named_ref(0, []))
+    with pytest.raises(ValueError, match="capture"):
+        infer_plan_schema(_project_named(caller, definition))
+
+
+def test_named_lambda_subquery_can_read_its_own_row():
+    local = stalg.Rel(
+        project=stalg.ProjectRel(
+            input=right_read_rel,
+            expressions=[_field_reference(1)],
+            common=stalg.RelCommon(emit=stalg.RelCommon.Emit(output_mapping=[2])),
+        )
+    )
+    body = stalg.Expression(
+        subquery=stalg.Expression.Subquery(
+            scalar=stalg.Expression.Subquery.Scalar(input=local)
+        )
+    )
+    plan = _project_named(_named_ref(0, []), _named_lambda(0, [], body))
+    assert infer_plan_schema(plan).struct.types[-1] == right_struct.types[1]
+
+
+@pytest.mark.parametrize("order", [(1, 2), (2, 1)])
+def test_named_lambda_dependency_via_shared_subtree(order):
+    shared = stalg.Rel(
+        project=stalg.ProjectRel(
+            input=right_read_rel,
+            expressions=[_named_ref(2, [_field_reference(1)])],
+            common=stalg.RelCommon(emit=stalg.RelCommon.Emit(output_mapping=[2])),
+        )
+    )
+    body = stalg.Expression(
+        subquery=stalg.Expression.Subquery(
+            scalar=stalg.Expression.Subquery.Scalar(
+                input=stalg.Rel(reference=stalg.ReferenceRel(subtree_ordinal=0))
+            )
+        )
+    )
+    definitions = {
+        1: _named_lambda(1, [], body),
+        2: _named_lambda(2, [right_struct.types[1]], _lambda_ref()),
+    }
+    plan = _project_named(_named_ref(1, []), *(definitions[anchor] for anchor in order))
+    plan.relations.insert(0, stp.PlanRel(rel=shared))
+
+    assert infer_plan_schema(plan).struct.types[-1] == right_struct.types[1]
 
 
 @pytest.mark.parametrize("nullable", [False, True])

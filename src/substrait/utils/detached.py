@@ -1,4 +1,4 @@
-"""Reading and writing detached subtrees (spec v0.105.0).
+"""Resolve detached relations and expressions, and detach expressions (spec v0.108.0).
 
 Protobuf parsers cap how deeply messages may nest: upb (the Python runtime),
 protobuf-java and C++ all reject a message nested more than 100 levels below the
@@ -6,11 +6,10 @@ one being parsed. Every expression level costs several message levels -- a neste
 struct is ``Expression`` -> ``Nested`` -> ``Struct`` -> ``Expression`` -- so a
 plan with an expression only ~33 levels deep can already be unreadable.
 
-The spec's workaround is `bounded expression nesting`_: a producer moves subtrees
-into a table on the containing ``PlanRel`` or ``ExtendedExpression`` -- expressions
-into ``detached_expressions`` -- and leaves an ordinal reference in their place
-(``detached_expression_ordinal``). Detachment is encoding-only; resolving the
-ordinals recovers the same logical tree.
+The spec's `detached relations and expressions`_ reduce nesting. A producer moves
+subtrees into ``detached_rels`` or ``detached_expressions`` on the containing
+``PlanRel`` or ``ExtendedExpression``. Each ordinal indexes the corresponding
+table. Resolving the ordinals recovers the same logical tree.
 
 * :func:`detach` is the producer side: it cuts expressions that would otherwise
   exceed a nesting budget, so the serialized message parses under the default
@@ -24,8 +23,8 @@ expression kind is covered, and both are iterative, so trees deeper than Python'
 recursion limit are fine. Neither looks inside a ``google.protobuf.Any``: its
 payload is opaque bytes here.
 
-.. _bounded expression nesting:
-   https://substrait.io/serialization/binary_serialization/#bounded-expression-nesting
+.. _detached relations and expressions:
+   https://substrait.io/serialization/binary_serialization/#detached-relations-and-expressions
 """
 
 from dataclasses import dataclass
@@ -47,8 +46,8 @@ _ANY = "google.protobuf.Any"
 class _Table:
     """One kind of detachable subtree: its message type, the oneof member that
     holds an ordinal in place of a subtree, and the container field holding the
-    detached entries. Each table is resolved on its own: an ordinal of one kind
-    only ever indexes the table of that kind."""
+    detached entries. An ordinal indexes only its own table, but its target
+    can contain ordinals of either kind."""
 
     label: str
     message: type
@@ -79,31 +78,46 @@ _EXPRESSIONS = _Table(
     "detached_expression_ordinal",
     "detached_expressions",
 )
-_TABLES = (_EXPRESSIONS,)
+_RELATIONS = _Table(
+    "relation", stalg.Rel, "rel_type", "detached_rel_ordinal", "detached_rels"
+)
+_TABLES = (_EXPRESSIONS, _RELATIONS)
 _TABLE_BY_MESSAGE = {table.full_name: table for table in _TABLES}
 _TABLE_FIELDS = frozenset(table.field for table in _TABLES)
 _TAGS = tuple(table.tag for table in _TABLES)
 
-# Stands in for a resolved entry that has to keep its position. Nothing can
-# validly reference it, so its content only has to be a valid expression.
-_PLACEHOLDER = stalg.Expression(
-    literal=stalg.Expression.Literal(
-        null=stt.Type(bool=stt.Type.Boolean(nullability=stt.Type.NULLABILITY_NULLABLE))
-    )
-)
+# A resolved slot that cannot be removed must not point back into either table.
+_PLACEHOLDERS = {
+    _EXPRESSIONS: stalg.Expression(
+        literal=stalg.Expression.Literal(
+            null=stt.Type(
+                bool=stt.Type.Boolean(nullability=stt.Type.NULLABILITY_NULLABLE)
+            )
+        )
+    ),
+    _RELATIONS: stalg.Rel(
+        read=stalg.ReadRel(
+            common=stalg.RelCommon(direct=stalg.RelCommon.Direct()),
+            base_schema=stt.NamedStruct(
+                struct=stt.Type.Struct(nullability=stt.Type.NULLABILITY_REQUIRED)
+            ),
+            virtual_table=stalg.ReadRel.VirtualTable(),
+        )
+    ),
+}
 
 
 def _declaration_index(item) -> int:
     return item[0].index
 
 
-def _children(msg: Message, *, skip_tables: bool = False):
+def _children(msg: Message, *, skip_fields=()):
     """Yield ``(child, levels)`` for each set submessage of ``msg``.
 
     ``levels`` is how many message levels below ``msg`` the child sits on the
     wire: 1, or 2 for a map value (the map entry is a message of its own).
     ``google.protobuf.Any`` payloads are opaque and not descended into, and
-    ``skip_tables`` leaves out a container's own detached tables.
+    ``skip_fields`` omits the named fields of ``msg``.
 
     Fields come in declaration order, not field-number order (which
     ``ListFields`` uses), so the cuts :func:`detach` makes are numbered the way
@@ -112,7 +126,7 @@ def _children(msg: Message, *, skip_tables: bool = False):
     if msg.DESCRIPTOR.full_name == _ANY:
         return
     for field, value in sorted(msg.ListFields(), key=_declaration_index):
-        if field.message_type is None or (skip_tables and field.name in _TABLE_FIELDS):
+        if field.message_type is None or field.name in skip_fields:
             continue
         if isinstance(value, Message):
             yield value, 1
@@ -125,20 +139,6 @@ def _children(msg: Message, *, skip_tables: bool = False):
         else:
             for item in value:
                 yield item, 1
-
-
-def _find(root: Message, predicate, *, skip_tables: bool = False) -> bool:
-    """Whether ``predicate`` holds for ``root`` or any submessage below it."""
-    stack = [root]
-    while stack:
-        msg = stack.pop()
-        if predicate(msg):
-            return True
-        stack.extend(
-            child
-            for child, _ in _children(msg, skip_tables=skip_tables and msg is root)
-        )
-    return False
 
 
 def _containers(msg):
@@ -167,10 +167,6 @@ def _ordinal_table(msg: Message):
     return None
 
 
-def _is_any(msg: Message) -> bool:
-    return msg.DESCRIPTOR.full_name == _ANY
-
-
 def _holds_ordinals(container) -> bool:
     """Whether ``container``'s relation or referred expressions hold an ordinal.
 
@@ -182,7 +178,13 @@ def _holds_ordinals(container) -> bool:
     data = container.SerializeToString()
     if not any(tag in data for tag in _TAGS):
         return False
-    return _find(container, _ordinal_table, skip_tables=True)
+    stack = [child for child, _ in _children(container, skip_fields=_TABLE_FIELDS)]
+    while stack:
+        node = stack.pop()
+        if _ordinal_table(node) is not None:
+            return True
+        stack.extend(child for child, _ in _children(node))
+    return False
 
 
 def resolve_detached(msg):
@@ -197,24 +199,31 @@ def resolve_detached(msg):
     1. an ordinal indexes its own container's table of its kind;
     2. each entry is referenced at most once;
     3. references are acyclic;
-    4. an entry is not itself an ordinal (its children may be).
+    4. an entry sets a non-ordinal relation or expression kind. Its children
+       may be ordinals.
 
     Unreachable entries are neither resolved nor validated.
 
-    A container's tables are then cleared -- unless it carries a
+    A container's tables are then cleared unless the resolved tree carries a
     ``google.protobuf.Any`` payload. An extension payload may reference entries
     the relation tree does not, and since it is opaque here its references
     cannot be followed, so those entries keep their ordinals, as the spec
     requires. The entries resolved here are a different matter: each entry is
     referenced at most once, so no payload can validly refer to one of them. The
-    trailing run of them is dropped, which renumbers nothing, and any left in
-    place are replaced by a null literal, so none still points into that run.
+    trailing run of them is dropped, which renumbers nothing. A resolved slot
+    that must stay in place holds a null literal or an empty virtual table.
 
-    ``msg`` itself is returned when it holds no ordinals, which is the common
-    case, so callers need not check first. Otherwise the result is a copy.
+    If ``msg`` has neither entries nor ordinals, it is returned unchanged.
+    Otherwise the result is a copy.
     """
-    if not any(_holds_ordinals(container) for container, _ in _containers(msg)):
+    if not _has_entries(msg) and not any(
+        _holds_ordinals(container) for container, _ in _containers(msg)
+    ):
         return msg
+    return _resolved_copy(msg)
+
+
+def _resolved_copy(msg):
     out = _copy(msg)
     for container, _ in _containers(out):
         _resolve_in_place(container)
@@ -230,14 +239,11 @@ def _has_entries(msg) -> bool:
 
 
 def resolve_present_tables(msg):
-    """:func:`resolve_detached`, skipped when ``msg`` has no detached entries.
+    """Resolve present tables without scanning table-free inputs at each build step.
 
-    For this library's own hot paths: the builders and schema inference run it
-    on every step, on messages that almost never carry a table. Skipping the
-    check there leaves an ordinal with no table unvalidated, but nothing can
-    consume one: schema inference rejects it.
+    Use :func:`resolve_detached` to also validate ordinals when no table is present.
     """
-    return resolve_detached(msg) if _has_entries(msg) else msg
+    return _resolved_copy(msg) if _has_entries(msg) else msg
 
 
 def resolve_for_building(msg):
@@ -250,7 +256,9 @@ def resolve_for_building(msg):
     subquery, at the enclosing container's entries, so that raises
     ``ValueError`` instead.
     """
-    out = resolve_present_tables(msg)
+    if not _has_entries(msg):
+        return msg
+    out = _resolved_copy(msg)
     if _has_entries(out):
         raise ValueError(
             "cannot build on a message whose detached entries an extension "
@@ -263,10 +271,10 @@ def _resolve_in_place(container) -> None:
     tables = {table: getattr(container, table.field) for table in _TABLES}
     used = {table: set() for table in _TABLES}
     has_any = False
-    stack = [child for child, _ in _children(container, skip_tables=True)]
+    stack = [child for child, _ in _children(container, skip_fields=_TABLE_FIELDS)]
     while stack:
         node = stack.pop()
-        if _is_any(node):
+        if node.DESCRIPTOR.full_name == _ANY:
             has_any = True
             continue
         table = _ordinal_table(node)
@@ -286,7 +294,12 @@ def _resolve_in_place(container) -> None:
                     "once, or by a cycle"
                 )
             entry = entries[ordinal]
-            if _ordinal_table(entry) is table:
+            kind = entry.WhichOneof(table.oneof)
+            if kind is None:
+                raise ValueError(
+                    f"detached {table.label} {ordinal} has no {table.oneof} set"
+                )
+            if kind == table.ordinal:
                 raise ValueError(
                     f"detached {table.label} {ordinal} is itself an ordinal "
                     f"({getattr(entry, table.ordinal)})"
@@ -295,14 +308,6 @@ def _resolve_in_place(container) -> None:
             node.CopyFrom(entry)
         stack.extend(child for child, _ in _children(node))
 
-    # An Any in an entry nothing here reached may still be live: a payload can
-    # reference that entry.
-    has_any = has_any or any(
-        _find(entries[i], _is_any)
-        for table, entries in tables.items()
-        for i in range(len(entries))
-        if i not in used[table]
-    )
     for table, entries in tables.items():
         if not has_any:
             container.ClearField(table.field)
@@ -311,7 +316,7 @@ def _resolve_in_place(container) -> None:
             del entries[-1]
         for i in used[table]:
             if i < len(entries):
-                entries[i].CopyFrom(_PLACEHOLDER)
+                entries[i].CopyFrom(_PLACEHOLDERS[table])
 
 
 def detach(msg, *, max_depth: int = DEFAULT_MAX_DEPTH):
@@ -336,11 +341,11 @@ def detach(msg, *, max_depth: int = DEFAULT_MAX_DEPTH):
     in the table keep their positions, so existing ordinals still find their
     targets.
 
-    Only expressions are detached. Nesting inside literals, types, field
-    reference paths, masks or relation trees (see ``ReferenceRel``), and inside
-    ``google.protobuf.Any`` payloads, is left as is, so such a message can still
-    exceed ``max_depth``: the result is best effort, since the limit belongs to
-    the consumer, and some raise it.
+    Only expressions are detached. Existing relation ordinals keep their targets.
+    Nesting inside literals, types, field reference paths, masks, relation trees
+    and ``google.protobuf.Any`` payloads is left as is, so such a message can
+    still exceed ``max_depth``. The result is best effort because the limit
+    belongs to the consumer, and some raise it.
 
     ``max_depth=0`` detaches every expression that can be, which is handy for
     testing a consumer against the detached form.
@@ -356,7 +361,7 @@ def detach(msg, *, max_depth: int = DEFAULT_MAX_DEPTH):
 
 def _detach_in_place(container, base: int, max_depth: int) -> bool:
     """Cut ``container``'s over-deep subtrees; whether anything was cut."""
-    tables = {table: getattr(container, table.field) for table in _TABLES}
+    tables = {_EXPRESSIONS: container.detached_expressions}
     entry_depth = base + 1
     # Only subtrees below the entry roots are cut, so an entry root is never
     # detached again however small the budget.
@@ -377,7 +382,7 @@ def _detach_in_place(container, base: int, max_depth: int) -> bool:
     ]
     roots += [
         (add(child), base + levels)
-        for child, levels in _children(container, skip_tables=True)
+        for child, levels in _children(container, skip_fields=(_EXPRESSIONS.field,))
     ]
     stack = [i for i, _ in roots]
     while stack:
@@ -404,12 +409,10 @@ def _detach_in_place(container, base: int, max_depth: int) -> bool:
         node = nodes[i]
         table = _TABLE_BY_MESSAGE.get(node.DESCRIPTOR.full_name)
         if (
-            table is not None
+            table is _EXPRESSIONS
             and not is_root
             and depth > threshold
-            # An ordinal is already as shallow as a subtree gets; detaching it
-            # would make an entry that is itself an ordinal.
-            and _ordinal_table(node) is None
+            and node.WhichOneof(table.oneof) not in (None, table.ordinal)
         ):
             if depth + height[i] <= max_depth:
                 continue

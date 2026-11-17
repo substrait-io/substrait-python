@@ -11,6 +11,7 @@ from typing import Any, Union
 import substrait.algebra_pb2 as stalg
 import substrait.extended_expression_pb2 as stee
 import substrait.type_pb2 as stp
+from google.protobuf.any_pb2 import Any as ProtoAny
 
 from substrait.extension_registry import (
     ExtensionRegistry,
@@ -21,6 +22,7 @@ from substrait.extension_registry import (
 from substrait.type_inference import infer_extended_expression_schema, outer_schemas
 from substrait.utils import (
     inline_reference_rels,
+    iter_proto_messages,
     plan_subtrees,
     remap_function_references,
     top_level_names,
@@ -1106,6 +1108,16 @@ def _inner_rel(query, registry: ExtensionRegistry, base_schema) -> stalg.Rel:
     subtrees = plan_subtrees(plan)
     if subtrees:
         rel = inline_reference_rels(rel, subtrees)
+    if plan.named_lambdas and any(
+        isinstance(
+            msg, (stalg.Expression.NamedLambdaReference, stalg.ReferenceRel, ProtoAny)
+        )
+        for msg in iter_proto_messages(rel)
+    ):
+        raise ValueError(
+            "cannot embed a subquery that may reference a named lambda: "
+            "its definitions do not travel into the ExtendedExpression"
+        )
     return rel
 
 

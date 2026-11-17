@@ -10,6 +10,8 @@ import substrait.plan_pb2 as stplan
 import substrait.type_pb2 as stp
 from google.protobuf.message import Message
 
+from substrait.utils.detached import _children, resolve_present_tables
+
 
 def type_num_names(typ: stp.Type):
     kind = typ.WhichOneof("kind")
@@ -126,6 +128,14 @@ def _child_rel_fields(node):
     ]
 
 
+def _is_repeated(field):
+    """Protobuf 5 uses ``label``; newer runtimes expose ``is_repeated``."""
+    try:
+        return field.is_repeated
+    except AttributeError:
+        return field.label == field.LABEL_REPEATED
+
+
 def _iter_child_rels(rel: stalg.Rel):
     """Yield ``(container, index_or_None)`` for each child ``Rel`` of ``rel``.
 
@@ -138,7 +148,7 @@ def _iter_child_rels(rel: stalg.Rel):
         return
     node = getattr(rel, rel_type)
     for field in _child_rel_fields(node):
-        if field.is_repeated:
+        if _is_repeated(field):
             children = getattr(node, field.name)
             for i in range(len(children)):
                 yield children, i
@@ -335,6 +345,43 @@ def _remap_function_references_in_place(msg, remap: dict) -> None:
                     _remap_function_references_in_place(item, remap)
 
 
+def iter_proto_messages(root: Message):
+    """Yield the root and each set submessage without unpacking Any payloads."""
+    stack = [root]
+    while stack:
+        msg = stack.pop()
+        yield msg
+        stack.extend(child for child, _ in _children(msg))
+
+
+def named_lambda_bindings(plan: stplan.Plan) -> dict[int, stplan.NamedLambda]:
+    """Index a single plan's definitions without hiding duplicate anchors."""
+    bindings = {}
+    for definition in plan.named_lambdas:
+        anchor = definition.lambda_anchor
+        if anchor in bindings:
+            raise ValueError(f"duplicate lambda_anchor {anchor} in Plan.named_lambdas")
+        bindings[anchor] = definition
+    return bindings
+
+
+def validate_named_lambda_references(msg):
+    """Check references against their own plan, including references inside definitions."""
+    bindings = named_lambda_bindings(msg) if isinstance(msg, stplan.Plan) else {}
+    for child in iter_proto_messages(msg):
+        if (
+            isinstance(child, stalg.Expression.NamedLambdaReference)
+            and child.lambda_reference not in bindings
+        ):
+            if isinstance(msg, stplan.Plan):
+                raise ValueError(
+                    f"unknown lambda_anchor {child.lambda_reference} in Plan.named_lambdas"
+                )
+            raise ValueError(
+                "a named lambda reference cannot be used in an ExtendedExpression"
+            )
+
+
 def _iter_direct_subexpressions(msg):
     """Yield the immediate ``Expression`` messages owned by ``msg``.
 
@@ -353,7 +400,7 @@ def _iter_direct_subexpressions(msg):
         if field.message_type.GetOptions().map_entry:
             continue
         full = field.message_type.full_name
-        if field.is_repeated:
+        if _is_repeated(field):
             values = getattr(msg, field.name)
             if full == "substrait.Expression":
                 yield from values
@@ -378,7 +425,7 @@ def _iter_named_direct_expressions(node):
         full = field.message_type.full_name
         if full == "substrait.Rel":
             continue
-        if field.is_repeated:
+        if _is_repeated(field):
             values = getattr(node, field.name)
         elif node.HasField(field.name):
             values = [getattr(node, field.name)]
@@ -413,7 +460,7 @@ def _iter_subquery_rels(expr: stalg.Expression):
         return
     inner = getattr(expr.subquery, variant)
     for field in _child_rel_fields(inner):
-        if field.is_repeated:
+        if _is_repeated(field):
             yield from getattr(inner, field.name)
         elif inner.HasField(field.name):
             yield getattr(inner, field.name)
@@ -467,36 +514,15 @@ def rel_anchor_of(rel: stalg.Rel):
     return node.common.rel_anchor
 
 
-def _all_subexpressions(expr: stalg.Expression):
-    """Yield every ``Expression`` transitively owned by ``expr`` in its own scope
-    (through operators and subquery-wrapping expressions, but not into subquery
-    input relations)."""
-    for sub in _iter_direct_subexpressions(expr):
-        yield sub
-        yield from _all_subexpressions(sub)
-
-
-def _is_steps_out_ref(expr: stalg.Expression) -> bool:
-    if expr.WhichOneof("rex_type") != "selection":
-        return False
-    sel = expr.selection
-    return (
-        sel.WhichOneof("root_type") == "outer_reference"
-        and sel.outer_reference.WhichOneof("outer_reference_type") == "steps_out"
-    )
-
-
 def _plan_has_steps_out(plan: stplan.Plan) -> bool:
-    """Whether any ``OuterReference`` in ``plan`` is still offset-based (``steps_out``)
-    -- i.e. whether :func:`to_id_based_outer_references` has anything to rewrite. A
-    cheap pre-scan so the common (non-correlated) plan skips the copy-and-walk."""
-    for rel in iter_plan_rels(plan):
-        for expr in _iter_rel_expressions(rel):
-            if _is_steps_out_ref(expr) or any(
-                _is_steps_out_ref(sub) for sub in _all_subexpressions(expr)
-            ):
-                return True
-    return False
+    """Check the resolved roots without recursing into a potentially deep tree."""
+    return any(
+        isinstance(node, stalg.Expression.FieldReference.OuterReference)
+        and node.WhichOneof("outer_reference_type") == "steps_out"
+        for plan_rel in plan.relations
+        if (kind := plan_rel.WhichOneof("rel_type")) is not None
+        for node in iter_proto_messages(getattr(plan_rel, kind))
+    )
 
 
 # A join's expression fields bind against two different rows: ``post_join_filter``
@@ -536,7 +562,8 @@ def to_id_based_outer_references(plan: stplan.Plan) -> stplan.Plan:
     reference is rewritten to name it; several references to the same scope share one
     anchor, and an anchor already present is reused. References already id-based are
     left unchanged, so the pass is idempotent and tolerates a partially-converted
-    input. A plan with nothing to rewrite is returned unchanged (no copy).
+    input. A plan with nothing to rewrite is returned unchanged. When a rewrite
+    is needed, detached references are resolved before assigning relation anchors.
 
     A ``steps_out`` reference resolves against an enclosing query's *row*, which is
     the output of a specific relation, so the relation whose output is that row is
@@ -565,14 +592,16 @@ def to_id_based_outer_references(plan: stplan.Plan) -> stplan.Plan:
       therefore cannot be anchored on it and is left offset-based, rather than
       aliasing (and corrupting) the left-row anchor.
 
-    Raises only if a resolvable binding carries no ``RelCommon`` at all (e.g. a
+    Raises if a resolvable binding carries no ``RelCommon`` at all (e.g. a
     ``Rel`` with no relation set), which no correlated-subquery shape produces.
     """
-    if not _plan_has_steps_out(plan):
+    out = resolve_present_tables(plan)
+    if not _plan_has_steps_out(out):
         return plan
 
-    out = stplan.Plan()
-    out.CopyFrom(plan)
+    if out is plan:
+        out = stplan.Plan()
+        out.CopyFrom(plan)
 
     subtrees = plan_subtrees(out)
     existing = [

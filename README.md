@@ -33,6 +33,8 @@ The specification version a release targets is set by the `substrait-protobuf`,
 definitions and the grammar all come from those packages rather than being vendored
 here. `substrait.version.substrait_version` reports it at runtime.
 
+When upgrading from spec v0.106.0 to v0.108.0, pass an IANA time zone when subtracting an `interval_year` from a `precision_timestamp_tz<P>`. For example, use `sub.f.subtract(sub.col("ts"), sub.col("offset"), "America/New_York")` instead of the two-argument call.
+
 # Building plans with the DataFrame API
 
 The `substrait.dataframe` module is an ergonomic, fluent API for authoring
@@ -65,6 +67,8 @@ pip install "substrait[extensions]"
 The examples below construct plans with the raw `substrait.proto` and
 `substrait.builders` layers. For most hand-authored plans, prefer the
 [DataFrame API](#building-plans-with-the-dataframe-api) above.
+
+When combining plans with named lambdas, give different definitions different `lambda_anchor` values. The builders preserve these anchors and reject conflicting definitions rather than silently changing which lambda a call uses. An `ExtendedExpression` cannot carry named lambda definitions. If a subquery uses a named lambda, or an opaque extension payload might refer to one, the builder rejects the subquery instead of discarding its definitions.
 
 ## Produce a Substrait Plan
 The ``substrait.proto`` module provides access to the classes
@@ -252,28 +256,20 @@ relations {
 ```
 
 ## Deeply nested expressions
-Protobuf parsers, including the one in the Python `protobuf` library, reject messages nested more
-than 100 levels deep, and each expression level takes several message levels. Substrait works
-around this with [detached expressions](https://substrait.io/serialization/binary_serialization/#bounded-expression-nesting):
-deep subtrees are moved to a table on the `PlanRel` or `ExtendedExpression` and referenced by
-ordinal.
+
+Protobuf parsers limit how deeply a message can nest. To stay within that limit, a producer can store an expression or relation subtree in a table on the containing `PlanRel` or `ExtendedExpression`. An ordinal in the tree refers to the table entry. See [detached relations and expressions](https://substrait.io/serialization/binary_serialization/#detached-relations-and-expressions).
 
 ```python
 from substrait.proto import Plan
 from substrait.utils.detached import detach, resolve_detached
 
-data = detach(plan).SerializeToString()  # parses under the default limits
-plan = resolve_detached(Plan.FromString(data))  # ordinary expression trees again
+data = detach(plan).SerializeToString()
+plan = resolve_detached(Plan.FromString(data))
 ```
 
-`detach` returns a plan with nothing to detach as is. `infer_plan_schema`,
-`infer_extended_expression_schema`, the plan printer, and the builders resolve detached expressions
-on their own. Functions that take a bare `Rel` or `Expression` cannot, since the table lives on the
-containing message, so resolve the `Plan` or `ExtendedExpression` first.
+`detach` splits deep expressions when writing a plan. It does not split deep relation trees. When reading, `resolve_detached` inlines both relation and expression references. Schema inference, the plan printer, and the builders do this automatically. If a function takes a bare `Rel` or `Expression`, resolve the containing message first so the tables are available.
 
-The builders work on the inlined tree, and the `protobuf` library copies messages passed to a
-constructor through its parser, so building on a detached plan works only while the plan still fits
-the limit once inlined. Detach the finished plan instead, just before serializing it.
+The builders work on the inlined tree. The `protobuf` library copies messages passed to a constructor through its parser, so the inlined tree must still fit the parser's limit. When building a plan, call `detach` just before serialization.
 
 ## Produce a Substrait Plan with Ibis
 Let's use an existing Substrait producer, [Ibis](https://ibis-project.org), 

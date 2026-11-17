@@ -43,6 +43,7 @@ from substrait.dataframe.expr import Expr, Measure, col, lit, sort_direction
 from substrait.extension_registry import ExtensionRegistry, build_scoped
 from substrait.type_inference import infer_plan_schema
 from substrait.utils import to_id_based_outer_references, top_level_names
+from substrait.utils.detached import resolve_present_tables
 
 # All 13 JoinRel.JoinType variants (SET_OP_UNSPECIFIED excluded). "single"
 # returns at most one right match per left row (runtime error on multiple);
@@ -626,7 +627,7 @@ class DataFrame:
         inner = self._plan
 
         def resolve(registry: ExtensionRegistry):
-            bound = inner(registry)
+            bound = resolve_present_tables(inner(registry))
             rel = bound.relations[-1].root.input
             rel_inner = getattr(rel, rel.WhichOneof("rel_type"))
             # A ReferenceRel (from .cache()) carries no RelCommon and so cannot
